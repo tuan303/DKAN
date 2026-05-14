@@ -40,30 +40,22 @@ export default function Login() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased">
-      <div className="hidden lg:flex lg:w-1/2 relative bg-surface-variant overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-surface-container overflow-hidden">
         <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105" 
-          style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBGzbWicP9-rNaDYHxwfLA5Hmv_4SEN7-Y6-uhRtX8kqnkSL3rfiQeR7BAQaQh5r0Z8kttUYu6v1EsEz3d9WFXYlQ-Y64h81xLOyBPzsZEOJVt9j_a8Jw5RbE5DUWqRafY_a48W1W6bAxEf4RltBSHx2chQEn-blYaVTNHVfUGjukeMkzTlIaDNbGPaohdkCboNdXWpW_4WjjmDELvZ53OOkHCldEEIgbPsjbj1uZ8fWNiVVEY3TVaK59f-767FpZkacy-MN446A7ZW')" }}
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000" 
+          style={{ backgroundImage: "url('https://hoangmaistarschool.edu.vn/thongtin/dka.png')" }}
         />
-        <div className="absolute inset-0 bg-primary/20 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/60 via-transparent to-transparent" />
-        <div className="absolute bottom-xl left-xl right-xl p-lg">
-          <h2 className="font-headline-lg text-headline-lg text-on-primary mb-sm">Hiệu Quả Kép.</h2>
-          <p className="font-body-lg text-body-lg text-primary-fixed-dim max-w-lg">
-            Hệ thống quản lý suất ăn và giao dịch tối ưu hóa quy trình, đảm bảo phục vụ nhanh chóng và chính xác cho cán bộ nhân viên nhà trường.
-          </p>
-        </div>
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(26,54,93,0.05)] min-h-[100dvh] lg:min-h-screen">
-        <div className="max-w-[400px] w-full flex flex-col gap-lg sm:gap-xl">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.05)] min-h-[100dvh] lg:min-h-screen">
+        <div className="max-w-[420px] w-full flex flex-col gap-lg sm:gap-xl">
           <div className="flex flex-col items-center text-center gap-md">
-            <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(26,54,93,0.1)] mb-sm">
+            <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.2)] mb-sm">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "32px" }}>restaurant</span>
             </div>
             <div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Chào mừng trở lại</h1>
-              <p className="font-body-lg text-body-lg text-on-surface-variant">
-                Đăng nhập vào hệ thống quản lý căng tin để tiếp tục công việc của bạn.
+              <h1 className="font-headline-md text-headline-sm font-bold text-on-surface mb-xs uppercase">NSHM - HỆ THỐNG ĐĂNG KÝ SUẤT ĂN</h1>
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                Đăng nhập vào hệ thống đăng ký suất ăn để đăng ký ăn hàng tháng, các sự kiện của nhà trường.
               </p>
             </div>
           </div>
@@ -88,7 +80,7 @@ export default function Login() {
             </button>
             <div className="flex items-center gap-sm mt-md">
               <div className="h-px bg-outline-variant flex-1"></div>
-              <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Nội bộ</span>
+              <span className="font-label-sm text-[11px] font-bold text-on-surface-variant uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
               <div className="h-px bg-outline-variant flex-1"></div>
             </div>
           </div>

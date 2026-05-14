@@ -65,7 +65,7 @@ export default function RegisterStaff() {
           {/* Form Header */}
           <div className="p-md md:p-lg border-b border-surface-variant bg-surface-bright">
             <h2 className="font-headline-md text-headline-md text-on-surface mb-xs">Đăng ký thông tin</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">Vui lòng điền đầy đủ thông tin bên dưới để tiếp tục.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant italic">Trường Họ tên được mặc định theo Tên hiển thị của Email và không thể chỉnh sửa.</p>
           </div>
 
           {/* Form Body */}
@@ -89,10 +89,10 @@ export default function RegisterStaff() {
                   id="fullName" 
                   name="fullName" 
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Nhập họ và tên của bạn" 
+                  readOnly
+                  placeholder="Họ và tên của bạn" 
                   required 
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface placeholder-outline transition-shadow" 
+                  className="block w-full pl-xl pr-md py-sm bg-surface-container border border-outline-variant rounded focus:ring-0 cursor-not-allowed font-body-md text-body-md text-on-surface-variant transition-shadow" 
                 />
               </div>
             </div>

@@ -113,7 +113,7 @@ export default function ScheduleEvent() {
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
                 <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
                 <p>Kính gửi Anh/Chị,</p>
-                <p>Hệ thống Quản lý Căng tin Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
+                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                   <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                     <th style="padding: 12px; text-align: left;">Sự kiện</th>
@@ -121,9 +121,13 @@ export default function ScheduleEvent() {
                   </tr>
                   ${eventsTableRows}
                 </table>
-                <p style="margin-top: 20px; font-size: 13px; color: #64748b; font-style: italic;">
-                  Lưu ý: Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.
-                </p>
+                <div style="margin-top: 20px; color: #d21235; font-weight: bold; border: 1px solid #d21235; padding: 15px; border-radius: 8px;">
+                  <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
+                  <ul style="margin-bottom: 0; padding-left: 20px;">
+                    <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
+                    <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
+                  </ul>
+                </div>
                 <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
               </div>
             `
