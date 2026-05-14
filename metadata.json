@@ -1,6 +1,6 @@
 {
-  "name": "Institution Registration",
-  "description": "An institutional management system for registering employee details and managing monthly meal schedules.",
+  "name": "NSHM - PHẦN MỀM ĐĂNG KÝ ĂN",
+  "description": "Hệ thống quản lý đăng ký suất ăn hàng tháng và sự kiện của Ngôi Sao Hoàng Mai.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

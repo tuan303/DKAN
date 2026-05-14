@@ -29,8 +29,8 @@ export function Header() {
   return (
     <header className="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant shadow-sm h-16 flex justify-between items-center px-md lg:px-lg">
       <Link to="/schedule" className="flex items-center gap-sm">
-        <span className="material-symbols-outlined text-primary dark:text-primary-fixed" style={{ fontVariationSettings: "'FILL' 1" }}>school</span>
-        <span className="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed">Institution Registration</span>
+        <span className="material-symbols-outlined text-primary dark:text-primary-fixed" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
+        <span className="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed uppercase">PHẦN MỀM ĐĂNG KÝ ĂN</span>
       </Link>
       
       {!isRegister ? (

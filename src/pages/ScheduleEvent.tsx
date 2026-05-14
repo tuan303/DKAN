@@ -78,6 +78,8 @@ export default function ScheduleEvent() {
                eventName: evt.name,
                choice: eventChoices[evt.id],
                fullName: staffData.fullName,
+               employeeId: staffData.employeeId,
+               department: staffData.department,
                email: user.email,
                timestamp: new Date().toISOString()
             });

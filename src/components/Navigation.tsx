@@ -1,8 +1,38 @@
 import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
+import { useState, useEffect } from 'react';
+import { auth, db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+const SUPER_ADMIN = 'tuantm@hoangmaistarschool.edu.vn';
 
 export function Navigation({ className }: { className?: string }) {
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        let isUserAdmin = user.email === SUPER_ADMIN;
+        if (!isUserAdmin) {
+          try {
+            const adminsSnapshot = await getDocs(collection(db, 'admins'));
+            const adminEmails = adminsSnapshot.docs.map(doc => doc.data().email);
+            if (user.email && adminEmails.includes(user.email)) {
+              isUserAdmin = true;
+            }
+          } catch (err) {
+            console.error('Error checking admin status in Navigation:', err);
+          }
+        }
+        setIsAdmin(isUserAdmin);
+      } else {
+        setIsAdmin(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const links = [
     { to: '/schedule', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
@@ -10,13 +40,32 @@ export function Navigation({ className }: { className?: string }) {
     { to: '#', icon: 'person', label: 'Tài Khoản' },
   ];
 
+  let displayLinks = links;
+
+  if (isAdmin) {
+    if (location.pathname.startsWith('/quantri')) {
+      displayLinks = [
+        { to: '/quantri?tab=monthly', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
+        { to: '/quantri?tab=events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
+        { to: '/quantri?tab=settings', icon: 'settings', label: 'CẤU HÌNH' },
+        { to: '/quantri?tab=admins', icon: 'admin_panel_settings', label: 'QUẢN TRỊ' },
+      ];
+    } else {
+      displayLinks = [...links, { to: '/quantri', icon: 'admin_panel_settings', label: 'QUẢN TRỊ' }];
+    }
+  }
+
   return (
     <>
       {/* Desktop Sidebar */}
       <aside className={clsx("fixed top-16 left-0 bottom-0 w-64 bg-surface border-r border-outline-variant hidden md:flex flex-col z-40", className)}>
         <nav className="flex-1 py-lg flex flex-col gap-sm px-md">
-          {links.map(link => {
-            const isActive = location.pathname.startsWith(link.to);
+          {displayLinks.map(link => {
+            const isActive = link.to !== '#' && (
+              location.pathname + location.search === link.to || 
+              (link.to === '/quantri' && location.pathname.startsWith('/quantri')) ||
+              (link.to !== '/quantri' && !location.pathname.startsWith('/quantri') && location.pathname.startsWith(link.to))
+            );
             return (
               <Link 
                 key={link.to}
@@ -40,8 +89,12 @@ export function Navigation({ className }: { className?: string }) {
 
       {/* Mobile Bottom Nav */}
       <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-evenly items-center h-16 bg-surface-container border-t border-outline-variant md:hidden">
-        {links.map(link => {
-          const isActive = location.pathname.startsWith(link.to);
+        {displayLinks.map(link => {
+          const isActive = link.to !== '#' && (
+            location.pathname + location.search === link.to ||
+            (link.to === '/quantri' && location.pathname.startsWith('/quantri')) ||
+            (link.to !== '/quantri' && !location.pathname.startsWith('/quantri') && location.pathname.startsWith(link.to))
+          );
           return (
             <Link 
               key={link.to}
