@@ -35,9 +35,17 @@ export default function Admin() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
+  const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
   const [admins, setAdmins] = useState<AdminData[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [currentMonth] = useState('2026-05'); 
+  const [selectedMonth, setSelectedMonth] = useState('2026-05'); 
+  const [selectedEventId, setSelectedEventId] = useState('');
+  
+  // Filters for Monthly
+  const [nameFilter, setNameFilter] = useState('');
+  const [idFilter, setIdFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+
   const [addingAdmin, setAddingAdmin] = useState(false);
 
   // New Tabs
@@ -74,6 +82,7 @@ export default function Admin() {
         setIsAdmin(true);
         fetchData();
         fetchSettings();
+        fetchEventRegistrations();
       } catch (err) {
         console.error('Error checking admin status:', err);
         navigate('/schedule');
@@ -86,7 +95,7 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'registrations'), where('month', '==', currentMonth));
+      const q = query(collection(db, 'registrations'), where('month', '==', selectedMonth));
       const querySnapshot = await getDocs(q);
       const regData: RegistrationData[] = [];
       querySnapshot.forEach((doc) => {
@@ -107,6 +116,31 @@ export default function Admin() {
     }
   };
 
+  useEffect(() => {
+    if (isAdmin) fetchData();
+  }, [selectedMonth, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && selectedEventId) fetchEventRegistrations();
+  }, [selectedEventId, isAdmin]);
+
+  const fetchEventRegistrations = async () => {
+    if (!selectedEventId) {
+      setEventRegistrations([]);
+      return;
+    }
+    try {
+      const q = query(collection(db, 'event_registrations'), where('eventId', '==', selectedEventId));
+      const querySnapshot = await getDocs(q);
+      const evRegData: any[] = [];
+      querySnapshot.forEach((doc) => {
+        evRegData.push({ id: doc.id, ...doc.data() });
+      });
+      setEventRegistrations(evRegData);
+    } catch (err) {
+      console.error('Error fetching event registrations:', err);
+    }
+  };
   const fetchSettings = async () => {
     try {
       // Fetch monthly config
@@ -130,8 +164,15 @@ export default function Admin() {
     }
   };
 
-  const totalBreakfast = registrations.reduce((sum, reg) => sum + (reg.breakfastCount || 0), 0);
-  const totalLunch = registrations.reduce((sum, reg) => sum + (reg.lunchCount || 0), 0);
+  const filteredRegistrations = registrations.filter(reg => {
+    const matchesName = reg.fullName.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesId = (reg.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
+    const matchesDept = (reg.department || '').toLowerCase().includes(deptFilter.toLowerCase());
+    return matchesName && matchesId && matchesDept;
+  });
+
+  const totalBreakfast = filteredRegistrations.reduce((sum, reg) => sum + (reg.breakfastCount || 0), 0);
+  const totalLunch = filteredRegistrations.reduce((sum, reg) => sum + (reg.lunchCount || 0), 0);
 
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
@@ -149,7 +190,7 @@ export default function Admin() {
   };
 
   const handleExportExcel = () => {
-    const exportData = registrations.map((reg, index) => ({
+    const exportData = filteredRegistrations.map((reg, index) => ({
       'STT': index + 1,
       'Mã Nhân Viên': reg.employeeId || 'N/A',
       'Họ và Tên': reg.fullName || 'N/A',
@@ -160,8 +201,26 @@ export default function Admin() {
 
     const worksheet = xlsx.utils.json_to_sheet(exportData);
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, `Dang_Ky_An_${currentMonth}`);
-    xlsx.writeFile(workbook, `Bao_Cao_Dang_Ky_An_${currentMonth}.xlsx`);
+    xlsx.utils.book_append_sheet(workbook, worksheet, `Dang_Ky_An_${selectedMonth}`);
+    xlsx.writeFile(workbook, `Bao_Cao_Dang_Ky_An_${selectedMonth}.xlsx`);
+  };
+
+  const handleExportEventExcel = () => {
+    const event = events.find(e => e.id === selectedEventId);
+    if (!event) return;
+
+    const exportData = eventRegistrations.map((reg, index) => ({
+      'STT': index + 1,
+      'Họ và Tên': reg.fullName || 'N/A',
+      'Email': reg.email || 'N/A',
+      'Lựa chọn': reg.choice === 'yes' ? 'Có ăn' : 'Không ăn',
+      'Thời gian': reg.timestamp
+    }));
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, `Su_Kien_${event.name}`);
+    xlsx.writeFile(workbook, `Bao_Cao_${event.name}.xlsx`);
   };
 
   const handleToggleMonth = async (month: string) => {
@@ -243,7 +302,7 @@ export default function Admin() {
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
               <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Sáng ({currentMonth})</span>
+                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Sáng ({selectedMonth})</span>
                   <span className="material-symbols-outlined text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
                 <div>
@@ -257,7 +316,7 @@ export default function Admin() {
 
               <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Trưa ({currentMonth})</span>
+                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Trưa ({selectedMonth})</span>
                   <span className="material-symbols-outlined text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
                 <div>
@@ -272,9 +331,23 @@ export default function Admin() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-md lg:gap-lg px-md md:px-0">
               {/* Main Content - Registration List */}
-              <div className="lg:col-span-2 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+              <div className="lg:col-span-3 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Danh Sách Đăng Ký ({currentMonth})</h2>
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
+                    <div className="flex items-center gap-2">
+                       <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                       <select 
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                       >
+                         {MONTHS.map(m => (
+                           <option key={m} value={`2026-${m}`}>Tháng {m}</option>
+                         ))}
+                       </select>
+                    </div>
+                  </div>
                   <button 
                     onClick={handleExportExcel}
                     className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
@@ -283,6 +356,40 @@ export default function Admin() {
                     Xuất Excel
                   </button>
                 </div>
+
+                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant">
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                      <input 
+                        type="text" 
+                        value={nameFilter}
+                        onChange={(e) => setNameFilter(e.target.value)}
+                        placeholder="Nhập tên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                      <input 
+                        type="text" 
+                        value={idFilter}
+                        onChange={(e) => setIdFilter(e.target.value)}
+                        placeholder="Nhập mã nhân viên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                      <input 
+                        type="text" 
+                        value={deptFilter}
+                        onChange={(e) => setDeptFilter(e.target.value)}
+                        placeholder="Nhập phòng ban..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
@@ -291,26 +398,26 @@ export default function Admin() {
                         <th className="p-md">Mã NV</th>
                         <th className="p-md">Tên</th>
                         <th className="p-md">Phòng ban</th>
-                        <th className="p-md">Sáng</th>
-                        <th className="p-md">Trưa</th>
+                        <th className="p-md text-right">Sáng</th>
+                        <th className="p-md text-right">Trưa</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant text-[14px]">
-                      {registrations.length === 0 ? (
+                      {filteredRegistrations.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="p-xl text-center text-on-surface-variant italic">
-                            Chưa có dữ liệu đăng ký.
+                            Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.
                           </td>
                         </tr>
                       ) : (
-                        registrations.map((reg, index) => (
+                        filteredRegistrations.map((reg, index) => (
                           <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
                             <td className="p-md">{index + 1}</td>
                             <td className="p-md">{reg.employeeId || 'N/A'}</td>
-                            <td className="p-md">{reg.fullName}</td>
+                            <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
                             <td className="p-md">{reg.department || 'N/A'}</td>
-                            <td className="p-md">{reg.breakfastCount}</td>
-                            <td className="p-md">{reg.lunchCount}</td>
+                            <td className="p-md text-right">{reg.breakfastCount}</td>
+                            <td className="p-md text-right">{reg.lunchCount}</td>
                           </tr>
                         ))
                       )}
@@ -319,9 +426,74 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Admin Management Sidebar */}
-              <div className="lg:col-span-1 flex flex-col gap-md lg:gap-lg">
-                <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden">
+              {/* Event Registration List */}
+              <div className="lg:col-span-3 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col mt-md">
+                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase pr-4">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
+                    <div className="flex items-center gap-2">
+                       <span className="font-label-sm text-on-surface-variant">Sự kiện:</span>
+                       <select 
+                        value={selectedEventId}
+                        onChange={(e) => setSelectedEventId(e.target.value)}
+                        className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none max-w-[250px]"
+                       >
+                         <option value="">-- Chọn sự kiện --</option>
+                         {events.map(event => (
+                           <option key={event.id} value={event.id}>{event.name}</option>
+                         ))}
+                       </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleExportEventExcel}
+                    disabled={!selectedEventId}
+                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    Xuất Excel Sự Kiện
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
+                      <tr>
+                        <th className="p-md">STT</th>
+                        <th className="p-md">Họ và Tên</th>
+                        <th className="p-md">Email</th>
+                        <th className="p-md">Lựa chọn</th>
+                        <th className="p-md">Thời gian đăng ký</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant text-[14px]">
+                      {eventRegistrations.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-xl text-center text-on-surface-variant italic">
+                            {!selectedEventId ? 'Vui lòng chọn sự kiện để xem danh sách.' : 'Chưa có dữ liệu đăng ký cho sự kiện này.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        eventRegistrations.map((reg, index) => (
+                          <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
+                            <td className="p-md">{index + 1}</td>
+                            <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
+                            <td className="p-md">{reg.email}</td>
+                            <td className="p-md">
+                               <span className={`px-2 py-1 rounded text-[12px] font-medium ${reg.choice === 'yes' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-error-container text-on-error-container'}`}>
+                                  {reg.choice === 'yes' ? 'Có ăn' : 'Không ăn'}
+                               </span>
+                            </td>
+                            <td className="p-md text-on-surface-variant">{new Date(reg.timestamp).toLocaleString('vi-VN')}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Admin Management */}
+              <div className="lg:col-span-3 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden mt-md">
                   <div className="p-md border-b border-outline-variant bg-surface-container-low">
                     <h2 className="font-headline-sm text-headline-sm text-on-surface">Tài Khoản Quản Trị</h2>
                   </div>
@@ -361,7 +533,6 @@ export default function Admin() {
                     </div>
                   </div>
                 </div>
-              </div>
             </div>
           </div>
         )}
