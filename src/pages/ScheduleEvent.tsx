@@ -60,10 +60,12 @@ export default function ScheduleEvent() {
     // const toEmail = userEmail || 'tuan303@gmail.com'; 
 
     try {
+      let staffData: any = {};
+      
       const user = auth.currentUser;
       if (user) {
         const staffDoc = await getDoc(doc(db, 'staff', user.uid));
-        const staffData = staffDoc.exists() ? staffDoc.data() : {
+        staffData = staffDoc.exists() ? staffDoc.data() : {
            fullName: user.displayName || 'Unknown',
            employeeId: 'N/A',
            department: 'N/A'

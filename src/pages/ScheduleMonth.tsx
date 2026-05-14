@@ -57,13 +57,13 @@ export default function ScheduleMonth() {
     // Simulate meals counts
     const breakfastCount = breakfastChoice === 'yes' ? 21 : 0;
     const lunchCount = lunchChoice === 'yes' ? 21 : 0;
-    const toEmail = userEmail || 'tuan303@gmail.com'; 
 
     try {
+      let staffData: any = {};
       const user = auth.currentUser;
       if (user) {
         const staffDoc = await getDoc(doc(db, 'staff', user.uid));
-        const staffData = staffDoc.exists() ? staffDoc.data() : {
+        staffData = staffDoc.exists() ? staffDoc.data() : {
            fullName: user.displayName || 'Unknown',
            employeeId: 'N/A',
            department: 'N/A'
@@ -83,6 +83,7 @@ export default function ScheduleMonth() {
         });
       }
 
+      const toEmail = userEmail || staffData.email || 'tuan303@gmail.com'; 
       try {
         const response = await fetch('/api/send-email', {
           method: 'POST',
