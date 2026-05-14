@@ -45,7 +45,7 @@ export default function RegisterStaff() {
         email: user.email,
         createdAt: new Date().toISOString(),
       });
-      navigate('/dashboard');
+      navigate('/schedule');
     } catch (err: any) {
       console.error(err);
       setError('Lỗi khi lưu thông tin: ' + err.message);

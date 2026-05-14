@@ -5,8 +5,7 @@ export function Navigation({ className }: { className?: string }) {
   const location = useLocation();
 
   const links = [
-    { to: '/dashboard', icon: 'how_to_reg', label: 'Tổng Quan' },
-    { to: '/schedule', icon: 'calendar_month', label: 'Lịch Trình' },
+    { to: '/schedule', icon: 'calendar_month', label: 'Thông tin đăng ký ăn' },
     { to: '#', icon: 'person', label: 'Tài Khoản' },
   ];
 

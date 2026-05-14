@@ -29,6 +29,30 @@ export default function ScheduleMonth() {
     const toEmail = userEmail || 'tuan303@gmail.com'; 
 
     try {
+      const user = auth.currentUser;
+      if (user) {
+        const { doc, getDoc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const staffDoc = await getDoc(doc(db, 'staff', user.uid));
+        const staffData = staffDoc.exists() ? staffDoc.data() : {
+           fullName: user.displayName || 'Unknown',
+           employeeId: 'N/A',
+           department: 'N/A'
+        };
+
+        await setDoc(doc(db, 'registrations', `${user.uid}_2026-05`), {
+          userId: user.uid,
+          month: '2026-05',
+          breakfastCount,
+          lunchCount,
+          fullName: staffData.fullName,
+          employeeId: staffData.employeeId,
+          department: staffData.department,
+          email: user.email,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -97,7 +121,7 @@ export default function ScheduleMonth() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">Đăng ký suất ăn tháng</h2>
+              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">Thông tin đăng ký ăn</h2>
               <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
             </div>
             {/* Month Selector */}
