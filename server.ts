@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import cors from "cors";
 
@@ -24,11 +23,15 @@ async function startServer() {
     }
 
     try {
-      // For development/preview, if no SMTP is provided, we can use ethereal or just log it
-      // but let's try to send if we have credentials, else we mock it
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      // Check for Microsoft Graph API credentials
+      if (
+        !process.env.MS_GRAPH_TENANT_ID ||
+        !process.env.MS_GRAPH_CLIENT_ID ||
+        !process.env.MS_GRAPH_CLIENT_SECRET ||
+        !process.env.MS_GRAPH_SENDER
+      ) {
         console.log("-----------------------------------------");
-        console.log("Mock Email Sent (No SMTP configuration inside .env):");
+        console.log("Mock Email Sent (No MS Graph configuration inside .env):");
         console.log("To:", to);
         console.log("Subject:", subject);
         console.log("HTML:", html);
@@ -36,27 +39,75 @@ async function startServer() {
         return res.status(200).json({ message: "Mock email sent successfully." });
       }
 
-      // Configure a generic SMTP transporter (you can adjust host/port based on your provider)
-      // Usually users will set SMTP_HOST and SMTP_PORT as well
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.gmail.com",
-        port: parseInt(process.env.SMTP_PORT || "587"),
-        secure: process.env.SMTP_SECURE === "true" || false,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+      const tenantId = process.env.MS_GRAPH_TENANT_ID;
+      const clientId = process.env.MS_GRAPH_CLIENT_ID;
+      const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET;
+      const senderEmail = process.env.MS_GRAPH_SENDER;
+
+      // 1. Get Access Token
+      const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
         },
+        body: new URLSearchParams({
+          client_id: clientId,
+          scope: "https://graph.microsoft.com/.default",
+          client_secret: clientSecret,
+          grant_type: "client_credentials",
+        }),
       });
 
-      const info = await transporter.sendMail({
-        from: `BỘ PHẬN DINH DƯỠNG <dinhduong@hoangmaistarschool.edu.vn>`,
-        to,
-        subject,
-        html,
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        console.error("Failed to get MS Graph access token:", errorData);
+        return res.status(500).json({ error: "Email service authentication failed." });
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = tokenData.access_token;
+
+      // 2. Send Email
+      const emailBody = {
+        message: {
+          subject: subject,
+          body: {
+            contentType: "HTML",
+            content: html,
+          },
+          toRecipients: [
+            {
+              emailAddress: {
+                address: to,
+              },
+            },
+          ],
+        },
+        saveToSentItems: "true",
+      };
+
+      const sendResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailBody),
       });
 
-      console.log("Message sent: %s", info.messageId);
-      res.status(200).json({ message: "Email sent successfully", info: info.messageId });
+      if (!sendResponse.ok) {
+        let errorData;
+        try {
+          errorData = await sendResponse.json();
+        } catch {
+          errorData = await sendResponse.text();
+        }
+        console.error("Failed to send email via MS Graph:", errorData);
+        return res.status(500).json({ error: "Failed to send email via Microsoft Graph" });
+      }
+
+      console.log("Message sent via MS Graph successfully.");
+      res.status(200).json({ message: "Email sent successfully" });
     } catch (error: any) {
       console.error("Error sending email:", error);
       res.status(500).json({ error: "Failed to send email", details: error.message });

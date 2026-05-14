@@ -102,12 +102,16 @@ export default function ScheduleMonth() {
                   <th style="padding: 12px; text-align: right;">Số lượng đã đăng ký</th>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 12px;">Đăng ký ăn Sáng</td>
-                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">${breakfastCount} suất</td>
+                  <td style="padding: 12px;">Bữa Sáng (T2 - T6)</td>
+                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+                    ${breakfastChoice === 'yes' ? 'Có ăn (' + breakfastCount + ' suất)' : 'Không ăn'}
+                  </td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 12px;">Đăng ký ăn Trưa</td>
-                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">${lunchCount} suất</td>
+                  <td style="padding: 12px;">Bữa Trưa (T2 - T6)</td>
+                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+                    ${lunchChoice === 'yes' ? 'Có ăn (' + lunchCount + ' suất)' : 'Không ăn'}
+                  </td>
                 </tr>
               </table>
               <p style="margin-top: 20px; font-size: 13px; color: #64748b; font-style: italic;">
