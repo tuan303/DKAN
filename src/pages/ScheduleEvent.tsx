@@ -90,53 +90,57 @@ export default function ScheduleEvent() {
       // Send confirmation email
       const toEmail = userEmail || staffData.email;
       if (toEmail) {
-        const eventsTableRows = events
-          .filter(evt => evt.isOpen)
-          .map(evt => `
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 12px;">${evt.name}</td>
-            <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
-              ${eventChoices[evt.id] === 'yes' ? 'Có ăn (1 suất)' : 'Không ăn'}
-            </td>
-          </tr>
-        `).join('');
+        try {
+          const eventsTableRows = events
+            .filter(evt => evt.isOpen)
+            .map(evt => `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 12px;">${evt.name}</td>
+              <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+                ${eventChoices[evt.id] === 'yes' ? 'Có ăn (1 suất)' : 'Không ăn'}
+              </td>
+            </tr>
+          `).join('');
 
-        const response = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: toEmail,
-            subject: 'Xác nhận đăng ký ăn Sự kiện',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-                <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
-                <p>Kính gửi Anh/Chị,</p>
-                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                  <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                    <th style="padding: 12px; text-align: left;">Sự kiện</th>
-                    <th style="padding: 12px; text-align: right;">Lựa chọn</th>
-                  </tr>
-                  ${eventsTableRows}
-                </table>
-                <div style="margin-top: 20px; color: #d21235; font-weight: bold; border: 1px solid #d21235; padding: 15px; border-radius: 8px;">
-                  <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
-                  <ul style="margin-bottom: 0; padding-left: 20px;">
-                    <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
-                    <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
-                  </ul>
+          const response = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: toEmail,
+              subject: 'Xác nhận đăng ký ăn Sự kiện',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+                  <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
+                  <p>Kính gửi Anh/Chị,</p>
+                  <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
+                  <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                    <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                      <th style="padding: 12px; text-align: left;">Sự kiện</th>
+                      <th style="padding: 12px; text-align: right;">Lựa chọn</th>
+                    </tr>
+                    ${eventsTableRows}
+                  </table>
+                  <div style="margin-top: 20px; color: #d21235; font-weight: bold; border: 1px solid #d21235; padding: 15px; border-radius: 8px;">
+                    <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
+                    <ul style="margin-bottom: 0; padding-left: 20px;">
+                      <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
+                      <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
+                    </ul>
+                  </div>
+                  <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
                 </div>
-                <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
-              </div>
-            `
-          })
-        });
+              `
+            })
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to send email');
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Email failed but registration was successful:', errorData.error);
+          }
+        } catch (emailError) {
+          console.error('Email sending error:', emailError);
         }
       }
 

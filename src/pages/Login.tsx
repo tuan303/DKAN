@@ -40,13 +40,13 @@ export default function Login() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased">
-      <div className="hidden lg:flex lg:w-1/2 relative bg-surface-container overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-[#f0f4f9] overflow-hidden">
         <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000" 
+          className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-transform duration-1000" 
           style={{ backgroundImage: "url('https://hoangmaistarschool.edu.vn/thongtin/dka.png')" }}
         />
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.05)] min-h-[100dvh] lg:min-h-screen">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] min-h-[100dvh] lg:min-h-screen">
         <div className="max-w-[420px] w-full flex flex-col gap-lg sm:gap-xl">
           <div className="flex flex-col items-center text-center gap-md">
             <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.2)] mb-sm">
