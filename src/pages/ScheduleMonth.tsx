@@ -123,6 +123,11 @@ export default function ScheduleMonth() {
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send email');
+      }
+
       setSubmitStatus({
         type: 'success',
         message: 'Đăng ký thành công! Đã gửi thông tin đến email của bạn.'

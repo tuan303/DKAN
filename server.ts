@@ -30,13 +30,8 @@ async function startServer() {
         !process.env.MS_GRAPH_CLIENT_SECRET ||
         !process.env.MS_GRAPH_SENDER
       ) {
-        console.log("-----------------------------------------");
-        console.log("Mock Email Sent (No MS Graph configuration inside .env):");
-        console.log("To:", to);
-        console.log("Subject:", subject);
-        console.log("HTML:", html);
-        console.log("-----------------------------------------");
-        return res.status(200).json({ message: "Mock email sent successfully." });
+        console.error("Missing MS Graph configuration. Please check Secrets panel to ensure MS_GRAPH_TENANT_ID, MS_GRAPH_CLIENT_ID, MS_GRAPH_CLIENT_SECRET, and MS_GRAPH_SENDER are set.");
+        return res.status(500).json({ error: "Email service is not configured correctly. Missing environment variables." });
       }
 
       const tenantId = process.env.MS_GRAPH_TENANT_ID;
