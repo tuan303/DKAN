@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import clsx from 'clsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { auth, db } from '../lib/firebase';
@@ -16,7 +17,26 @@ export default function ScheduleMonth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>('');
-  const [isMonthOpen, setIsMonthOpen] = useState(true);
+  const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
+  
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const getWeekdaysCount = (month: number, year: number) => {
+    let count = 0;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let i = 1; i <= daysInMonth; i++) {
+      const day = new Date(year, month, i).getDay();
+      if (day !== 0 && day !== 6) { // Not Sunday (0) or Saturday (6)
+        count++;
+      }
+    }
+    return count;
+  };
+
+  const weekdaysCount = getWeekdaysCount(selectedMonthIndex, selectedYear);
+  const monthString = (selectedMonthIndex + 1).toString().padStart(2, '0');
+  const isMonthOpen = monthlyStatus[monthString] ?? false; 
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -35,14 +55,32 @@ export default function ScheduleMonth() {
       // Current month config check
       const monthlyDoc = await getDoc(doc(db, 'settings', 'monthlyConfig'));
       if (monthlyDoc.exists()) {
-        const data = monthlyDoc.data();
-        if (data && data['05'] !== undefined) {
-          setIsMonthOpen(data['05']);
-        }
+        const data = monthlyDoc.data() as Record<string, boolean>;
+        setMonthlyStatus(data);
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handlePrevMonth = () => {
+    setSelectedMonthIndex((prev) => {
+      if (prev === 0) {
+        setSelectedYear((y) => y - 1);
+        return 11;
+      }
+      return prev - 1;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonthIndex((prev) => {
+      if (prev === 11) {
+        setSelectedYear((y) => y + 1);
+        return 0;
+      }
+      return prev + 1;
+    });
   };
 
   const handleRegister = async () => {
@@ -54,9 +92,9 @@ export default function ScheduleMonth() {
     setIsSubmitting(true);
     setSubmitStatus(null);
     
-    // Simulate meals counts
-    const breakfastCount = breakfastChoice === 'yes' ? 21 : 0;
-    const lunchCount = lunchChoice === 'yes' ? 21 : 0;
+    // Calculate meals counts
+    const breakfastCount = breakfastChoice === 'yes' ? weekdaysCount : 0;
+    const lunchCount = lunchChoice === 'yes' ? weekdaysCount : 0;
 
     try {
       let staffData: any = {};
@@ -70,9 +108,9 @@ export default function ScheduleMonth() {
         };
 
         // Monthly
-        await setDoc(doc(db, 'registrations', `${user.uid}_2026-05`), {
+        await setDoc(doc(db, 'registrations', `${user.uid}_${selectedYear}-${monthString}`), {
           userId: user.uid,
-          month: '2026-05',
+          month: `${selectedYear}-${monthString}`,
           breakfastCount,
           lunchCount,
           fullName: staffData.fullName,
@@ -92,12 +130,12 @@ export default function ScheduleMonth() {
           },
           body: JSON.stringify({
             to: toEmail,
-            subject: 'Xác nhận đăng ký ăn Tháng 05/2026',
+            subject: `Xác nhận đăng ký ăn Tháng ${monthString}/${selectedYear}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
                 <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
                 <p>Kính gửi Anh/Chị,</p>
-                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng 05/2026</strong>. Chi tiết số lượng suất ăn như sau:</p>
+                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết số lượng suất ăn như sau:</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                   <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                     <th style="padding: 12px; text-align: left;">Hạng mục</th>
@@ -106,13 +144,13 @@ export default function ScheduleMonth() {
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Sáng (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
-                      ${breakfastChoice === 'yes' ? 'Có ăn (' + breakfastCount + ' suất)' : 'Không ăn'}
+                      ${breakfastChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Trưa (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
-                      ${lunchChoice === 'yes' ? 'Có ăn (' + lunchCount + ' suất)' : 'Không ăn'}
+                      ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                 </table>
@@ -169,11 +207,15 @@ export default function ScheduleMonth() {
             </div>
             {/* Month Selector */}
             <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)]">
-              <button className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
+              <button 
+                onClick={handlePrevMonth}
+                className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
-              <span className="font-headline-sm text-headline-sm text-primary min-w-[120px] text-center">Tháng 05, 2026</span>
-              <button className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
+              <span className="font-headline-sm text-headline-sm text-primary min-w-[120px] text-center">Tháng {monthString}, {selectedYear}</span>
+              <button 
+                onClick={handleNextMonth}
+                className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
@@ -198,81 +240,94 @@ export default function ScheduleMonth() {
               {/* Simplified List View */}
               <div className="space-y-md">
                 <div className="space-y-sm">
-                  <h4 className="font-headline-sm text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG 05/2026</h4>
+                  <h4 className="font-headline-sm text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG {monthString}/{selectedYear}</h4>
                   
-                  {/* Day Row 1 */}
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                    <div className="flex items-center gap-md">
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                        <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
+                  {isMonthOpen ? (
+                    <>
+                      {/* Day Row 1 */}
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                        <div className="flex items-center gap-md">
+                          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                            <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
+                          </div>
+                          <div>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA SÁNG</h5>
+                            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                            <input 
+                              type="radio" 
+                              name="breakfast" 
+                              checked={breakfastChoice === 'yes'}
+                              onChange={() => setBreakfastChoice('yes')}
+                              className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
+                            />
+                            <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                          </label>
+                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                            <input 
+                              type="radio" 
+                              name="breakfast" 
+                              checked={breakfastChoice === 'no'}
+                              onChange={() => setBreakfastChoice('no')}
+                              className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
+                            />
+                            <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                          </label>
+                        </div>
                       </div>
-                      <div>
-                        <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA SÁNG</h5>
-                        <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
-                      <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
-                        <input 
-                          type="radio" 
-                          name="breakfast" 
-                          checked={breakfastChoice === 'yes'}
-                          onChange={() => setBreakfastChoice('yes')}
-                          className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
-                        />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
-                      </label>
-                      <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
-                        <input 
-                          type="radio" 
-                          name="breakfast" 
-                          checked={breakfastChoice === 'no'}
-                          onChange={() => setBreakfastChoice('no')}
-                          className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
-                        />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
-                      </label>
-                    </div>
-                  </div>
 
-                  {/* Day Row 2 */}
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                    <div className="flex items-center gap-md">
-                      <div className="w-12 h-12 bg-secondary-container rounded-full flex items-center justify-center text-on-secondary-container">
-                        <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
+                      {/* Day Row 2 */}
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                        <div className="flex items-center gap-md">
+                          <div className="w-12 h-12 bg-secondary-container rounded-full flex items-center justify-center text-on-secondary-container">
+                            <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
+                          </div>
+                          <div>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA TRƯA</h5>
+                            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                            <input 
+                              type="radio" 
+                              name="lunch" 
+                              checked={lunchChoice === 'yes'}
+                              onChange={() => setLunchChoice('yes')}
+                              className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
+                            />
+                            <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                          </label>
+                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                            <input 
+                              type="radio" 
+                              name="lunch" 
+                              checked={lunchChoice === 'no'}
+                              onChange={() => setLunchChoice('no')}
+                              className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
+                            />
+                            <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                          </label>
+                        </div>
                       </div>
-                      <div>
-                        <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA TRƯA</h5>
-                        <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
+                    </>
+                  ) : (
+                    <div className="py-[60px] px-6 text-center bg-surface-container-lowest rounded-[24px] border border-outline-variant flex flex-col items-center justify-center w-full my-4 shadow-sm">
+                      <div className="w-20 h-20 bg-surface-variant/30 rounded-full flex items-center justify-center mb-6">
+                        <span className="material-symbols-outlined text-[40px] text-on-surface-variant">event_busy</span>
                       </div>
+                      <h3 className="text-[20px] font-bold text-on-surface mb-3">Đã đóng đăng ký</h3>
+                      <p className="text-[15px] text-on-surface-variant max-w-[320px] leading-relaxed">
+                        Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.
+                      </p>
                     </div>
-                    
-                    <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
-                      <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
-                        <input 
-                          type="radio" 
-                          name="lunch" 
-                          checked={lunchChoice === 'yes'}
-                          onChange={() => setLunchChoice('yes')}
-                          className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
-                        />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
-                      </label>
-                      <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
-                        <input 
-                          type="radio" 
-                          name="lunch" 
-                          checked={lunchChoice === 'no'}
-                          onChange={() => setLunchChoice('no')}
-                          className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
-                        />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
-                      </label>
-                    </div>
-                  </div>
+                  )}
                 </div>
-
               </div>
             </div>
 
@@ -294,7 +349,7 @@ export default function ScheduleMonth() {
                     <span className="font-body-md text-body-md text-on-surface">Bữa sáng</span>
                   </div>
                   <span className="font-headline-md text-headline-md text-primary">
-                     {breakfastChoice === 'yes' ? 21 : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                     {isMonthOpen && breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
@@ -303,26 +358,73 @@ export default function ScheduleMonth() {
                     <span className="font-body-md text-body-md text-on-surface">Bữa trưa</span>
                   </div>
                   <span className="font-headline-md text-headline-md text-primary">
-                    {lunchChoice === 'yes' ? 21 : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    {isMonthOpen && lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
               </div>
-              <button 
-                onClick={handleRegister}
-                disabled={isSubmitting}
-                className={`w-full mt-xl text-on-primary font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${!isMonthOpen ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
-              >
-                {isSubmitting ? (
-                  <span className="material-symbols-outlined animate-spin">refresh</span>
-                ) : (
-                  <span className="material-symbols-outlined">{!isMonthOpen ? 'lock' : 'check_circle'}</span>
-                )}
-                {isSubmitting ? 'Đang gửi...' : 'Xác nhận đăng ký'}
-              </button>
+              
+              {isMonthOpen && (
+                <button 
+                  onClick={handleRegister}
+                  disabled={isSubmitting}
+                  className="w-full mt-xl text-on-primary font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                  ) : (
+                    <span className="material-symbols-outlined">check_circle</span>
+                  )}
+                  {isSubmitting ? 'Đang gửi...' : 'Xác nhận đăng ký'}
+                </button>
+              )}
             </div>
           </div>
         </section>
       </main>
+      {/* Professional Notification Modal */}
+      {submitStatus && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
+          <div className={clsx(
+            "relative w-full max-w-sm bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+            submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
+          )}>
+            <div className="p-xl text-center flex flex-col items-center">
+              <div className={clsx(
+                "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
+                submitStatus.type === 'success' ? "bg-green-100 text-green-600" : "bg-error-container text-on-error-container"
+              )}>
+                <span className="material-symbols-outlined text-[48px]">
+                  {submitStatus.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+              </div>
+              
+              <h3 className={clsx(
+                "font-headline-sm text-headline-sm mb-sm",
+                submitStatus.type === 'success' ? "text-green-800" : "text-error"
+              )}>
+                {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
+              </h3>
+              
+              <p className="font-body-md text-body-md text-on-surface-variant mb-xl">
+                {submitStatus.message}
+              </p>
+              
+              <button 
+                onClick={() => setSubmitStatus(null)}
+                className={clsx(
+                  "w-full py-3 rounded-xl font-label-lg text-label-lg transition-colors shadow-sm",
+                  submitStatus.type === 'success' 
+                    ? "bg-primary text-on-primary hover:bg-primary/90" 
+                    : "bg-error text-on-error hover:bg-error/90"
+                )}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import clsx from 'clsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { auth, db } from '../lib/firebase';
@@ -186,9 +187,15 @@ export default function ScheduleEvent() {
 
               <div className="space-y-sm">
                 {events.length === 0 ? (
-                    <div className="p-md text-center">
-                      <p className="font-body-md text-body-md text-on-surface-variant italic">Không có sự kiện nào đang mở đăng ký.</p>
+                  <div className="py-[60px] px-6 text-center bg-surface-container-lowest rounded-[24px] border border-outline-variant flex flex-col items-center justify-center w-full my-4 shadow-sm">
+                    <div className="w-20 h-20 bg-surface-variant/30 rounded-full flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-[40px] text-on-surface-variant">event_busy</span>
                     </div>
+                    <h3 className="text-[20px] font-bold text-on-surface mb-3">Không có sự kiện</h3>
+                    <p className="text-[15px] text-on-surface-variant max-w-[320px] leading-relaxed">
+                      Hiện tại không có sự kiện nào đang trong thời gian mở đăng ký ăn. Vui lòng quay lại sau!
+                    </p>
+                  </div>
                 ) : events.map(evt => (
                   <div key={evt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                     <div className="flex items-center gap-md">
@@ -269,6 +276,50 @@ export default function ScheduleEvent() {
           </div>
         </section>
       </main>
+      {/* Professional Notification Modal */}
+      {submitStatus && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
+          <div className={clsx(
+            "relative w-full max-w-sm bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+            submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
+          )}>
+            <div className="p-xl text-center flex flex-col items-center">
+              <div className={clsx(
+                "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
+                submitStatus.type === 'success' ? "bg-green-100 text-green-600" : "bg-error-container text-on-error-container"
+              )}>
+                <span className="material-symbols-outlined text-[48px]">
+                  {submitStatus.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+              </div>
+              
+              <h3 className={clsx(
+                "font-headline-sm text-headline-sm mb-sm",
+                submitStatus.type === 'success' ? "text-green-800" : "text-error"
+              )}>
+                {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
+              </h3>
+              
+              <p className="font-body-md text-body-md text-on-surface-variant mb-xl">
+                {submitStatus.message}
+              </p>
+              
+              <button 
+                onClick={() => setSubmitStatus(null)}
+                className={clsx(
+                  "w-full py-3 rounded-xl font-label-lg text-label-lg transition-colors shadow-sm",
+                  submitStatus.type === 'success' 
+                    ? "bg-primary text-on-primary hover:bg-primary/90" 
+                    : "bg-error text-on-error hover:bg-error/90"
+                )}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

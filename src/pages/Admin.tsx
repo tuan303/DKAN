@@ -642,21 +642,21 @@ export default function Admin() {
 
                   <div className="border-t border-outline-variant pt-md mt-md">
                     <h3 className="font-label-md text-label-md text-on-surface mb-sm">Thêm quản trị viên mới</h3>
-                    <div className="flex gap-2 max-w-md">
+                    <div className="flex flex-col sm:flex-row gap-3 max-w-md">
                       <input 
                         type="email" 
                         value={newAdminEmail}
                         onChange={(e) => setNewAdminEmail(e.target.value)}
                         placeholder="Nhập email nhân viên..."
-                        className="flex-1 min-w-0 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-[14px] focus:ring-1 focus:ring-primary focus:border-primary"
+                        className="flex-1 bg-surface border border-outline-variant rounded-lg px-4 py-2 text-[14px] focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                       />
                       <button 
                         onClick={handleAddAdmin}
                         disabled={addingAdmin || !newAdminEmail}
-                        className="bg-primary text-on-primary px-4 py-2 rounded-lg flex items-center justify-center hover:bg-primary-container disabled:opacity-50 transition-colors gap-2"
+                        className="bg-primary text-on-primary px-4 py-2 flex-shrink-0 rounded-lg flex items-center justify-center hover:bg-primary-container disabled:opacity-50 transition-colors gap-2"
                       >
                         <span className="material-symbols-outlined text-[20px]">person_add</span>
-                        <span className="hidden sm:inline">Thêm Admin</span>
+                        <span>Thêm Admin</span>
                       </button>
                     </div>
                   </div>
