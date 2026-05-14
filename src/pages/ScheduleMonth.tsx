@@ -1,14 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+
+interface EventData {
+  id: string;
+  name: string;
+  isOpen: boolean;
+}
 
 export default function ScheduleMonth() {
   const [breakfastChoice, setBreakfastChoice] = useState('yes');
   const [lunchChoice, setLunchChoice] = useState('yes');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>('');
+  const [isMonthOpen, setIsMonthOpen] = useState(true);
+  const [events, setEvents] = useState<EventData[]>([]);
+  const [eventChoices, setEventChoices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -16,10 +26,45 @@ export default function ScheduleMonth() {
         setUserEmail(user.email);
       }
     });
+
+    fetchConfigAndEvents();
+
     return () => unsubscribe();
   }, []);
 
+  const fetchConfigAndEvents = async () => {
+    try {
+      // Current month config check
+      const monthlyDoc = await getDoc(doc(db, 'settings', 'monthlyConfig'));
+      if (monthlyDoc.exists()) {
+        const data = monthlyDoc.data();
+        if (data && data['05'] !== undefined) {
+          setIsMonthOpen(data['05']);
+        }
+      }
+
+      // Events
+      const eventsSnapshot = await getDocs(collection(db, 'events'));
+      const evts: EventData[] = [];
+      const initChoices: Record<string, string> = {};
+      eventsSnapshot.forEach((d) => {
+        const evt = { id: d.id, ...d.data() } as EventData;
+        evts.push(evt);
+        initChoices[evt.id] = 'yes';
+      });
+      setEvents(evts);
+      setEventChoices(initChoices);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleRegister = async () => {
+    if (!isMonthOpen) {
+      alert("Hiện đăng ký ăn đã bị khóa, vui lòng liên hệ với Bộ phận Dinh dưỡng");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitStatus(null);
     
@@ -31,8 +76,6 @@ export default function ScheduleMonth() {
     try {
       const user = auth.currentUser;
       if (user) {
-        const { doc, getDoc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('../lib/firebase');
         const staffDoc = await getDoc(doc(db, 'staff', user.uid));
         const staffData = staffDoc.exists() ? staffDoc.data() : {
            fullName: user.displayName || 'Unknown',
@@ -40,6 +83,7 @@ export default function ScheduleMonth() {
            department: 'N/A'
         };
 
+        // Monthly
         await setDoc(doc(db, 'registrations', `${user.uid}_2026-05`), {
           userId: user.uid,
           month: '2026-05',
@@ -51,6 +95,21 @@ export default function ScheduleMonth() {
           email: user.email,
           timestamp: new Date().toISOString()
         });
+
+        // Loop over events and save if open
+        for (const evt of events) {
+          if (evt.isOpen) {
+            await setDoc(doc(db, 'event_registrations', `${user.uid}_${evt.id}`), {
+               userId: user.uid,
+               eventId: evt.id,
+               eventName: evt.name,
+               choice: eventChoices[evt.id],
+               fullName: staffData.fullName,
+               email: user.email,
+               timestamp: new Date().toISOString()
+            });
+          }
+        }
       }
 
       const response = await fetch('/api/send-email', {
@@ -62,43 +121,38 @@ export default function ScheduleMonth() {
           to: toEmail,
           subject: 'Xác nhận đăng ký ăn Tháng 05/2026',
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-              <h2 style="color: #1a365d;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
-              <p>Xin chào,</p>
-              <p>Hệ thống Quản lý Căng tin Trường Ngôi Sao Hoàng Mai xác nhận bạn đã đăng ký suất ăn cho <strong>Tháng 05/2026</strong> với chi tiết như sau:</p>
-              <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+              <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
+              <p>Kính gửi Anh/Chị,</p>
+              <p>Hệ thống Quản lý Căng tin Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng 05/2026</strong>. Chi tiết số lượng suất ăn như sau:</p>
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                  <th style="padding: 10px; text-align: left;">Bữa ăn</th>
-                  <th style="padding: 10px; text-align: right;">Số suất</th>
+                  <th style="padding: 12px; text-align: left;">Hạng mục</th>
+                  <th style="padding: 12px; text-align: right;">Số lượng đã đăng ký</th>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px;">Bữa Sáng</td>
-                  <td style="padding: 10px; text-align: right;"><strong>${breakfastCount}</strong> suất</td>
+                  <td style="padding: 12px;">Đăng ký ăn Sáng</td>
+                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">${breakfastCount} suất</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px;">Bữa Trưa</td>
-                  <td style="padding: 10px; text-align: right;"><strong>${lunchCount}</strong> suất</td>
+                  <td style="padding: 12px;">Đăng ký ăn Trưa</td>
+                  <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">${lunchCount} suất</td>
                 </tr>
               </table>
-              <p style="margin-top: 20px; font-size: 13px; color: #64748b;">
-                Đây là email tự động từ hệ thống. Vui lòng không trả lời email này. Nếu có thắc mắc, vui lòng liên hệ Bộ phận Dinh dưỡng.
+              <p style="margin-top: 20px; font-size: 13px; color: #64748b; font-style: italic;">
+                Lưu ý: Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.
               </p>
-              <p style="font-weight: bold; margin-top: 30px;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
+              <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
             </div>
           `
         })
       });
-
-      if (!response.ok) {
-        throw new Error('Network error');
-      }
 
       setSubmitStatus({
         type: 'success',
         message: 'Đăng ký thành công! Đã gửi thông tin đến email của bạn.'
       });
 
-      // Clear success message after 5 seconds
       setTimeout(() => setSubmitStatus(null), 5000);
 
     } catch (error) {
@@ -121,7 +175,7 @@ export default function ScheduleMonth() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">Thông tin đăng ký ăn</h2>
+              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN HÀNG THÁNG</h2>
               <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
             </div>
             {/* Month Selector */}
@@ -139,9 +193,9 @@ export default function ScheduleMonth() {
           {/* Bento Grid Layout for Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
-            <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full">
+            <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mb-md border-b border-outline-variant pb-md">
-                <h3 className="font-headline-sm text-headline-sm text-primary">Lịch Đăng Ký</h3>
+                <h3 className="font-headline-sm text-headline-sm text-primary">ĐĂNG KÝ ĂN HÀNG THÁNG</h3>
                 <div className="flex gap-md md:gap-sm bg-surface-container p-1 rounded-md md:bg-transparent md:p-0">
                   <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant px-2 py-1">
                     <span className="w-3 h-3 rounded-full bg-primary"></span> Sáng
@@ -153,8 +207,7 @@ export default function ScheduleMonth() {
               </div>
 
               {/* Simplified List View */}
-              <div className="overflow-y-auto max-h-[500px] flex-1 md:pr-sm space-y-md">
-                {/* Month header */}
+              <div className="space-y-md">
                 <div className="space-y-sm">
                   <h4 className="font-headline-sm text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG 05/2026</h4>
                   
@@ -231,15 +284,60 @@ export default function ScheduleMonth() {
                   </div>
                 </div>
 
-                {/* Remaining Days Note */}
-                <div className="p-md text-center">
-                  <p className="font-body-md text-body-md text-on-surface-variant italic">Bạn đang thao tác đăng ký nhanh suất ăn cho cả tháng 05/2026.</p>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mt-xl mb-md border-b border-outline-variant pb-md">
+                  <h3 className="font-headline-sm text-headline-sm text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h3>
                 </div>
+
+                <div className="space-y-sm">
+                  {events.length === 0 ? (
+                     <div className="p-md text-center">
+                        <p className="font-body-md text-body-md text-on-surface-variant italic">Không có sự kiện nào đang mở đăng ký.</p>
+                     </div>
+                  ) : events.map(evt => (
+                    <div key={evt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                      <div className="flex items-center gap-md">
+                        <div className="w-12 h-12 bg-[#ffe4e6] rounded-full flex items-center justify-center text-[#e11d48]">
+                          <span className="material-symbols-outlined text-[24px]">event</span>
+                        </div>
+                        <div>
+                          <h5 className="font-headline-sm text-[16px] text-on-surface w-full max-w-[200px] md:max-w-none">{evt.name}</h5>
+                          {!evt.isOpen && <p className="font-body-md text-error text-[13px] mt-0.5">Sự kiện đã khóa đăng ký</p>}
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                        <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors ${!evt.isOpen ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <input 
+                            type="radio" 
+                            name={`event_${evt.id}`} 
+                            checked={eventChoices[evt.id] === 'yes'}
+                            onChange={() => setEventChoices({...eventChoices, [evt.id]: 'yes'})}
+                            disabled={!evt.isOpen}
+                            className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
+                          />
+                          <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                        </label>
+                        <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors ${!evt.isOpen ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <input 
+                            type="radio" 
+                            name={`event_${evt.id}`}
+                            checked={eventChoices[evt.id] === 'no'}
+                            onChange={() => setEventChoices({...eventChoices, [evt.id]: 'no'})}
+                            disabled={!evt.isOpen}
+                            className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
+                          />
+                          <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
               </div>
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24">
+            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
               <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
               
               {submitStatus && (
@@ -268,16 +366,28 @@ export default function ScheduleMonth() {
                     {lunchChoice === 'yes' ? 21 : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
+                
+                {events.filter(e => eventChoices[e.id] === 'yes').map(e => (
+                  <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
+                    <div className="flex items-center gap-sm">
+                      <span className="material-symbols-outlined text-[#e11d48]">event</span>
+                      <span className="font-body-md text-body-md text-on-surface max-w-[120px] truncate">{e.name}</span>
+                    </div>
+                    <span className="font-headline-md text-headline-md text-primary">
+                      1 <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    </span>
+                  </div>
+                ))}
               </div>
               <button 
                 onClick={handleRegister}
                 disabled={isSubmitting}
-                className="w-full mt-xl bg-primary text-on-primary font-headline-sm text-headline-sm py-md rounded-lg hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm active:scale-95 duration-100 flex items-center justify-center gap-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                className={`w-full mt-xl text-on-primary font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${!isMonthOpen ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
               >
                 {isSubmitting ? (
                   <span className="material-symbols-outlined animate-spin">refresh</span>
                 ) : (
-                  <span className="material-symbols-outlined">check_circle</span>
+                  <span className="material-symbols-outlined">{!isMonthOpen ? 'lock' : 'check_circle'}</span>
                 )}
                 {isSubmitting ? 'Đang gửi...' : 'Xác nhận đăng ký'}
               </button>
