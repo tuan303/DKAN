@@ -39,7 +39,7 @@ export function Navigation({ className }: { className?: string }) {
       </aside>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-md pb-safe bg-surface dark:bg-surface-dim shadow-[0_-4px_6px_-1px_rgba(26,54,93,0.05)] rounded-t-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-evenly items-center h-16 bg-surface-container border-t border-outline-variant md:hidden">
         {links.map(link => {
           const isActive = location.pathname.startsWith(link.to);
           return (
@@ -47,16 +47,26 @@ export function Navigation({ className }: { className?: string }) {
               key={link.to}
               to={link.to}
               className={clsx(
-                "flex flex-col items-center justify-center rounded-full px-4 py-1 transition-all active:scale-90 duration-200",
+                "flex flex-col items-center justify-center h-full flex-1 transition-all",
                 isActive 
-                  ? "bg-primary-container text-on-primary-container"
-                  : "text-on-surface-variant hover:bg-surface-container"
+                  ? "text-primary"
+                  : "text-on-surface-variant hover:text-on-surface"
               )}
             >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}>
-                {link.icon}
+              <div className={clsx(
+                "px-5 py-1 rounded-full transition-colors",
+                isActive ? "bg-secondary-container" : "hover:bg-surface-container-high"
+              )}>
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}>
+                  {link.icon}
+                </span>
+              </div>
+              <span className={clsx(
+                "font-label-md text-[11px] mt-1 text-center",
+                isActive ? "font-bold" : "font-normal"
+              )}>
+                {link.label}
               </span>
-              <span className="font-label-md text-label-md mt-1">{link.label}</span>
             </Link>
           );
         })}

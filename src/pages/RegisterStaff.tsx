@@ -1,26 +1,82 @@
 import { Header } from '../components/Header';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { auth, db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function RegisterStaff() {
   const navigate = useNavigate();
+  const [fullName, setFullName] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [department, setDepartment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate('/login');
+      } else if (user.displayName) {
+        setFullName(user.displayName);
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async () => {
+    if (!fullName || !employeeId || !department) {
+      setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      setError('Bạn chưa đăng nhập');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await setDoc(doc(db, 'staff', user.uid), {
+        fullName,
+        employeeId,
+        department,
+        email: user.email,
+        createdAt: new Date().toISOString(),
+      });
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error(err);
+      setError('Lỗi khi lưu thông tin: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md">
       <Header />
       
       {/* Main Content Canvas */}
-      <main className="flex-grow pt-24 pb-md px-md md:px-lg flex flex-col items-center justify-center">
+      <main className="flex-grow pt-20 md:pt-24 pb-md px-4 md:px-lg flex flex-col items-center justify-center">
         <div className="w-full max-w-[600px] bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] border border-surface-variant overflow-hidden flex flex-col">
           
           {/* Form Header */}
-          <div className="p-lg border-b border-surface-variant bg-surface-bright">
+          <div className="p-md md:p-lg border-b border-surface-variant bg-surface-bright">
             <h2 className="font-headline-md text-headline-md text-on-surface mb-xs">Đăng ký thông tin</h2>
             <p className="font-body-md text-body-md text-on-surface-variant">Vui lòng điền đầy đủ thông tin bên dưới để tiếp tục.</p>
           </div>
 
           {/* Form Body */}
-          <div className="p-lg flex flex-col gap-lg">
+          <div className="p-md md:p-lg flex flex-col gap-md md:gap-lg">
             
+            {error && (
+              <div className="bg-error-container text-on-error-container p-sm rounded-lg font-body-md text-body-md">
+                {error}
+              </div>
+            )}
+
             {/* Full Name Field */}
             <div className="flex flex-col gap-sm">
               <label htmlFor="fullName" className="font-label-md text-label-md text-on-surface">Họ tên</label>
@@ -32,6 +88,8 @@ export default function RegisterStaff() {
                   type="text" 
                   id="fullName" 
                   name="fullName" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   placeholder="Nhập họ và tên của bạn" 
                   required 
                   className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface placeholder-outline transition-shadow" 
@@ -50,6 +108,8 @@ export default function RegisterStaff() {
                   type="text" 
                   id="employeeId" 
                   name="employeeId" 
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
                   placeholder="Nhập mã nhân viên của bạn" 
                   required 
                   className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface placeholder-outline transition-shadow" 
@@ -68,7 +128,8 @@ export default function RegisterStaff() {
                   id="department" 
                   name="department" 
                   required 
-                  defaultValue=""
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
                   className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface appearance-none transition-shadow"
                 >
                   <option value="" disabled>Chọn phòng ban / tổ khối</option>
@@ -87,20 +148,22 @@ export default function RegisterStaff() {
           </div>
 
           {/* Form Actions */}
-          <div className="p-lg border-t border-surface-variant bg-surface-bright flex justify-end gap-md">
+          <div className="p-md md:p-lg border-t border-surface-variant bg-surface-bright flex flex-col-reverse md:flex-row justify-end gap-sm md:gap-md">
             <button 
               type="button" 
               onClick={() => navigate('/login')}
-              className="px-md py-sm bg-surface-container-lowest border border-outline font-label-md text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm"
+              disabled={loading}
+              className="w-full md:w-auto px-md py-sm bg-surface-container-lowest border border-outline font-label-md text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
             >
               Hủy
             </button>
             <button 
               type="button" 
-              onClick={() => navigate('/dashboard')}
-              className="px-md py-sm bg-primary border border-transparent font-label-md text-label-md text-on-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center gap-xs"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="w-full md:w-auto justify-center px-md py-sm bg-primary border border-transparent font-label-md text-label-md text-on-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center gap-xs disabled:opacity-50"
             >
-              Tiếp tục
+              {loading ? 'Đang lưu...' : 'Tiếp tục'}
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </button>
           </div>

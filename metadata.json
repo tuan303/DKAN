@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Institution Registration",
+  "description": "An institutional management system for registering employee details and managing monthly meal schedules.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

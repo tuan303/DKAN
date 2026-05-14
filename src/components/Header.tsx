@@ -1,9 +1,30 @@
 import clsx from 'clsx';
 import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { auth } from '../lib/firebase';
 
-export function Header({ userName = "Nguyễn Văn A", initials = "NV" }: { userName?: string, initials?: string }) {
+export function Header() {
   const location = useLocation();
   const isRegister = location.pathname.startsWith('/register');
+  const [userName, setUserName] = useState("Nguyễn Văn A");
+  const [initials, setInitials] = useState("NV");
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user && user.displayName) {
+        setUserName(user.displayName);
+        
+        // Calculate initials from name
+        const names = user.displayName.split(' ');
+        if (names.length > 1) {
+          setInitials(`${names[0][0]}${names[names.length - 1][0]}`.toUpperCase());
+        } else {
+          setInitials(user.displayName.substring(0, 2).toUpperCase());
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   return (
     <header className="fixed top-0 w-full z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant shadow-sm h-16 flex justify-between items-center px-md lg:px-lg">

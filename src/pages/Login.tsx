@@ -1,7 +1,42 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, microsoftProvider } from '../lib/firebase';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleMicrosoftLogin = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await signInWithPopup(auth, microsoftProvider);
+      
+      const email = result.user.email;
+      if (email && !email.endsWith('@hoangmaistarschool.edu.vn')) {
+        await auth.signOut();
+        setError("Vui lòng sử dụng tài khoản email của trường (@hoangmaistarschool.edu.vn).");
+        return;
+      }
+
+      navigate('/register');
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError("Tên miền này chưa được cấp phép trong Firebase Console. Vui lòng kiểm tra mục 'Authorized domains'.");
+      } else if (err.code === 'auth/configuration-not-found') {
+        setError("Chưa cấu hình Microsoft Provider trong Firebase Console.");
+      } else if (err.message?.includes('AADSTS7000215')) {
+        setError("Lỗi Microsoft: ID hoặc Secret của ứng dụng không chính xác. Vui lòng kiểm tra lại cấu hình Azure.");
+      } else {
+        setError(err.message || "Đã xảy ra lỗi khi đăng nhập.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased">
@@ -19,8 +54,8 @@ export default function Login() {
           </p>
         </div>
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-lg sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(26,54,93,0.05)]">
-        <div className="max-w-[400px] w-full flex flex-col gap-xl">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(26,54,93,0.05)] min-h-[100dvh] lg:min-h-screen">
+        <div className="max-w-[400px] w-full flex flex-col gap-lg sm:gap-xl">
           <div className="flex flex-col items-center text-center gap-md">
             <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(26,54,93,0.1)] mb-sm">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "32px" }}>restaurant</span>
@@ -33,9 +68,15 @@ export default function Login() {
             </div>
           </div>
           <div className="flex flex-col gap-md mt-sm">
+            {error && (
+              <div className="bg-error-container text-on-error-container p-sm rounded-lg font-body-md text-body-md">
+                {error}
+              </div>
+            )}
             <button 
-              onClick={() => navigate('/register')}
-              className="w-full bg-surface-container-lowest border border-outline-variant hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg px-margin py-md flex items-center justify-center gap-md transition-all duration-200 shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)] hover:shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
+              onClick={handleMicrosoftLogin}
+              disabled={loading}
+              className="w-full bg-surface-container-lowest border border-outline-variant hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg px-margin py-md flex items-center justify-center gap-md transition-all duration-200 shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)] hover:shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 0h10v10H0z" fill="#f25022"></path>
@@ -43,7 +84,7 @@ export default function Login() {
                 <path d="M0 11h10v10H0z" fill="#00a4ef"></path>
                 <path d="M11 11h10v10H11z" fill="#ffb900"></path>
               </svg>
-              Đăng nhập bằng Microsoft
+              {loading ? "Đang đăng nhập..." : "Đăng nhập bằng Microsoft"}
             </button>
             <div className="flex items-center gap-sm mt-md">
               <div className="h-px bg-outline-variant flex-1"></div>
@@ -51,11 +92,11 @@ export default function Login() {
               <div className="h-px bg-outline-variant flex-1"></div>
             </div>
           </div>
-          <div className="mt-xl text-center">
-            <p className="font-body-md text-body-md text-on-surface-variant">
-              Sử dụng tài khoản email do trường cấp (VD: ten.ho@university.edu.vn) để truy cập hệ thống.
+          <div className="mt-lg sm:mt-xl text-center">
+            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] sm:text-[14px]">
+              Sử dụng tài khoản email do trường cấp (VD: ten.ho@hoangmaistarschool.edu.vn) để truy cập hệ thống.
             </p>
-            <div className="mt-lg">
+            <div className="mt-md sm:mt-lg">
               <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
                 Cần hỗ trợ đăng nhập?
               </a>

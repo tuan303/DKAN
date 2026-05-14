@@ -9,15 +9,15 @@ export default function Dashboard() {
       <Header />
       <Navigation />
       
-      <main className="flex-1 max-w-[1440px] mx-auto w-full p-md md:p-lg lg:p-xl flex flex-col gap-lg">
-        <div className="flex justify-between items-end">
+      <main className="flex-1 max-w-[1440px] mx-auto w-full p-sm md:p-lg lg:p-xl flex flex-col gap-md md:gap-lg">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-sm border-b md:border-b-0 border-outline-variant pb-md md:pb-0 px-md md:px-0 mt-md md:mt-0">
           <div>
-            <h1 className="font-headline-lg-mobile md:text-headline-lg text-on-surface">Tổng Quan Tháng 10</h1>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1">Tóm tắt tình trạng đăng ký suất ăn của bạn.</p>
+            <h1 className="font-headline-lg-mobile md:text-headline-lg text-primary md:text-on-surface">Tổng Quan Tháng 10</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1 text-[13px] md:text-[14px]">Tóm tắt tình trạng đăng ký suất ăn của bạn.</p>
           </div>
           <button 
             onClick={() => navigate('/schedule')}
-            className="hidden md:flex items-center justify-center gap-sm bg-primary text-on-primary px-lg py-sm rounded-lg font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-all shadow-sm hover:shadow-md"
+            className="w-full md:w-auto flex items-center justify-center gap-sm bg-primary text-on-primary px-lg py-sm rounded-lg font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-all shadow-sm hover:shadow-md"
           >
             <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
             Thay Đổi Đăng Ký
@@ -25,7 +25,7 @@ export default function Dashboard() {
         </div>
 
         {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-md lg:gap-lg">
+        <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-3 gap-md lg:gap-lg">
           {/* Summary Card 1 */}
           <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),0_2px_4px_-1px_rgba(26,54,93,0.03)] border border-outline-variant flex flex-col gap-md">
             <div className="flex justify-between items-center">
@@ -76,7 +76,7 @@ export default function Dashboard() {
         </div>
 
         {/* Upcoming Meals List */}
-        <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),0_2px_4px_-1px_rgba(26,54,93,0.03)] border border-outline-variant overflow-hidden">
+        <div className="mx-md md:mx-0 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),0_2px_4px_-1px_rgba(26,54,93,0.03)] border border-outline-variant overflow-hidden mb-24">
           <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
             <h2 className="font-headline-sm text-headline-sm text-on-surface">Bữa Ăn Sắp Tới (Tuần Này)</h2>
             <a className="font-label-md text-label-md text-primary hover:underline" href="#">Xem tất cả</a>

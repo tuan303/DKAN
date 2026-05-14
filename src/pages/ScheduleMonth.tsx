@@ -7,15 +7,15 @@ export default function ScheduleMonth() {
       <Header />
       <Navigation />
       
-      <main className="flex-1 px-margin md:px-xl max-w-[1440px] w-full mx-auto py-lg grid grid-cols-1 md:grid-cols-12 gap-gutter">
-        <section className="col-span-1 md:col-span-12 space-y-xl">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md">
+      <main className="flex-1 max-w-[1440px] w-full mx-auto py-md md:py-lg flex flex-col gap-md md:gap-lg">
+        <section className="space-y-xl px-0 md:px-margin lg:px-xl">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg text-headline-lg text-primary">Đăng ký suất ăn tháng</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
+              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">Đăng ký suất ăn tháng</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
             </div>
             {/* Month Selector */}
-            <div className="flex items-center gap-md bg-surface border border-outline-variant rounded-lg p-sm shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)]">
+            <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)]">
               <button className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
@@ -27,23 +27,23 @@ export default function ScheduleMonth() {
           </div>
 
           {/* Bento Grid Layout for Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
-            <div className="lg:col-span-2 bg-surface rounded-xl border border-outline-variant p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full">
-              <div className="flex justify-between items-center mb-md border-b border-outline-variant pb-md">
+            <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mb-md border-b border-outline-variant pb-md">
                 <h3 className="font-headline-sm text-headline-sm text-primary">Lịch Đăng Ký</h3>
-                <div className="flex gap-sm">
-                  <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant">
+                <div className="flex gap-md md:gap-sm bg-surface-container p-1 rounded-md md:bg-transparent md:p-0">
+                  <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant px-2 py-1">
                     <span className="w-3 h-3 rounded-full bg-primary"></span> Sáng
                   </span>
-                  <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant">
+                  <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant px-2 py-1">
                     <span className="w-3 h-3 rounded-full bg-secondary-container border border-primary"></span> Trưa
                   </span>
                 </div>
               </div>
 
               {/* Simplified List View */}
-              <div className="overflow-y-auto max-h-[500px] flex-1 pr-sm space-y-md">
+              <div className="overflow-y-auto max-h-[500px] flex-1 md:pr-sm space-y-md">
                 {/* Week 1 */}
                 <div className="space-y-sm">
                   <h4 className="font-label-md text-label-md text-outline">Tuần 1 (01/11 - 05/11)</h4>
@@ -98,7 +98,7 @@ export default function ScheduleMonth() {
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col">
+            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24">
               <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
               <div className="space-y-md flex-1">
                 <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
