@@ -17,8 +17,6 @@ export default function ScheduleMonth() {
   const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>('');
   const [isMonthOpen, setIsMonthOpen] = useState(true);
-  const [events, setEvents] = useState<EventData[]>([]);
-  const [eventChoices, setEventChoices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -42,18 +40,6 @@ export default function ScheduleMonth() {
           setIsMonthOpen(data['05']);
         }
       }
-
-      // Events
-      const eventsSnapshot = await getDocs(collection(db, 'events'));
-      const evts: EventData[] = [];
-      const initChoices: Record<string, string> = {};
-      eventsSnapshot.forEach((d) => {
-        const evt = { id: d.id, ...d.data() } as EventData;
-        evts.push(evt);
-        initChoices[evt.id] = 'yes';
-      });
-      setEvents(evts);
-      setEventChoices(initChoices);
     } catch (err) {
       console.error(err);
     }
@@ -95,21 +81,6 @@ export default function ScheduleMonth() {
           email: user.email,
           timestamp: new Date().toISOString()
         });
-
-        // Loop over events and save if open
-        for (const evt of events) {
-          if (evt.isOpen) {
-            await setDoc(doc(db, 'event_registrations', `${user.uid}_${evt.id}`), {
-               userId: user.uid,
-               eventId: evt.id,
-               eventName: evt.name,
-               choice: eventChoices[evt.id],
-               fullName: staffData.fullName,
-               email: user.email,
-               timestamp: new Date().toISOString()
-            });
-          }
-        }
       }
 
       const response = await fetch('/api/send-email', {
@@ -175,7 +146,7 @@ export default function ScheduleMonth() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN HÀNG THÁNG</h2>
+              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐK ĂN HÀNG THÁNG</h2>
               <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
             </div>
             {/* Month Selector */}
@@ -195,7 +166,7 @@ export default function ScheduleMonth() {
             {/* Calendar View */}
             <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mb-md border-b border-outline-variant pb-md">
-                <h3 className="font-headline-sm text-headline-sm text-primary">ĐĂNG KÝ ĂN HÀNG THÁNG</h3>
+                <h3 className="font-headline-sm text-headline-sm text-primary">ĐK ĂN HÀNG THÁNG</h3>
                 <div className="flex gap-md md:gap-sm bg-surface-container p-1 rounded-md md:bg-transparent md:p-0">
                   <span className="flex items-center gap-xs font-label-md text-label-md text-on-surface-variant px-2 py-1">
                     <span className="w-3 h-3 rounded-full bg-primary"></span> Sáng
@@ -284,55 +255,6 @@ export default function ScheduleMonth() {
                   </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mt-xl mb-md border-b border-outline-variant pb-md">
-                  <h3 className="font-headline-sm text-headline-sm text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h3>
-                </div>
-
-                <div className="space-y-sm">
-                  {events.length === 0 ? (
-                     <div className="p-md text-center">
-                        <p className="font-body-md text-body-md text-on-surface-variant italic">Không có sự kiện nào đang mở đăng ký.</p>
-                     </div>
-                  ) : events.map(evt => (
-                    <div key={evt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                      <div className="flex items-center gap-md">
-                        <div className="w-12 h-12 bg-[#ffe4e6] rounded-full flex items-center justify-center text-[#e11d48]">
-                          <span className="material-symbols-outlined text-[24px]">event</span>
-                        </div>
-                        <div>
-                          <h5 className="font-headline-sm text-[16px] text-on-surface w-full max-w-[200px] md:max-w-none">{evt.name}</h5>
-                          {!evt.isOpen && <p className="font-body-md text-error text-[13px] mt-0.5">Sự kiện đã khóa đăng ký</p>}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
-                        <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors ${!evt.isOpen ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <input 
-                            type="radio" 
-                            name={`event_${evt.id}`} 
-                            checked={eventChoices[evt.id] === 'yes'}
-                            onChange={() => setEventChoices({...eventChoices, [evt.id]: 'yes'})}
-                            disabled={!evt.isOpen}
-                            className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
-                          />
-                          <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
-                        </label>
-                        <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors ${!evt.isOpen ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <input 
-                            type="radio" 
-                            name={`event_${evt.id}`}
-                            checked={eventChoices[evt.id] === 'no'}
-                            onChange={() => setEventChoices({...eventChoices, [evt.id]: 'no'})}
-                            disabled={!evt.isOpen}
-                            className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
-                          />
-                          <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
               </div>
             </div>
 
@@ -366,18 +288,6 @@ export default function ScheduleMonth() {
                     {lunchChoice === 'yes' ? 21 : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
-                
-                {events.filter(e => eventChoices[e.id] === 'yes').map(e => (
-                  <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
-                    <div className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-[#e11d48]">event</span>
-                      <span className="font-body-md text-body-md text-on-surface max-w-[120px] truncate">{e.name}</span>
-                    </div>
-                    <span className="font-headline-md text-headline-md text-primary">
-                      1 <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
-                    </span>
-                  </div>
-                ))}
               </div>
               <button 
                 onClick={handleRegister}

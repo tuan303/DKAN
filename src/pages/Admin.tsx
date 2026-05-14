@@ -371,7 +371,7 @@ export default function Admin() {
             {/* Monthly Config Section */}
             <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
               <div className="p-md border-b border-outline-variant bg-surface-container-low">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface">ĐĂNG KÝ ĂN HÀNG THÁNG</h2>
+                <h2 className="font-headline-sm text-headline-sm text-on-surface">ĐK ĂN HÀNG THÁNG</h2>
                 <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Đóng / Mở form đăng ký suất ăn theo tháng (Năm 2026).</p>
               </div>
               <div className="p-md grid grid-cols-2 md:grid-cols-3 gap-md">
