@@ -132,12 +132,40 @@ export default function RegisterStaff() {
                   onChange={(e) => setDepartment(e.target.value)}
                   className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface appearance-none transition-shadow"
                 >
-                  <option value="" disabled>Chọn phòng ban / tổ khối</option>
-                  <option value="admin">Ban Giám Hiệu</option>
-                  <option value="hr">Phòng Hành Chính - Nhân Sự</option>
-                  <option value="finance">Phòng Tài Vụ</option>
-                  <option value="teachers">Tổ Giáo Viên</option>
-                  <option value="cafeteria">Tổ Bếp / Căn Tin</option>
+                  <option value="" disabled>Chọn phòng ban / tổ / khối</option>
+                  <option value="BAN LÃNH ĐẠO">BAN LÃNH ĐẠO</option>
+                  <option value="THƯ KÝ - TRỢ LÝ">THƯ KÝ - TRỢ LÝ</option>
+                  <option value="PHÒNG HTQT & HN">PHÒNG HTQT & HN</option>
+                  <option value="PHÒNG KẾ TOÁN">PHÒNG KẾ TOÁN</option>
+                  <option value="PHÒNG HÀNH CHÍNH">PHÒNG HÀNH CHÍNH</option>
+                  <option value="BỘ PHẬN CNTT">BỘ PHẬN CNTT</option>
+                  <option value="PHÒNG NHÂN SỰ">PHÒNG NHÂN SỰ</option>
+                  <option value="PHÒNG TRUYỀN THÔNG">PHÒNG TRUYỀN THÔNG</option>
+                  <option value="PHÒNG GIÁO VỤ">PHÒNG GIÁO VỤ</option>
+                  <option value="PHÒNG KHẢO THÍ">PHÒNG KHẢO THÍ</option>
+                  <option value="BAN GIÁM HIỆU">BAN GIÁM HIỆU</option>
+                  <option value="CHĂM SÓC HỌC SINH">CHĂM SÓC HỌC SINH</option>
+                  <option value="KHỐI 1">KHỐI 1</option>
+                  <option value="KHỐI 2">KHỐI 2</option>
+                  <option value="KHỐI 3">KHỐI 3</option>
+                  <option value="KHỐI 4">KHỐI 4</option>
+                  <option value="KHỐI 5">KHỐI 5</option>
+                  <option value="KHCN TiH">KHCN TiH</option>
+                  <option value="TIẾNG ANH TiH">TIẾNG ANH TiH</option>
+                  <option value="TỔ THỂ THAO">TỔ THỂ THAO</option>
+                  <option value="TRẢI NGHIỆM">TRẢI NGHIỆM</option>
+                  <option value="TỔ NĂNG KHIẾU">TỔ NĂNG KHIẾU</option>
+                  <option value="TỔ TOÁN THCS">TỔ TOÁN THCS</option>
+                  <option value="KHCN THCS">KHCN THCS</option>
+                  <option value="XÃ HỘI THCS">XÃ HỘI THCS</option>
+                  <option value="NGOẠI NGỮ THCS">NGOẠI NGỮ THCS</option>
+                  <option value="TỔ TOÁN THPT">TỔ TOÁN THPT</option>
+                  <option value="KHCN THPT">KHCN THPT</option>
+                  <option value="XÃ HỘI THPT">XÃ HỘI THPT</option>
+                  <option value="NGOẠI NGỮ THPT">NGOẠI NGỮ THPT</option>
+                  <option value="GIÁO VIÊN THỈNH GIẢNG">GIÁO VIÊN THỈNH GIẢNG</option>
+                  <option value="ĐỐI TÁC">ĐỐI TÁC</option>
+                  <option value="CỘNG TÁC VIÊN">CỘNG TÁC VIÊN</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">arrow_drop_down</span>
