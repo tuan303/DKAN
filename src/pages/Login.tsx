@@ -47,24 +47,24 @@ export default function Login() {
           style={{ backgroundImage: "url('https://hoangmaistarschool.edu.vn/thongtin/dka.png')" }}
         />
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] min-h-[100dvh] lg:min-h-screen">
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center justify-center">
-          <img src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png" alt="NSHM Logo" className="h-[60px] object-contain" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] h-[100dvh] lg:h-screen overflow-hidden">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center justify-center z-20">
+          <img src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png" alt="NSHM Logo" className="h-[50px] md:h-[60px] object-contain" />
         </div>
-        <div className="max-w-[420px] w-full flex flex-col h-full justify-center pt-20 pb-4">
-          <div className="flex flex-col items-center text-center gap-md">
-            <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.2)] mb-2 mt-4 md:mt-0">
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "32px" }}>restaurant</span>
+        <div className="max-w-[420px] w-full flex flex-col h-full justify-center pt-12">
+          <div className="flex flex-col items-center text-center gap-y-3 sm:gap-y-4">
+            <div className="h-14 w-14 md:h-16 md:w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.2)] mb-1">
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "30px" }}>restaurant</span>
             </div>
             <div>
-              <h1 className="font-headline-md text-headline-sm font-bold text-on-surface mb-xs uppercase">NSHM - HỆ THỐNG ĐĂNG KÝ SUẤT ĂN</h1>
-              <p className="font-body-md text-body-md text-on-surface-variant">
-                Đăng nhập vào hệ thống đăng ký suất ăn để đăng ký ăn hàng tháng, các sự kiện của nhà trường.
+              <h1 className="font-headline-sm text-[18px] md:text-headline-sm font-bold text-on-surface mb-xs uppercase tracking-tight">NSHM - HỆ THỐNG ĐĂNG KÝ SUẤT ĂN</h1>
+              <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant line-clamp-2 md:line-clamp-none">
+                Đăng nhập để đăng ký suất ăn hàng tháng và các sự kiện của nhà trường.
               </p>
             </div>
           </div>
           
-          <div className="flex flex-col gap-md mt-lg">
+          <div className="flex flex-col gap-y-4 mt-6 md:mt-8">
             {error && (
               <div className="bg-error-container text-on-error-container p-sm rounded-lg font-body-md text-body-md">
                 {error}
@@ -73,7 +73,7 @@ export default function Login() {
             <button 
               onClick={handleMicrosoftLogin}
               disabled={loading}
-              className="w-full bg-surface-container-lowest border border-outline-variant hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg px-margin py-md flex items-center justify-center gap-md transition-all duration-200 shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)] hover:shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-75 disabled:cursor-not-allowed"
+              className="w-full bg-surface-container-lowest border border-outline-variant hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg px-margin py-3 md:py-md flex items-center justify-center gap-md transition-all duration-200 shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)] hover:shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 0h10v10H0z" fill="#f25022"></path>
@@ -83,25 +83,25 @@ export default function Login() {
               </svg>
               {loading ? "Đang đăng nhập..." : "Đăng nhập bằng Microsoft"}
             </button>
-            <div className="flex items-center gap-sm mt-md">
+            <div className="flex items-center gap-sm">
               <div className="h-px bg-outline-variant flex-1"></div>
-              <span className="font-label-sm text-[11px] font-bold text-on-surface-variant uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
+              <span className="font-label-sm text-[10px] md:text-[11px] font-bold text-on-surface-variant uppercase tracking-widest text-center">CBGV-NV HỆ THỐNG</span>
               <div className="h-px bg-outline-variant flex-1"></div>
             </div>
           </div>
           
-          <div className="mt-8 text-center flex flex-col justify-end flex-grow pb-4">
-            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] sm:text-[14px]">
-              Sử dụng tài khoản email do trường cấp (VD: ten.ho@hoangmaistarschool.edu.vn) để truy cập hệ thống.
+          <div className="mt-8 md:mt-10 text-center flex flex-col justify-center">
+            <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant text-[12px] md:text-[14px] px-4">
+              Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
             </p>
-            <div className="mt-4 mb-4">
+            <div className="mt-2">
               <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
-                Cần hỗ trợ đăng nhập?
+                Cần hỗ trợ?
               </a>
             </div>
           </div>
           
-          <div className="mt-auto">
+          <div className="mt-8">
             <Footer />
           </div>
         </div>
