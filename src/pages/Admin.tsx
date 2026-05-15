@@ -403,7 +403,7 @@ export default function Admin() {
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
               <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Sáng ({selectedMonth})</span>
+                  <span className="font-label-lg font-bold text-on-surface-variant uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
                   <span className="material-symbols-outlined text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
                 <div>
@@ -417,7 +417,7 @@ export default function Admin() {
 
               <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tổng Đăng Ký Trưa ({selectedMonth})</span>
+                  <span className="font-label-lg font-bold text-on-surface-variant uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
                   <span className="material-symbols-outlined text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
                 <div>
@@ -570,6 +570,39 @@ export default function Admin() {
 
         {activeTab === 'events' && (
           <div className="flex flex-col gap-md lg:gap-lg">
+            {/* Event Summary */}
+            {selectedEventId && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg px-md md:px-0">
+                <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+                  <div className="flex justify-between items-center">
+                    <span className="font-label-lg font-bold text-[#065f46] uppercase tracking-wider">CÓ ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                    <span className="material-symbols-outlined text-[#065f46]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
+                  </div>
+                  <div>
+                    <span className="font-headline-lg text-headline-lg text-on-surface">{eventRegistrations.filter(r => r.choice === 'yes').length}</span>
+                    <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  </div>
+                   <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
+                    <div className="bg-[#065f46] h-2 rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+                  <div className="flex justify-between items-center">
+                    <span className="font-label-lg font-bold text-on-error-container uppercase tracking-wider">KHÔNG ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                    <span className="material-symbols-outlined text-on-error-container" style={{ fontVariationSettings: "'FILL' 1" }}>no_meals</span>
+                  </div>
+                  <div>
+                    <span className="font-headline-lg text-headline-lg text-on-surface">{eventRegistrations.filter(r => r.choice === 'no').length}</span>
+                    <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  </div>
+                   <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
+                    <div className="bg-error h-2 rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Event Registration List */}
             <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col px-md md:px-0">
               <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
