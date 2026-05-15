@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, microsoftProvider } from '../lib/firebase';
+import { Footer } from '../components/Footer';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -47,7 +48,10 @@ export default function Login() {
         />
       </div>
       <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] min-h-[100dvh] lg:min-h-screen">
-        <div className="max-w-[420px] w-full flex flex-col gap-lg sm:gap-xl">
+        <div className="absolute top-8 md:top-12 left-1/2 transform -translate-x-1/2 flex items-center justify-center">
+          <img src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png" alt="NSHM Logo" className="h-[60px] object-contain" />
+        </div>
+        <div className="max-w-[420px] w-full flex flex-col gap-lg sm:gap-xl h-full justify-center pt-16">
           <div className="flex flex-col items-center text-center gap-md">
             <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.2)] mb-sm">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "32px" }}>restaurant</span>
@@ -84,16 +88,17 @@ export default function Login() {
               <div className="h-px bg-outline-variant flex-1"></div>
             </div>
           </div>
-          <div className="mt-lg sm:mt-xl text-center">
+          <div className="mt-lg sm:mt-xl text-center flex-1 pr-2">
             <p className="font-body-md text-body-md text-on-surface-variant text-[13px] sm:text-[14px]">
               Sử dụng tài khoản email do trường cấp (VD: ten.ho@hoangmaistarschool.edu.vn) để truy cập hệ thống.
             </p>
-            <div className="mt-md sm:mt-lg">
+            <div className="mt-md sm:mt-lg mb-8">
               <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
                 Cần hỗ trợ đăng nhập?
               </a>
             </div>
           </div>
+          <Footer />
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, a
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
+import { Footer } from '../components/Footer';
 
 interface RegistrationData {
   id?: string;
@@ -845,6 +846,7 @@ export default function Admin() {
         )}
 
       </main>
+      <Footer />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { auth, db } from '../lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { Footer } from '../components/Footer';
 
 interface EventData {
   id: string;
@@ -316,6 +317,7 @@ export default function ScheduleEvent() {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { useNavigate } from 'react-router-dom';
+import { Footer } from '../components/Footer';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -161,6 +162,7 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }
