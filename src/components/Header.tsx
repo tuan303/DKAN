@@ -36,15 +36,21 @@ export function Header() {
       {!isRegister ? (
         <>
           {/* Desktop User Info */}
-          <div className="hidden md:flex items-center gap-md">
-            <span className="font-body-md text-body-md text-on-surface">Xin chào, {userName}</span>
-            <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md">
+          <div 
+            className="hidden md:flex items-center gap-md cursor-pointer group"
+            onClick={() => window.dispatchEvent(new Event('open-account-modal'))}
+          >
+            <span className="font-body-md text-body-md text-on-surface group-hover:text-primary transition-colors">Xin chào, {userName}</span>
+            <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md group-hover:ring-2 group-hover:ring-primary/50 transition-all">
               {initials}
             </div>
           </div>
 
           {/* Mobile User Info */}
-          <div className="md:hidden w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md">
+          <div 
+            className="md:hidden w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all active:scale-95"
+            onClick={() => window.dispatchEvent(new Event('open-account-modal'))}
+          >
             {initials}
           </div>
         </>

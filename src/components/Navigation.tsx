@@ -60,7 +60,13 @@ export function Navigation({ className }: { className?: string }) {
       }
     });
 
-    return () => unsubscribe();
+    const handleOpenModal = () => setShowAccountModal(true);
+    window.addEventListener('open-account-modal', handleOpenModal);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('open-account-modal', handleOpenModal);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -74,7 +80,6 @@ export function Navigation({ className }: { className?: string }) {
   const links = [
     { to: '/schedule', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
     { to: '/events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
-    { to: '#account', icon: 'person', label: 'TÀI KHOẢN' },
   ];
 
   let displayLinks = links;
@@ -192,7 +197,7 @@ export function Navigation({ className }: { className?: string }) {
       {showAccountModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowAccountModal(false)}></div>
-          <div className="bg-surface relative w-full max-w-sm sm:max-w-md rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant flex flex-col max-h-[85vh]">
+          <div className="bg-surface relative w-[min(calc(100vw-32px),380px)] rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant flex flex-col max-h-[85vh]">
             
             {/* Header Pattern */}
             <div className="px-6 pt-8 pb-5 flex flex-col items-center flex-shrink-0 bg-surface z-10 border-b border-outline-variant/40">

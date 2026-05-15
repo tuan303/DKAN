@@ -85,7 +85,10 @@ export default function ScheduleMonth() {
 
   const handleRegister = async () => {
     if (!isMonthOpen) {
-      alert("Hiện đăng ký ăn đã bị khóa, vui lòng liên hệ với Bộ phận Dinh dưỡng");
+      setSubmitStatus({
+        type: 'error',
+        message: 'Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.'
+      });
       return;
     }
 
@@ -242,10 +245,8 @@ export default function ScheduleMonth() {
                 <div className="space-y-sm">
                   <h4 className="font-headline-sm text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG {monthString}/{selectedYear}</h4>
                   
-                  {isMonthOpen ? (
-                    <>
-                      {/* Day Row 1 */}
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                  {/* Day Row 1 */}
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                         <div className="flex items-center gap-md">
                           <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
                             <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
@@ -315,18 +316,6 @@ export default function ScheduleMonth() {
                           </label>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="py-[60px] px-6 text-center bg-surface-container-lowest rounded-[24px] border border-outline-variant flex flex-col items-center justify-center w-full my-4 shadow-sm">
-                      <div className="w-20 h-20 bg-surface-variant/30 rounded-full flex items-center justify-center mb-6">
-                        <span className="material-symbols-outlined text-[40px] text-on-surface-variant">event_busy</span>
-                      </div>
-                      <h3 className="text-[20px] font-bold text-on-surface mb-3">Đã đóng đăng ký</h3>
-                      <p className="text-[15px] text-on-surface-variant max-w-[320px] leading-relaxed">
-                        Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -349,7 +338,7 @@ export default function ScheduleMonth() {
                     <span className="font-body-md text-body-md text-on-surface">Bữa sáng</span>
                   </div>
                   <span className="font-headline-md text-headline-md text-primary">
-                     {isMonthOpen && breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    {breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
@@ -358,25 +347,28 @@ export default function ScheduleMonth() {
                     <span className="font-body-md text-body-md text-on-surface">Bữa trưa</span>
                   </div>
                   <span className="font-headline-md text-headline-md text-primary">
-                    {isMonthOpen && lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    {lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
               </div>
               
-              {isMonthOpen && (
-                <button 
-                  onClick={handleRegister}
-                  disabled={isSubmitting}
-                  className="w-full mt-xl text-on-primary font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <span className="material-symbols-outlined animate-spin">refresh</span>
-                  ) : (
-                    <span className="material-symbols-outlined">check_circle</span>
-                  )}
-                  {isSubmitting ? 'Đang gửi...' : 'Xác nhận đăng ký'}
-                </button>
-              )}
+              <button 
+                onClick={handleRegister}
+                disabled={isSubmitting}
+                className={clsx(
+                  "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
+                  !isMonthOpen 
+                    ? "bg-surface-variant text-on-surface-variant opacity-70 hover:opacity-80" 
+                    : "bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95"
+                )}
+              >
+                {isSubmitting ? (
+                  <span className="material-symbols-outlined animate-spin">refresh</span>
+                ) : (
+                  <span className="material-symbols-outlined">check_circle</span>
+                )}
+                {isSubmitting ? 'Đang gửi...' : 'Xác nhận đăng ký'}
+              </button>
             </div>
           </div>
         </section>
