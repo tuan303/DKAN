@@ -19,6 +19,8 @@ export default function ScheduleMonth() {
   const [userEmail, setUserEmail] = useState<string | null>('');
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
   
+  const [blockedMonths, setBlockedMonths] = useState<Record<string, boolean>>({});
+  
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -37,6 +39,7 @@ export default function ScheduleMonth() {
   const weekdaysCount = getWeekdaysCount(selectedMonthIndex, selectedYear);
   const monthString = (selectedMonthIndex + 1).toString().padStart(2, '0');
   const isMonthOpen = monthlyStatus[monthString] ?? false; 
+  const isUserBlocked = blockedMonths[`${selectedYear}-${monthString}`] ?? false;
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -49,6 +52,32 @@ export default function ScheduleMonth() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const checkBlockedStatus = async () => {
+      if (!userEmail) return;
+      const monthKey = `${selectedYear}-${monthString}`;
+      try {
+        const docRef = doc(db, 'blocked_users', monthKey);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const emails: string[] = docSnap.data().emails || [];
+          setBlockedMonths(prev => ({
+            ...prev,
+            [monthKey]: emails.includes(userEmail.toLowerCase())
+          }));
+        } else {
+          setBlockedMonths(prev => ({
+            ...prev,
+            [monthKey]: false
+          }));
+        }
+      } catch (err) {
+        console.error('Error checking block status', err);
+      }
+    };
+    checkBlockedStatus();
+  }, [selectedYear, monthString, userEmail]);
 
   const fetchConfigAndEvents = async () => {
     try {
@@ -84,6 +113,14 @@ export default function ScheduleMonth() {
   };
 
   const handleRegister = async () => {
+    if (isUserBlocked) {
+      setSubmitStatus({
+        type: 'error',
+        message: 'Thầy/Cô đã vi phạm quy định chấm ăn! Không được đăng ký ăn trong tháng này'
+      });
+      return;
+    }
+
     if (!isMonthOpen) {
       setSubmitStatus({
         type: 'error',
@@ -252,7 +289,7 @@ export default function ScheduleMonth() {
                             <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA SÁNG</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA SÁNG</h5>
                             <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
@@ -288,7 +325,7 @@ export default function ScheduleMonth() {
                             <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface">ĐĂNG KÝ ĂN BỮA TRƯA</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA TRƯA</h5>
                             <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
@@ -324,6 +361,20 @@ export default function ScheduleMonth() {
             <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
               <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
               
+              {isUserBlocked && (
+                <div className="mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 bg-error-container text-error">
+                  <span className="material-symbols-outlined text-[18px] mt-0.5">error</span>
+                  <p>Thầy/Cô đã vi phạm quy định chấm ăn! Không được đăng ký ăn trong tháng này.</p>
+                </div>
+              )}
+
+              {!isMonthOpen && !isUserBlocked && (
+                <div className="mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 bg-error-container text-error opacity-80">
+                  <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
+                  <p>Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.</p>
+                </div>
+              )}
+
               <div className="space-y-md flex-1">
                 <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                   <div className="flex items-center gap-sm">
@@ -347,10 +398,10 @@ export default function ScheduleMonth() {
               
               <button 
                 onClick={handleRegister}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUserBlocked}
                 className={clsx(
                   "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
-                  !isMonthOpen 
+                  (!isMonthOpen || isUserBlocked)
                     ? "bg-surface-variant text-on-surface-variant opacity-70 hover:opacity-80" 
                     : "bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95"
                 )}

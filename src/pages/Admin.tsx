@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
@@ -49,8 +49,12 @@ export default function Admin() {
 
   const [addingAdmin, setAddingAdmin] = useState(false);
 
+  // Blocked users
+  const [blockedEmails, setBlockedEmails] = useState<string[]>([]);
+  const [blockedEmailsInput, setBlockedEmailsInput] = useState('');
+
   // Tabs from URL
-  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'events' | 'settings' | 'admins';
+  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'events' | 'settings' | 'admins' | 'blocked';
   const setActiveTab = (tab: string) => setSearchParams({ tab });
 
   // Settings states
@@ -118,8 +122,52 @@ export default function Admin() {
     }
   };
 
+  const fetchBlockedEmails = async () => {
+    try {
+      const docRef = doc(db, 'blocked_users', selectedMonth);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setBlockedEmails(docSnap.data().emails || []);
+      } else {
+        setBlockedEmails([]);
+      }
+    } catch (err) {
+      console.error('Error fetching blocked emails:', err);
+    }
+  };
+
+  const handleSaveBlockedEmails = async (emails: string[]) => {
+    try {
+      await setDoc(doc(db, 'blocked_users', selectedMonth), { emails });
+      setBlockedEmails(emails);
+    } catch (err) {
+      console.error('Error saving blocked emails:', err);
+    }
+  };
+
+  const handleAddBlockedEmails = () => {
+    const newEmails = blockedEmailsInput
+      .split('\n')
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e.length > 0 && e.includes('@'));
+    
+    if (newEmails.length === 0) return;
+    
+    const uniqueEmails = Array.from(new Set([...blockedEmails, ...newEmails]));
+    handleSaveBlockedEmails(uniqueEmails);
+    setBlockedEmailsInput('');
+  };
+
+  const handleRemoveBlockedEmail = (emailToRemove: string) => {
+    const updated = blockedEmails.filter(e => e !== emailToRemove);
+    handleSaveBlockedEmails(updated);
+  };
+
   useEffect(() => {
-    if (isAdmin) fetchData();
+    if (isAdmin) {
+      fetchData();
+      fetchBlockedEmails();
+    }
   }, [selectedMonth, isAdmin]);
 
   useEffect(() => {
@@ -319,6 +367,12 @@ export default function Admin() {
             onClick={() => setActiveTab('settings')}
           >
             CẤU HÌNH
+          </button>
+          <button 
+            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'blocked' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            onClick={() => setActiveTab('blocked')}
+          >
+            VI PHẠM
           </button>
           <button 
             className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'admins' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
@@ -608,6 +662,81 @@ export default function Admin() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'blocked' && (
+          <div className="px-md md:px-0 grid grid-cols-1 gap-md">
+            {/* Blocked Users Management */}
+            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden">
+                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Quản Lý Vi Phạm</h2>
+                    <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Danh sách người dùng không được đăng ký ăn trong thời gian đã chọn.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <span className="font-label-sm text-on-surface-variant">Tháng áp dụng:</span>
+                     <select 
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                     >
+                       {MONTHS.map(m => (
+                         <option key={m} value={`2026-${m}`}>Tháng {m} / 2026</option>
+                       ))}
+                     </select>
+                  </div>
+                </div>
+                
+                <div className="p-md grid grid-cols-1 md:grid-cols-2 gap-lg items-start">
+                  <div className="flex flex-col gap-md">
+                    <h3 className="font-label-md text-label-md text-on-surface">Thêm Email Vi Phạm</h3>
+                    <p className="text-sm text-on-surface-variant">Nhập danh sách email cần chặn, mỗi email trên 1 dòng.</p>
+                    <textarea 
+                      value={blockedEmailsInput}
+                      onChange={(e) => setBlockedEmailsInput(e.target.value)}
+                      placeholder="email1@school.edu.vn&#10;email2@school.edu.vn"
+                      className="w-full bg-surface border border-outline-variant rounded-lg p-3 min-h-[150px] text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-y"
+                    ></textarea>
+                    <button 
+                      onClick={handleAddBlockedEmails}
+                      disabled={!blockedEmailsInput.trim()}
+                      className="bg-error text-on-error px-4 py-2 rounded-lg font-label-md disabled:opacity-50 flex justify-center items-center gap-2 hover:bg-error/90 transition-colors w-fit"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">block</span>
+                      Cập nhật danh sách chặn
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-md">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-label-md text-label-md text-on-surface">Danh sách đang chặn</h3>
+                      <span className="bg-error-container text-on-error-container text-xs px-2 py-0.5 rounded-full font-bold">{blockedEmails.length}</span>
+                    </div>
+                    
+                    <div className="bg-surface border border-outline-variant flex-1 rounded-lg overflow-y-auto max-h-[300px] min-h-[200px] flex flex-col p-2 space-y-2">
+                      {blockedEmails.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-on-surface-variant italic text-sm">
+                          Chưa có email nào bị chặn trong tháng này
+                        </div>
+                      ) : (
+                        blockedEmails.map((email, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant group hover:border-error transition-colors">
+                            <span className="font-body-md text-sm truncate pr-2">{email}</span>
+                            <button 
+                              onClick={() => handleRemoveBlockedEmail(email)}
+                              className="text-on-surface-variant hover:text-error transition-colors p-1"
+                              title="Gỡ chặn"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
           </div>
         )}
 
