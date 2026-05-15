@@ -40,6 +40,7 @@ export default function Admin() {
   const [admins, setAdmins] = useState<AdminData[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2026-05'); 
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedEventId, setSelectedEventId] = useState('');
   
   // Filters for Monthly
@@ -222,6 +223,19 @@ export default function Admin() {
 
   const totalBreakfast = filteredRegistrations.reduce((sum, reg) => sum + (reg.breakfastCount || 0), 0);
   const totalLunch = filteredRegistrations.reduce((sum, reg) => sum + (reg.lunchCount || 0), 0);
+
+  // Daily statistics calculations 
+  const [yearStr, monthStr] = selectedMonth.split('-');
+  const selYear = parseInt(yearStr);
+  const selMonthIndex = parseInt(monthStr) - 1; 
+  
+  const daysInMonth = new Date(selYear, selMonthIndex + 1, 0).getDate();
+  const cappedSelectedDay = Math.min(selectedDay, daysInMonth);
+  const selectedDateObj = new Date(selYear, selMonthIndex, cappedSelectedDay);
+  const isSelectedDayWeekday = selectedDateObj.getDay() !== 0 && selectedDateObj.getDay() !== 6;
+
+  const dailyBreakfast = isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0;
+  const dailyLunch = isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.lunchCount || 0) > 0).length : 0;
 
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
@@ -411,6 +425,42 @@ export default function Admin() {
                 </div>
                  <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
                   <div className="bg-secondary h-2 rounded-full" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Daily Statistics */}
+            <div className="px-md md:px-0">
+              <div className="bg-surface-container-lowest rounded-xl p-md lg:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none m-0">Thống Kê Theo Ngày</h2>
+                    <select 
+                      value={selectedDay}
+                      onChange={(e) => setSelectedDay(parseInt(e.target.value))}
+                      className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-sm outline-none font-bold text-primary ml-2 cursor-pointer shadow-sm"
+                    >
+                      {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+                        <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-4 flex-wrap w-full md:w-auto">
+                    <div className="flex items-center justify-between md:justify-start gap-4 bg-primary-container text-on-primary-container px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-primary/10">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+                        <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
+                      </div>
+                      <span className="font-headline-md font-black">{dailyBreakfast}</span>
+                    </div>
+                    <div className="flex items-center justify-between md:justify-start gap-4 bg-secondary-container text-on-secondary-container px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-secondary/10">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+                        <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
+                      </div>
+                      <span className="font-headline-md font-black">{dailyLunch}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
