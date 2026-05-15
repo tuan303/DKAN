@@ -136,7 +136,7 @@ export default function ScheduleMonth() {
             subject: `Xác nhận đăng ký ăn Tháng ${monthString}/${selectedYear}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-                <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
+                <h2 style="color: #23328c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
                 <p>Kính gửi Anh/Chị,</p>
                 <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết số lượng suất ăn như sau:</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -146,25 +146,25 @@ export default function ScheduleMonth() {
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Sáng (T2 - T6)</td>
-                    <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+                    <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
                       ${breakfastChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Trưa (T2 - T6)</td>
-                    <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+                    <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
                       ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                 </table>
-                <div style="margin-top: 20px; color: #d21235; font-weight: bold; border: 1px solid #d21235; padding: 15px; border-radius: 8px;">
+                <div style="margin-top: 20px; color: #23328c; font-weight: bold; border: 1px solid #23328c; padding: 15px; border-radius: 8px;">
                   <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
                   <ul style="margin-bottom: 0; padding-left: 20px;">
                     <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
                     <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
                   </ul>
                 </div>
-                <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
+                <p style="font-weight: bold; margin-top: 30px; color: #23328c;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
               </div>
             `
           })
@@ -324,13 +324,6 @@ export default function ScheduleMonth() {
             <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
               <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
               
-              {submitStatus && (
-                <div className={`mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 ${submitStatus.type === 'success' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-error-container text-on-error-container'}`}>
-                  <span className="material-symbols-outlined text-[18px] mt-0.5">{submitStatus.type === 'success' ? 'check_circle' : 'error'}</span>
-                  <p>{submitStatus.message}</p>
-                </div>
-              )}
-
               <div className="space-y-md flex-1">
                 <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                   <div className="flex items-center gap-sm">
@@ -378,7 +371,7 @@ export default function ScheduleMonth() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
           <div className={clsx(
-            "relative w-full max-w-sm bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+            "relative w-[min(calc(100vw-32px),384px)] bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
             submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
           )}>
             <div className="p-xl text-center flex flex-col items-center">
@@ -398,7 +391,10 @@ export default function ScheduleMonth() {
                 {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
               </h3>
               
-              <p className="font-body-md text-body-md text-on-surface-variant mb-xl">
+              <p className={clsx(
+                "font-body-md text-body-md mb-xl",
+                submitStatus.type === 'error' ? "text-error" : "text-on-surface-variant"
+              )}>
                 {submitStatus.message}
               </p>
               

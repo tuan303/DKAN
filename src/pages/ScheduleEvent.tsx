@@ -99,7 +99,7 @@ export default function ScheduleEvent() {
             .map(evt => `
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 12px;">${evt.name}</td>
-              <td style="padding: 12px; text-align: right; color: #1a365d; font-weight: bold;">
+              <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
                 ${eventChoices[evt.id] === 'yes' ? 'Có ăn (1 suất)' : 'Không ăn'}
               </td>
             </tr>
@@ -115,7 +115,7 @@ export default function ScheduleEvent() {
               subject: 'Xác nhận đăng ký ăn Sự kiện',
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-                  <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
+                  <h2 style="color: #23328c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
                   <p>Kính gửi Anh/Chị,</p>
                   <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
                   <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -125,14 +125,14 @@ export default function ScheduleEvent() {
                     </tr>
                     ${eventsTableRows}
                   </table>
-                  <div style="margin-top: 20px; color: #d21235; font-weight: bold; border: 1px solid #d21235; padding: 15px; border-radius: 8px;">
+                  <div style="margin-top: 20px; color: #23328c; font-weight: bold; border: 1px solid #23328c; padding: 15px; border-radius: 8px;">
                     <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
                     <ul style="margin-bottom: 0; padding-left: 20px;">
                       <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
                       <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
                     </ul>
                   </div>
-                  <p style="font-weight: bold; margin-top: 30px; color: #1a365d;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
+                  <p style="font-weight: bold; margin-top: 30px; color: #23328c;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
                 </div>
               `
             })
@@ -188,18 +188,18 @@ export default function ScheduleEvent() {
               <div className="space-y-sm">
                 {events.length === 0 ? (
                   <div className="py-[60px] px-6 text-center bg-surface-container-lowest rounded-[24px] border border-outline-variant flex flex-col items-center justify-center w-full my-4 shadow-sm">
-                    <div className="w-20 h-20 bg-surface-variant/30 rounded-full flex items-center justify-center mb-6">
-                      <span className="material-symbols-outlined text-[40px] text-on-surface-variant">event_busy</span>
+                    <div className="w-20 h-20 bg-error/10 rounded-full flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-[40px] text-error">event_busy</span>
                     </div>
-                    <h3 className="text-[20px] font-bold text-on-surface mb-3">Không có sự kiện</h3>
-                    <p className="text-[15px] text-on-surface-variant max-w-[320px] leading-relaxed">
+                    <h3 className="text-[20px] font-bold text-error mb-3">Không có sự kiện</h3>
+                    <p className="text-[15px] text-error/80 max-w-[320px] leading-relaxed">
                       Hiện tại không có sự kiện nào đang trong thời gian mở đăng ký ăn. Vui lòng quay lại sau!
                     </p>
                   </div>
                 ) : events.map(evt => (
                   <div key={evt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                     <div className="flex items-center gap-md">
-                      <div className="w-12 h-12 bg-[#ffe4e6] rounded-full flex items-center justify-center text-[#e11d48]">
+                      <div className="w-12 h-12 bg-primary-container rounded-full flex items-center justify-center text-on-primary-container">
                         <span className="material-symbols-outlined text-[24px]">event</span>
                       </div>
                       <div>
@@ -238,20 +238,13 @@ export default function ScheduleEvent() {
             <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
               <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Thông tin xác nhận</h3>
               
-              {submitStatus && (
-                <div className={`mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 ${submitStatus.type === 'success' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-error-container text-on-error-container'}`}>
-                  <span className="material-symbols-outlined text-[18px] mt-0.5">{submitStatus.type === 'success' ? 'check_circle' : 'error'}</span>
-                  <p>{submitStatus.message}</p>
-                </div>
-              )}
-
               <div className="space-y-md flex-1">
                 {events.filter(e => eventChoices[e.id] === 'yes').length === 0 ? (
                   <p className="text-on-surface-variant italic font-body-md text-[14px]">Bạn chưa đăng ký sự kiện nào.</p>
                 ) : events.filter(e => eventChoices[e.id] === 'yes').map(e => (
                   <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                     <div className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-[#e11d48]">event</span>
+                      <span className="material-symbols-outlined text-primary">event</span>
                       <span className="font-body-md text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">{e.name}</span>
                     </div>
                     <span className="font-headline-md text-headline-md text-primary ml-2">
@@ -281,7 +274,7 @@ export default function ScheduleEvent() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
           <div className={clsx(
-            "relative w-full max-w-sm bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+            "relative w-[min(calc(100vw-32px),384px)] bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
             submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
           )}>
             <div className="p-xl text-center flex flex-col items-center">
@@ -301,7 +294,10 @@ export default function ScheduleEvent() {
                 {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
               </h3>
               
-              <p className="font-body-md text-body-md text-on-surface-variant mb-xl">
+              <p className={clsx(
+                "font-body-md text-body-md mb-xl",
+                submitStatus.type === 'error' ? "text-error" : "text-on-surface-variant"
+              )}>
                 {submitStatus.message}
               </p>
               
