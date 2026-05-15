@@ -89,17 +89,16 @@ export default function Login() {
                 <span className="font-label-sm text-[10px] md:text-[11px] font-bold text-[#D21235] uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
                 <div className="h-px bg-outline-variant flex-1"></div>
               </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 md:mt-8 text-center flex flex-col justify-center">
-            <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant text-[12px] md:text-[14px] px-4">
-              Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
-            </p>
-            <div className="mt-1">
-              <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
-                Cần hỗ trợ?
-              </a>
+              <div className="text-center flex flex-col justify-center">
+                <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant text-[12px] md:text-[14px] px-4">
+                  Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
+                </p>
+                <div className="mt-1">
+                  <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
+                    Cần hỗ trợ?
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
           
