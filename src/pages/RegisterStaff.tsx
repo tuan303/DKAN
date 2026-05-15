@@ -167,6 +167,7 @@ export default function RegisterStaff() {
                   <option value="GIÁO VIÊN THỈNH GIẢNG">GIÁO VIÊN THỈNH GIẢNG</option>
                   <option value="ĐỐI TÁC">ĐỐI TÁC</option>
                   <option value="CỘNG TÁC VIÊN">CỘNG TÁC VIÊN</option>
+                  <option value="Khác">Khác</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">arrow_drop_down</span>
