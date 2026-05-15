@@ -94,7 +94,7 @@ export default function Login() {
                   Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
                 </p>
                 <div className="mt-1">
-                  <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="#">
+                  <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="https://zalo.me/664388665648927162" target="_blank" rel="noopener noreferrer">
                     Cần hỗ trợ?
                   </a>
                 </div>
