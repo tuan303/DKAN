@@ -141,6 +141,31 @@ export default function ScheduleMonth() {
       let staffData: any = {};
       const user = auth.currentUser;
       if (user) {
+        // Check if already registered
+        const regDocRef = doc(db, 'registrations', `${user.uid}_${selectedYear}-${monthString}`);
+        const regDocSnap = await getDoc(regDocRef);
+        
+        if (regDocSnap.exists()) {
+          const data = regDocSnap.data();
+          let dateStr = '';
+          if (data.timestamp) {
+            const date = new Date(data.timestamp);
+            const hh = date.getHours().toString().padStart(2, '0');
+            const mm = date.getMinutes().toString().padStart(2, '0');
+            const dd = date.getDate().toString().padStart(2, '0');
+            const MM = (date.getMonth() + 1).toString().padStart(2, '0');
+            const yyyy = date.getFullYear();
+            dateStr = `${hh}:${mm} ngày ${dd}/${MM}/${yyyy}`;
+          }
+          
+          setSubmitStatus({
+            type: 'info',
+            message: `Thầy/Cô đã đăng ký lúc: ${dateStr}`
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
         const staffDoc = await getDoc(doc(db, 'staff', user.uid));
         staffData = staffDoc.exists() ? staffDoc.data() : {
            fullName: user.displayName || 'Unknown',
@@ -174,9 +199,9 @@ export default function ScheduleMonth() {
             subject: `Xác nhận đăng ký ăn Tháng ${monthString}/${selectedYear}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-                <h2 style="color: #23328c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
-                <p>Kính gửi Anh/Chị,</p>
-                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết số lượng suất ăn như sau:</p>
+                <h2 style="color: #D21235; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
+                <p>Kính gửi Thầy/Cô,</p>
+                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết số lượng suất ăn như sau:</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                   <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                     <th style="padding: 12px; text-align: left;">Hạng mục</th>
@@ -184,25 +209,25 @@ export default function ScheduleMonth() {
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Sáng (T2 - T6)</td>
-                    <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
+                    <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
                       ${breakfastChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Trưa (T2 - T6)</td>
-                    <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
+                    <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
                       ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                 </table>
-                <div style="margin-top: 20px; color: #23328c; font-weight: bold; border: 1px solid #23328c; padding: 15px; border-radius: 8px;">
+                <div style="margin-top: 20px; color: #D21235; font-weight: bold; border: 1px solid #D21235; padding: 15px; border-radius: 8px;">
                   <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
                   <ul style="margin-bottom: 0; padding-left: 20px;">
                     <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
                     <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
                   </ul>
                 </div>
-                <p style="font-weight: bold; margin-top: 30px; color: #23328c;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
+                <p style="font-weight: bold; margin-top: 30px; color: #333;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
               </div>
             `
           })

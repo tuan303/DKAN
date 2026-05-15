@@ -66,6 +66,35 @@ export default function ScheduleEvent() {
       
       const user = auth.currentUser;
       if (user) {
+        // Check if already registered
+        const openEvents = events.filter(e => e.isOpen);
+        if (openEvents.length > 0) {
+          const firstOpenEventId = openEvents[0].id;
+          const regDocRef = doc(db, 'event_registrations', `${user.uid}_${firstOpenEventId}`);
+          const regDocSnap = await getDoc(regDocRef);
+          
+          if (regDocSnap.exists()) {
+            const data = regDocSnap.data();
+            let dateStr = '';
+            if (data.timestamp) {
+              const date = new Date(data.timestamp);
+              const hh = date.getHours().toString().padStart(2, '0');
+              const mm = date.getMinutes().toString().padStart(2, '0');
+              const dd = date.getDate().toString().padStart(2, '0');
+              const MM = (date.getMonth() + 1).toString().padStart(2, '0');
+              const yyyy = date.getFullYear();
+              dateStr = `${hh}:${mm} ngày ${dd}/${MM}/${yyyy}`;
+            }
+            
+            setSubmitStatus({
+              type: 'info',
+              message: `Thầy/Cô đã đăng ký lúc: ${dateStr}`
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
         const staffDoc = await getDoc(doc(db, 'staff', user.uid));
         staffData = staffDoc.exists() ? staffDoc.data() : {
            fullName: user.displayName || 'Unknown',
@@ -100,7 +129,7 @@ export default function ScheduleEvent() {
             .map(evt => `
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 12px;">${evt.name}</td>
-              <td style="padding: 12px; text-align: right; color: #23328c; font-weight: bold;">
+              <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
                 ${eventChoices[evt.id] === 'yes' ? 'Có ăn (1 suất)' : 'Không ăn'}
               </td>
             </tr>
@@ -116,9 +145,9 @@ export default function ScheduleEvent() {
               subject: 'Xác nhận đăng ký ăn Sự kiện',
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-                  <h2 style="color: #23328c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
-                  <p>Kính gửi Anh/Chị,</p>
-                  <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Anh/Chị đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
+                  <h2 style="color: #D21235; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
+                  <p>Kính gửi Thầy/Cô,</p>
+                  <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
                   <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                     <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                       <th style="padding: 12px; text-align: left;">Sự kiện</th>
@@ -126,14 +155,14 @@ export default function ScheduleEvent() {
                     </tr>
                     ${eventsTableRows}
                   </table>
-                  <div style="margin-top: 20px; color: #23328c; font-weight: bold; border: 1px solid #23328c; padding: 15px; border-radius: 8px;">
+                  <div style="margin-top: 20px; color: #D21235; font-weight: bold; border: 1px solid #D21235; padding: 15px; border-radius: 8px;">
                     <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
                     <ul style="margin-bottom: 0; padding-left: 20px;">
                       <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
                       <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
                     </ul>
                   </div>
-                  <p style="font-weight: bold; margin-top: 30px; color: #23328c;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
+                  <p style="font-weight: bold; margin-top: 30px; color: #333;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
                 </div>
               `
             })
