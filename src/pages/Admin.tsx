@@ -64,6 +64,8 @@ export default function Admin() {
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
   const [events, setEvents] = useState<EventData[]>([]);
   const [newEventName, setNewEventName] = useState('');
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingEventName, setEditingEventName] = useState('');
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -266,6 +268,7 @@ export default function Admin() {
   };
 
   const [adminToDelete, setAdminToDelete] = useState<{id: string, email: string} | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
 
   const handleRemoveAdmin = async (adminId: string, email: string) => {
     try {
@@ -361,6 +364,31 @@ export default function Admin() {
       setEvents(events.map(e => e.id === id ? { ...e, isOpen: !currentStatus } : e));
     } catch (err) {
       console.error('Error toggling event:', err);
+    }
+  };
+
+  const handleEditEvent = async (id: string) => {
+    if (!editingEventName.trim()) return;
+    try {
+      await updateDoc(doc(db, 'events', id), { name: editingEventName.trim() });
+      setEvents(events.map(e => e.id === id ? { ...e, name: editingEventName.trim() } : e));
+      setEditingEventId(null);
+      setEditingEventName('');
+    } catch (err) {
+      console.error('Error editing event:', err);
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'events', id));
+      setEvents(events.filter(e => e.id !== id));
+      if (selectedEventId === id) {
+        setSelectedEventId('');
+      }
+      setEventToDelete(null);
+    } catch (err) {
+      console.error('Error deleting event:', err);
     }
   };
 
@@ -752,9 +780,72 @@ export default function Admin() {
                     <p className="text-on-surface-variant text-center italic text-[14px] py-4">Chưa có sự kiện nào.</p>
                   ) : (
                     events.map(event => (
-                      <div key={event.id} className="flex justify-between items-center p-sm bg-surface border border-outline-variant rounded-lg">
-                        <span className="font-body-md font-medium text-[15px]">{event.name}</span>
+                      <div key={event.id} className="flex justify-between items-center p-sm bg-surface border border-outline-variant rounded-lg group">
+                        {editingEventId === event.id ? (
+                          <div className="flex-1 flex gap-2 mr-4">
+                            <input
+                              type="text"
+                              value={editingEventName}
+                              onChange={(e) => setEditingEventName(e.target.value)}
+                              className="flex-1 bg-surface border border-outline-variant rounded px-2 py-1 text-[14px] focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleEditEvent(event.id as string)}
+                              disabled={!editingEventName.trim()}
+                              className="text-xs bg-primary text-on-primary px-2 py-1 rounded disabled:opacity-50 hover:bg-primary/90"
+                            >
+                              Lưu
+                            </button>
+                            <button
+                              onClick={() => setEditingEventId(null)}
+                              className="text-xs bg-surface-variant text-on-surface-variant px-2 py-1 rounded hover:bg-surface-variant/80"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="font-body-md font-medium text-[15px]">{event.name}</span>
+                        )}
                         <div className="flex items-center gap-sm">
+                          {editingEventId !== event.id && (
+                            <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setEditingEventId(event.id as string);
+                                  setEditingEventName(event.name);
+                                }}
+                                className="w-7 h-7 flex items-center justify-center text-primary hover:bg-primary-container rounded"
+                                title="Sửa tên"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                              </button>
+                              {eventToDelete === event.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleDeleteEvent(event.id as string)}
+                                    className="px-2 py-1 text-xs bg-error text-on-error rounded hover:bg-error/90 transition-colors"
+                                  >
+                                    Xác nhận
+                                  </button>
+                                  <button
+                                    onClick={() => setEventToDelete(null)}
+                                    className="px-2 py-1 text-xs bg-surface-variant text-on-surface-variant rounded hover:bg-surface-variant/80 transition-colors"
+                                  >
+                                    Hủy
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setEventToDelete(event.id as string)}
+                                  className="w-7 h-7 flex items-center justify-center text-error hover:bg-error-container rounded"
+                                  title="Xóa"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                           <span className="font-label-sm text-on-surface-variant text-[12px] uppercase">
                             {event.isOpen ? 'Mở' : 'Khóa'}
                           </span>
