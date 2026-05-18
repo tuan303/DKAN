@@ -214,7 +214,7 @@ export default function ScheduleEvent() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
               <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Đăng ký suất ăn tham gia các sự kiện của cơ quan.</p>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
             </div>
           </div>
 
@@ -279,12 +279,16 @@ export default function ScheduleEvent() {
               
               <div className="space-y-md flex-1">
                 {events.filter(e => eventChoices[e.id] === 'yes').length === 0 ? (
-                  <p className="text-on-surface-variant italic font-body-md text-[14px]">Bạn chưa đăng ký sự kiện nào.</p>
+                  <p className="text-error italic font-body-md text-[14px]">thầy/cô không đăng ký ăn sự kiện này</p>
                 ) : events.filter(e => eventChoices[e.id] === 'yes').map(e => (
                   <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                     <div className="flex items-center gap-sm">
                       <span className="material-symbols-outlined text-primary">event</span>
-                      <span className="font-body-md text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">{e.name}</span>
+                      <span className="font-body-md text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">
+                        {e.name.split(' ').length > 3 
+                          ? e.name.split(' ').slice(0, 3).join(' ') + '...' 
+                          : e.name}
+                      </span>
                     </div>
                     <span className="font-headline-md text-headline-md text-primary ml-2">
                       1 <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
