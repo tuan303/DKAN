@@ -19,6 +19,7 @@ export default function ScheduleMonth() {
   const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>('');
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
+  const [monthlyExpiry, setMonthlyExpiry] = useState<Record<string, string>>({});
   
   const [blockedMonths, setBlockedMonths] = useState<Record<string, boolean>>({});
   
@@ -39,7 +40,13 @@ export default function ScheduleMonth() {
 
   const weekdaysCount = getWeekdaysCount(selectedMonthIndex, selectedYear);
   const monthString = (selectedMonthIndex + 1).toString().padStart(2, '0');
-  const isMonthOpen = monthlyStatus[monthString] ?? false; 
+  let isMonthOpen = monthlyStatus[monthString] ?? false; 
+  if (isMonthOpen && monthlyExpiry[monthString]) {
+    const expiryDate = new Date(monthlyExpiry[monthString]);
+    if (new Date() > expiryDate) {
+      isMonthOpen = false;
+    }
+  }
   const isUserBlocked = blockedMonths[`${selectedYear}-${monthString}`] ?? false;
 
   useEffect(() => {
@@ -87,6 +94,11 @@ export default function ScheduleMonth() {
       if (monthlyDoc.exists()) {
         const data = monthlyDoc.data() as Record<string, boolean>;
         setMonthlyStatus(data);
+      }
+      
+      const expiryDoc = await getDoc(doc(db, 'settings', 'monthlyExpiry'));
+      if (expiryDoc.exists()) {
+        setMonthlyExpiry(expiryDoc.data() as Record<string, string>);
       }
     } catch (err) {
       console.error(err);

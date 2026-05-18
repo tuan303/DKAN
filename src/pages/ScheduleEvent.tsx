@@ -10,6 +10,7 @@ interface EventData {
   id: string;
   name: string;
   isOpen: boolean;
+  expiresAt?: string;
 }
 
 export default function ScheduleEvent() {
@@ -39,7 +40,15 @@ export default function ScheduleEvent() {
       const initChoices: Record<string, string> = {};
       eventsSnapshot.forEach((d) => {
         const evt = { id: d.id, ...d.data() } as EventData;
-        if (evt.isOpen) {
+        let isOpen = evt.isOpen;
+        if (isOpen && evt.expiresAt) {
+          const expiryDate = new Date(evt.expiresAt);
+          if (new Date() > expiryDate) {
+            isOpen = false;
+          }
+        }
+        
+        if (isOpen) {
           evts.push(evt);
           initChoices[evt.id] = 'yes';
         }

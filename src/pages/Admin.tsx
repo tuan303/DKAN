@@ -16,6 +16,7 @@ interface RegistrationData {
   email: string;
   breakfastCount: number;
   lunchCount: number;
+  timestamp?: string;
 }
 
 interface AdminData {
@@ -27,6 +28,7 @@ interface EventData {
   id: string;
   name: string;
   isOpen: boolean;
+  expiresAt?: string;
 }
 
 const SUPER_ADMIN = 'tuantm@hoangmaistarschool.edu.vn';
@@ -62,6 +64,7 @@ export default function Admin() {
 
   // Settings states
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
+  const [monthlyExpiry, setMonthlyExpiry] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<EventData[]>([]);
   const [newEventName, setNewEventName] = useState('');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -218,6 +221,10 @@ export default function Admin() {
         setMonthlyStatus(defaultStatus);
         await setDoc(doc(db, 'settings', 'monthlyConfig'), defaultStatus);
       }
+      const expiryConfig = monthlyDoc.docs.find(d => d.id === 'monthlyExpiry');
+      if (expiryConfig) {
+        setMonthlyExpiry(expiryConfig.data() as Record<string, string>);
+      }
 
       // Fetch Events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
@@ -338,6 +345,12 @@ export default function Admin() {
     xlsx.writeFile(workbook, safeFileName);
   };
 
+  const handleSetMonthExpiry = async (month: string, dateStr: string) => {
+    const newExpiry = { ...monthlyExpiry, [month]: dateStr };
+    setMonthlyExpiry(newExpiry);
+    await setDoc(doc(db, 'settings', 'monthlyExpiry'), newExpiry, { merge: true });
+  };
+
   const handleToggleMonth = async (month: string) => {
     const newStatus = !monthlyStatus[month];
     const newMonthlyStatus = { ...monthlyStatus, [month]: newStatus };
@@ -368,6 +381,15 @@ export default function Admin() {
       setEvents(events.map(e => e.id === id ? { ...e, isOpen: !currentStatus } : e));
     } catch (err) {
       console.error('Error toggling event:', err);
+    }
+  };
+
+  const handleSetEventExpiry = async (id: string, dateStr: string) => {
+    try {
+      await updateDoc(doc(db, 'events', id), { expiresAt: dateStr });
+      setEvents(events.map(e => e.id === id ? { ...e, expiresAt: dateStr } : e));
+    } catch (err) {
+      console.error('Error setting event expiry:', err);
     }
   };
 
@@ -742,14 +764,27 @@ export default function Admin() {
               </div>
               <div className="p-md grid grid-cols-2 md:grid-cols-3 gap-md focus:outline-none">
                 {MONTHS.map(month => (
-                  <div key={month} className="flex items-center justify-between bg-surface p-sm rounded-lg border border-outline-variant">
-                    <span className="font-label-md">Tháng {month}</span>
-                    <button 
-                      onClick={() => handleToggleMonth(month)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${monthlyStatus[month] ? 'bg-primary' : 'bg-surface-variant'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                  <div key={month} className="flex flex-col bg-surface p-sm rounded-lg border border-outline-variant gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-md">Tháng {month}</span>
+                      <button 
+                        onClick={() => handleToggleMonth(month)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${monthlyStatus[month] ? 'bg-primary' : 'bg-surface-variant'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {monthlyStatus[month] && (
+                      <div className="flex flex-col gap-1 mt-1 border-t border-outline-variant pt-2">
+                        <label className="text-[11px] text-on-surface-variant">Tự động khóa lúc:</label>
+                        <input 
+                          type="datetime-local"
+                          value={monthlyExpiry[month] || ''}
+                          onChange={(e) => handleSetMonthExpiry(month, e.target.value)}
+                          className="text-xs p-1 bg-surface-bright border border-outline-variant rounded text-on-surface w-full focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -784,82 +819,95 @@ export default function Admin() {
                     <p className="text-on-surface-variant text-center italic text-[14px] py-4">Chưa có sự kiện nào.</p>
                   ) : (
                     events.map(event => (
-                      <div key={event.id} className="flex justify-between items-center p-sm bg-surface border border-outline-variant rounded-lg group">
-                        {editingEventId === event.id ? (
-                          <div className="flex-1 flex gap-2 mr-4">
-                            <input
-                              type="text"
-                              value={editingEventName}
-                              onChange={(e) => setEditingEventName(e.target.value)}
-                              className="flex-1 bg-surface border border-outline-variant rounded px-2 py-1 text-[14px] focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleEditEvent(event.id as string)}
-                              disabled={!editingEventName.trim()}
-                              className="text-xs bg-primary text-on-primary px-2 py-1 rounded disabled:opacity-50 hover:bg-primary/90"
+                      <div key={event.id} className="flex flex-col bg-surface p-sm border border-outline-variant rounded-lg gap-2 group">
+                        <div className="flex justify-between items-center">
+                          {editingEventId === event.id ? (
+                            <div className="flex-1 flex gap-2 mr-4">
+                              <input
+                                type="text"
+                                value={editingEventName}
+                                onChange={(e) => setEditingEventName(e.target.value)}
+                                className="flex-1 bg-surface border border-outline-variant rounded px-2 py-1 text-[14px] focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleEditEvent(event.id as string)}
+                                disabled={!editingEventName.trim()}
+                                className="text-xs bg-primary text-on-primary px-2 py-1 rounded disabled:opacity-50 hover:bg-primary/90"
+                              >
+                                Lưu
+                              </button>
+                              <button
+                                onClick={() => setEditingEventId(null)}
+                                className="text-xs bg-surface-variant text-on-surface-variant px-2 py-1 rounded hover:bg-surface-variant/80"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="font-body-md font-medium text-[15px]">{event.name}</span>
+                          )}
+                          <div className="flex items-center gap-sm">
+                            {editingEventId !== event.id && (
+                              <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => {
+                                    setEditingEventId(event.id as string);
+                                    setEditingEventName(event.name);
+                                  }}
+                                  className="w-7 h-7 flex items-center justify-center text-primary hover:bg-primary-container rounded"
+                                  title="Sửa tên"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+                                {eventToDelete === event.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleDeleteEvent(event.id as string)}
+                                      className="px-2 py-1 text-xs bg-error text-on-error rounded hover:bg-error/90 transition-colors"
+                                    >
+                                      Xác nhận
+                                    </button>
+                                    <button
+                                      onClick={() => setEventToDelete(null)}
+                                      className="px-2 py-1 text-xs bg-surface-variant text-on-surface-variant rounded hover:bg-surface-variant/80 transition-colors"
+                                    >
+                                      Hủy
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setEventToDelete(event.id as string)}
+                                    className="w-7 h-7 flex items-center justify-center text-error hover:bg-error-container rounded"
+                                    title="Xóa"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            <span className="font-label-sm text-on-surface-variant text-[12px] uppercase">
+                              {event.isOpen ? 'Mở' : 'Khóa'}
+                            </span>
+                            <button 
+                              onClick={() => handleToggleEvent(event.id, event.isOpen)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${event.isOpen ? 'bg-primary' : 'bg-surface-variant'}`}
                             >
-                              Lưu
-                            </button>
-                            <button
-                              onClick={() => setEditingEventId(null)}
-                              className="text-xs bg-surface-variant text-on-surface-variant px-2 py-1 rounded hover:bg-surface-variant/80"
-                            >
-                              Hủy
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event.isOpen ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                           </div>
-                        ) : (
-                          <span className="font-body-md font-medium text-[15px]">{event.name}</span>
-                        )}
-                        <div className="flex items-center gap-sm">
-                          {editingEventId !== event.id && (
-                            <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => {
-                                  setEditingEventId(event.id as string);
-                                  setEditingEventName(event.name);
-                                }}
-                                className="w-7 h-7 flex items-center justify-center text-primary hover:bg-primary-container rounded"
-                                title="Sửa tên"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
-                              </button>
-                              {eventToDelete === event.id ? (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleDeleteEvent(event.id as string)}
-                                    className="px-2 py-1 text-xs bg-error text-on-error rounded hover:bg-error/90 transition-colors"
-                                  >
-                                    Xác nhận
-                                  </button>
-                                  <button
-                                    onClick={() => setEventToDelete(null)}
-                                    className="px-2 py-1 text-xs bg-surface-variant text-on-surface-variant rounded hover:bg-surface-variant/80 transition-colors"
-                                  >
-                                    Hủy
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => setEventToDelete(event.id as string)}
-                                  className="w-7 h-7 flex items-center justify-center text-error hover:bg-error-container rounded"
-                                  title="Xóa"
-                                >
-                                  <span className="material-symbols-outlined text-[16px]">delete</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          <span className="font-label-sm text-on-surface-variant text-[12px] uppercase">
-                            {event.isOpen ? 'Mở' : 'Khóa'}
-                          </span>
-                          <button 
-                            onClick={() => handleToggleEvent(event.id, event.isOpen)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${event.isOpen ? 'bg-primary' : 'bg-surface-variant'}`}
-                          >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event.isOpen ? 'translate-x-6' : 'translate-x-1'}`} />
-                          </button>
                         </div>
+                        {event.isOpen && (
+                          <div className="flex items-center justify-between border-t border-outline-variant pt-2 mt-1">
+                            <label className="text-[12px] text-on-surface-variant">Tự động khóa lúc:</label>
+                            <input 
+                              type="datetime-local"
+                              value={event.expiresAt || ''}
+                              onChange={(e) => handleSetEventExpiry(event.id, e.target.value)}
+                              className="text-xs p-1 bg-surface-bright border border-outline-variant rounded text-on-surface focus:outline-none focus:border-primary max-w-[200px]"
+                            />
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
