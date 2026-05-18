@@ -19,6 +19,7 @@ interface RegistrationData {
 }
 
 interface AdminData {
+  id?: string;
   email: string;
 }
 
@@ -125,7 +126,7 @@ export default function Admin() {
       const adminsSnapshot = await getDocs(collection(db, 'admins'));
       const adminData: AdminData[] = [];
       adminsSnapshot.forEach((doc) => {
-        adminData.push(doc.data() as AdminData);
+        adminData.push({ id: doc.id, ...doc.data() } as AdminData);
       });
       setAdmins(adminData);
     } catch (err) {
@@ -261,6 +262,19 @@ export default function Admin() {
       console.error('Error adding admin:', err);
     } finally {
       setAddingAdmin(false);
+    }
+  };
+
+  const [adminToDelete, setAdminToDelete] = useState<{id: string, email: string} | null>(null);
+
+  const handleRemoveAdmin = async (adminId: string, email: string) => {
+    try {
+      await deleteDoc(doc(db, 'admins', adminId));
+      fetchData();
+      setAdminToDelete(null);
+    } catch (err) {
+      console.error('Error removing admin:', err);
+      alert('Có lỗi xảy ra khi xóa quyền quản trị. Vui lòng thử lại.');
     }
   };
 
@@ -859,7 +873,35 @@ export default function Admin() {
                           <span className="material-symbols-outlined text-[18px] text-secondary">shield_person</span>
                           <span className="font-body-md text-body-md text-[14px] truncate">{admin.email}</span>
                         </div>
-                        <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
+                          {auth.currentUser?.email === SUPER_ADMIN && admin.id && (
+                            adminToDelete?.id === admin.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleRemoveAdmin(admin.id as string, admin.email)}
+                                  className="px-2 py-1 text-xs bg-error text-on-error rounded hover:bg-error/90 transition-colors"
+                                >
+                                  Xác nhận
+                                </button>
+                                <button
+                                  onClick={() => setAdminToDelete(null)}
+                                  className="px-2 py-1 text-xs bg-surface-variant text-on-surface-variant rounded hover:bg-surface-variant/80 transition-colors"
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setAdminToDelete({ id: admin.id as string, email: admin.email })}
+                                className="w-8 h-8 flex items-center justify-center text-error hover:bg-error-container hover:text-on-error-container transition-colors rounded"
+                                title="Xóa quyền quản trị"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
