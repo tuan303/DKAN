@@ -144,6 +144,7 @@ export default function RegisterStaff() {
                   <option value="PHÒNG TRUYỀN THÔNG">PHÒNG TRUYỀN THÔNG</option>
                   <option value="PHÒNG GIÁO VỤ">PHÒNG GIÁO VỤ</option>
                   <option value="PHÒNG KHẢO THÍ">PHÒNG KHẢO THÍ</option>
+                  <option value="PHÒNG TUYỂN SINH">PHÒNG TUYỂN SINH</option>
                   <option value="BAN GIÁM HIỆU">BAN GIÁM HIỆU</option>
                   <option value="CHĂM SÓC HỌC SINH">CHĂM SÓC HỌC SINH</option>
                   <option value="KHỐI 1">KHỐI 1</option>
