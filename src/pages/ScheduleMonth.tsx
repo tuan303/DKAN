@@ -208,13 +208,13 @@ export default function ScheduleMonth() {
                     <th style="padding: 12px; text-align: right;">Số lượng đã đăng ký</th>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 12px;">Bữa Sáng (T2 - T6)</td>
+                    <td style="padding: 12px;">Bữa Sáng + Trưa (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
                       ${breakfastChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 12px;">Bữa Trưa (T2 - T6)</td>
+                    <td style="padding: 12px;">Chỉ ăn Bữa Trưa (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
                       ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
                     </td>
@@ -315,7 +315,7 @@ export default function ScheduleMonth() {
                             <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA SÁNG</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA SÁNG + TRƯA</h5>
                             <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
@@ -326,7 +326,10 @@ export default function ScheduleMonth() {
                               type="radio" 
                               name="breakfast" 
                               checked={breakfastChoice === 'yes'}
-                              onChange={() => setBreakfastChoice('yes')}
+                              onChange={() => {
+                                setBreakfastChoice('yes');
+                                setLunchChoice('no');
+                              }}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
                             <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
@@ -351,7 +354,7 @@ export default function ScheduleMonth() {
                             <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA TRƯA</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ CHỈ ĂN BỮA TRƯA</h5>
                             <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
@@ -362,7 +365,10 @@ export default function ScheduleMonth() {
                               type="radio" 
                               name="lunch" 
                               checked={lunchChoice === 'yes'}
-                              onChange={() => setLunchChoice('yes')}
+                              onChange={() => {
+                                setLunchChoice('yes');
+                                setBreakfastChoice('no');
+                              }}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
                             <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
