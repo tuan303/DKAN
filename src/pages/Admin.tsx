@@ -74,11 +74,22 @@ export default function Admin() {
       try {
         let isUserAdmin = user.email === SUPER_ADMIN;
         
-        if (!isUserAdmin) {
-          const adminsSnapshot = await getDocs(collection(db, 'admins'));
-          const adminEmails = adminsSnapshot.docs.map(doc => doc.data().email);
-          if (user.email && adminEmails.includes(user.email)) {
+        if (!isUserAdmin && user.email) {
+          // First check by standard doc ID
+          const docId = user.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+          const adminDoc = await getDoc(doc(db, 'admins', docId));
+          if (adminDoc.exists()) {
             isUserAdmin = true;
+          } else {
+            // Fallback to checking the collection
+            const adminsSnapshot = await getDocs(collection(db, 'admins'));
+            const adminEmails = adminsSnapshot.docs.map(doc => {
+              const email = doc.data().email;
+              return typeof email === 'string' ? email.toLowerCase().trim() : '';
+            });
+            if (adminEmails.includes(user.email.toLowerCase().trim())) {
+              isUserAdmin = true;
+            }
           }
         }
 
