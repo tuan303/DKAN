@@ -13,8 +13,8 @@ interface EventData {
 }
 
 export default function ScheduleMonth() {
-  const [breakfastChoice, setBreakfastChoice] = useState('yes');
-  const [lunchChoice, setLunchChoice] = useState('yes');
+  const [breakfastChoice, setBreakfastChoice] = useState('');
+  const [lunchChoice, setLunchChoice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>('');
@@ -126,6 +126,14 @@ export default function ScheduleMonth() {
       setSubmitStatus({
         type: 'error',
         message: 'Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.'
+      });
+      return;
+    }
+
+    if (!breakfastChoice || !lunchChoice) {
+      setSubmitStatus({
+        type: 'error',
+        message: 'Vui lòng chọn trạng thái Có ăn hoặc Không ăn cho tùy chọn bữa ăn.'
       });
       return;
     }
@@ -423,7 +431,7 @@ export default function ScheduleMonth() {
                     <span className="font-body-md text-body-md text-on-surface">Bữa trưa</span>
                   </div>
                   <span className="font-headline-md text-headline-md text-primary">
-                    {lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    {breakfastChoice === 'yes' || lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
                   </span>
                 </div>
               </div>

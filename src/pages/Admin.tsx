@@ -223,7 +223,7 @@ export default function Admin() {
   });
 
   const totalBreakfast = filteredRegistrations.reduce((sum, reg) => sum + (reg.breakfastCount || 0), 0);
-  const totalLunch = filteredRegistrations.reduce((sum, reg) => sum + (reg.lunchCount || 0), 0);
+  const totalLunch = filteredRegistrations.reduce((sum, reg) => sum + Math.max(reg.lunchCount || 0, reg.breakfastCount || 0), 0);
 
   // Daily statistics calculations 
   const [yearStr, monthStr] = selectedMonth.split('-');
@@ -236,7 +236,7 @@ export default function Admin() {
   const isSelectedDayWeekday = selectedDateObj.getDay() !== 0 && selectedDateObj.getDay() !== 6;
 
   const dailyBreakfast = isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0;
-  const dailyLunch = isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.lunchCount || 0) > 0).length : 0;
+  const dailyLunch = isSelectedDayWeekday ? filteredRegistrations.filter(reg => Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) > 0).length : 0;
 
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
@@ -275,8 +275,8 @@ export default function Admin() {
       'Mã Nhân Viên': reg.employeeId || 'N/A',
       'Họ và Tên': reg.fullName || 'N/A',
       'Phòng ban/Tổ khối': reg.department || 'N/A',
-      'ĐK Bữa sáng': reg.breakfastCount,
-      'ĐK Bữa trưa': reg.lunchCount,
+      'ĐK Bữa sáng': reg.breakfastCount || 0,
+      'ĐK Bữa trưa': Math.max(reg.lunchCount || 0, reg.breakfastCount || 0),
       'Thời gian đăng ký': formatTimestamp(reg.timestamp)
     }));
 
@@ -554,8 +554,8 @@ export default function Admin() {
                             <td className="p-md">{reg.employeeId || 'N/A'}</td>
                             <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
                             <td className="p-md">{reg.department || 'N/A'}</td>
-                            <td className="p-md text-right">{reg.breakfastCount}</td>
-                            <td className="p-md text-right">{reg.lunchCount}</td>
+                            <td className="p-md text-right">{reg.breakfastCount || 0}</td>
+                            <td className="p-md text-right">{Math.max(reg.lunchCount || 0, reg.breakfastCount || 0)}</td>
                             <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
                           </tr>
                         ))
