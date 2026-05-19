@@ -289,7 +289,7 @@ export default function ScheduleMonth() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
               <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐK ĂN HÀNG THÁNG</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn các ngày bạn muốn đăng ký ăn tại nhà ăn cơ quan.</p>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn bữa ăn thầy/cô muốn đăng ký ăn tại trường</p>
             </div>
             {/* Month Selector */}
             <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)]">
