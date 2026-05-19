@@ -220,23 +220,23 @@ export default function ScheduleMonth() {
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
                 <h2 style="color: #D21235; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
-                <p>Kính gửi Thầy/Cô,</p>
-                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết số lượng suất ăn như sau:</p>
+                <p>Kính gửi Thầy/Cô: ${staffData.fullName || 'Thầy/Cô'},</p>
+                <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết như sau:</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                   <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                    <th style="padding: 12px; text-align: left;">Hạng mục</th>
+                    <th style="padding: 12px; text-align: left;">Thông tin</th>
                     <th style="padding: 12px; text-align: right;">Số lượng đã đăng ký</th>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Bữa Sáng + Trưa (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
-                      ${breakfastChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
+                      ${breakfastChoice === 'yes' ? 'Có ăn (' + (weekdaysCount * 2) + ' suất)' : '-'}
                     </td>
                   </tr>
                   <tr style="border-bottom: 1px solid #e2e8f0;">
                     <td style="padding: 12px;">Chỉ ăn Bữa Trưa (T2 - T6)</td>
                     <td style="padding: 12px; text-align: right; color: #D21235; font-weight: bold;">
-                      ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : 'Không ăn'}
+                      ${lunchChoice === 'yes' ? 'Có ăn (' + weekdaysCount + ' suất)' : '-'}
                     </td>
                   </tr>
                 </table>

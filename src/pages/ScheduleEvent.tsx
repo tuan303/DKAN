@@ -155,11 +155,11 @@ export default function ScheduleEvent() {
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
                   <h2 style="color: #D21235; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN SỰ KIỆN</h2>
-                  <p>Kính gửi Thầy/Cô,</p>
-                  <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin trân trọng xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
+                  <p>Kính gửi Thầy/Cô: ${staffData.fullName || 'Thầy/Cô'},</p>
+                  <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công đối với các sự kiện hiện hành. Chi tiết như sau:</p>
                   <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                     <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                      <th style="padding: 12px; text-align: left;">Sự kiện</th>
+                      <th style="padding: 12px; text-align: left;">Thông tin</th>
                       <th style="padding: 12px; text-align: right;">Lựa chọn</th>
                     </tr>
                     ${eventsTableRows}
