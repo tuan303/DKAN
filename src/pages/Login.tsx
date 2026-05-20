@@ -54,7 +54,7 @@ export default function Login() {
         <div className="max-w-[420px] w-full flex flex-col h-full justify-between pt-12">
           <div className="flex-1 flex flex-col justify-center gap-y-8 md:gap-y-12">
             <div className="flex flex-col items-center text-center gap-y-3 sm:gap-y-4">
-              <div className="h-14 w-14 md:h-16 md:w-16 bg-[#D21235] rounded-xl flex items-center justify-center text-on-primary shadow-[0_4px_6px_-1px_rgba(210,18,53,0.3)] mb-1">
+              <div className="h-14 w-14 md:h-16 md:w-16 bg-primary rounded-2xl flex items-center justify-center text-on-primary shadow-sm mb-1">
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "30px" }}>restaurant</span>
               </div>
               <div>
@@ -86,7 +86,7 @@ export default function Login() {
               </button>
               <div className="flex items-center gap-sm">
                 <div className="h-px bg-outline-variant flex-1"></div>
-                <span className="font-label-sm text-[10px] md:text-[11px] font-bold text-[#D21235] uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
+                <span className="font-label-sm text-[10px] md:text-[11px] font-bold text-primary uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
                 <div className="h-px bg-outline-variant flex-1"></div>
               </div>
               <div className="text-center flex flex-col justify-center">

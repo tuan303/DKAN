@@ -32,6 +32,9 @@ export default function ScheduleMonth() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCanteen, setCancelCanteen] = useState('');
   const [isCanceling, setIsCanceling] = useState(false);
+  
+  const [userRegistrationForCancel, setUserRegistrationForCancel] = useState<any>(null);
+  const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
 
   const getMinCancelDate = () => {
     const d = new Date();
@@ -106,6 +109,33 @@ export default function ScheduleMonth() {
     };
     checkBlockedStatus();
   }, [selectedYear, monthString, userEmail]);
+
+  useEffect(() => {
+    const fetchCancelMonthRegistration = async () => {
+      if (!cancelDate) return;
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      setIsCheckingRegistration(true);
+      const dateParts = cancelDate.split('-');
+      const yyyy = dateParts[0];
+      const mm = (parseInt(dateParts[1], 10)).toString().padStart(2, '0');
+      try {
+        const regDocRef = doc(db, 'registrations', `${user.uid}_${yyyy}-${mm}`);
+        const regDocSnap = await getDoc(regDocRef);
+        if (regDocSnap.exists()) {
+          setUserRegistrationForCancel(regDocSnap.data());
+        } else {
+          setUserRegistrationForCancel(null);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsCheckingRegistration(false);
+      }
+    };
+    fetchCancelMonthRegistration();
+  }, [cancelDate]);
 
   const fetchConfigAndEvents = async () => {
     try {
@@ -657,13 +687,17 @@ export default function ScheduleMonth() {
                       <select 
                         value={cancelMeal}
                         onChange={(e) => setCancelMeal(e.target.value)}
-                        className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                        className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!cancelDate || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                       >
                         <option value="">-- Chọn bữa --</option>
-                        <option value="breakfast">Bữa sáng</option>
-                        <option value="lunch">Bữa trưa</option>
-                        <option value="both">Cả 2 bữa (Sáng + Trưa)</option>
+                        {userRegistrationForCancel?.breakfastCount > 0 && <option value="breakfast">Bữa sáng</option>}
+                        {userRegistrationForCancel?.lunchCount > 0 && <option value="lunch">Bữa trưa</option>}
+                        {userRegistrationForCancel?.breakfastCount > 0 && userRegistrationForCancel?.lunchCount > 0 && <option value="both">Cả 2 bữa (Sáng + Trưa)</option>}
                       </select>
+                      {cancelDate && !isCheckingRegistration && (!userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)) && (
+                        <span className="text-[12px] italic font-bold text-error leading-tight">Bạn chưa đăng ký ăn trong tháng này.</span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2 md:col-span-2">
                       <label className="font-label-md text-on-surface">Nhà ăn <span className="text-error">*</span></label>
@@ -760,7 +794,7 @@ export default function ScheduleMonth() {
                   </div>
                   <button 
                     onClick={handleCancel}
-                    disabled={isCanceling}
+                    disabled={isCanceling || !cancelDate || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                     className={clsx(
                       "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
                       "bg-error text-on-error hover:bg-[#b00f2c] active:scale-95"

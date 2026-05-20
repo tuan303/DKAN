@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
@@ -43,6 +43,12 @@ export default function Admin() {
   const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
   const [admins, setAdmins] = useState<AdminData[]>([]);
   const [cancelations, setCancelations] = useState<any[]>([]);
+  
+  const [globalCancelStats, setGlobalCancelStats] = useState({
+    todayStr: '', todayCount: 0, todayBreakfast: 0, todayLunch: 0,
+    tomorrowStr: '', tomorrowCount: 0, tomorrowBreakfast: 0, tomorrowLunch: 0
+  });
+
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2026-05'); 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
@@ -118,40 +124,83 @@ export default function Admin() {
     return () => unsubscribe();
   }, [navigate]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, 'registrations'), where('month', '==', selectedMonth));
-      const querySnapshot = await getDocs(q);
-      const regData: RegistrationData[] = [];
-      querySnapshot.forEach((doc) => {
-        regData.push({ id: doc.id, ...doc.data() } as RegistrationData);
-      });
-      setRegistrations(regData);
+  useEffect(() => {
+    let cancelUnsubscribe: any = null;
+    let registrationsUnsubscribe: any = null;
 
-      const cancelQ = query(collection(db, 'cancel_registrations'));
-      const cancelSnapshot = await getDocs(cancelQ);
-      const cancelData: any[] = [];
-      cancelSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.cancelDate && data.cancelDate.startsWith(selectedMonth)) {
-          cancelData.push(data);
-        }
-      });
-      setCancelations(cancelData);
+    const setupRealtimeListeners = async () => {
+      setLoading(true);
+      try {
+        const q = query(collection(db, 'registrations'), where('month', '==', selectedMonth));
+        registrationsUnsubscribe = onSnapshot(q, (querySnapshot) => {
+          const regData: RegistrationData[] = [];
+          querySnapshot.forEach((doc) => {
+            regData.push({ id: doc.id, ...doc.data() } as RegistrationData);
+          });
+          setRegistrations(regData);
+        });
 
-      const adminsSnapshot = await getDocs(collection(db, 'admins'));
-      const adminData: AdminData[] = [];
-      adminsSnapshot.forEach((doc) => {
-        adminData.push({ id: doc.id, ...doc.data() } as AdminData);
-      });
-      setAdmins(adminData);
-    } catch (err) {
-      console.error('Error fetching admin data:', err);
-    } finally {
-      setLoading(false);
+        const cancelQ = query(collection(db, 'cancel_registrations'));
+        cancelUnsubscribe = onSnapshot(cancelQ, (cancelSnapshot) => {
+          const cancelData: any[] = [];
+          
+          const d1 = new Date();
+          const d2 = new Date(); d2.setDate(d2.getDate() + 1);
+          const f1 = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
+          const f2 = `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}-${String(d2.getDate()).padStart(2,'0')}`;
+          
+          let tC=0, tB=0, tL=0;
+          let tmC=0, tmB=0, tmL=0;
+
+          cancelSnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.cancelDate && data.cancelDate.startsWith(selectedMonth)) {
+              cancelData.push(data);
+            }
+            
+            if (data.cancelDate === f1) {
+              tC++;
+              if(data.cancelMeal === 'breakfast' || data.cancelMeal === 'both') tB++;
+              if(data.cancelMeal === 'lunch' || data.cancelMeal === 'both') tL++;
+            }
+            if (data.cancelDate === f2) {
+              tmC++;
+              if(data.cancelMeal === 'breakfast' || data.cancelMeal === 'both') tmB++;
+              if(data.cancelMeal === 'lunch' || data.cancelMeal === 'both') tmL++;
+            }
+          });
+          setCancelations(cancelData);
+          setGlobalCancelStats({
+             todayStr: `${String(d1.getDate()).padStart(2,'0')}/${String(d1.getMonth()+1).padStart(2,'0')}/${d1.getFullYear()}`,
+             todayCount: tC, todayBreakfast: tB, todayLunch: tL,
+             tomorrowStr: `${String(d2.getDate()).padStart(2,'0')}/${String(d2.getMonth()+1).padStart(2,'0')}/${d2.getFullYear()}`,
+             tomorrowCount: tmC, tomorrowBreakfast: tmB, tomorrowLunch: tmL
+          });
+        });
+
+        const adminsSnapshot = await getDocs(collection(db, 'admins'));
+        const adminData: AdminData[] = [];
+        adminsSnapshot.forEach((doc) => {
+          adminData.push({ id: doc.id, ...doc.data() } as AdminData);
+        });
+        setAdmins(adminData);
+      } catch (err) {
+        console.error('Error fetching admin data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAdmin) {
+      setupRealtimeListeners();
+      fetchBlockedEmails();
     }
-  };
+
+    return () => {
+      if (cancelUnsubscribe) cancelUnsubscribe();
+      if (registrationsUnsubscribe) registrationsUnsubscribe();
+    };
+  }, [selectedMonth, isAdmin]);
 
   const fetchBlockedEmails = async () => {
     try {
@@ -194,12 +243,19 @@ export default function Admin() {
     handleSaveBlockedEmails(updated);
   };
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchData();
-      fetchBlockedEmails();
-    }
-  }, [selectedMonth, isAdmin]);
+  const fetchData = async () => {
+    // Only used conceptually now by add/remove admin if needed, 
+    // but the real-time handles most updates. 
+    // For admins we just fetch once anyway.
+    try {
+        const adminsSnapshot = await getDocs(collection(db, 'admins'));
+        const adminData: AdminData[] = [];
+        adminsSnapshot.forEach((doc) => {
+          adminData.push({ id: doc.id, ...doc.data() } as AdminData);
+        });
+        setAdmins(adminData);
+    } catch (err) {}
+  };
 
   useEffect(() => {
     if (isAdmin && selectedEventId) fetchEventRegistrations();
@@ -726,6 +782,29 @@ export default function Admin() {
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
               <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-md border-b border-outline-variant bg-surface-bright grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-error-container/20 border border-error/10 p-4 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-on-surface-variant font-label-md">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
+                    <div className="flex items-end gap-2 mt-1">
+                      <span className="text-error font-headline-lg font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                      <span className="text-on-surface-variant font-body-md mb-1 pb-0.5">suất</span>
+                    </div>
+                    <div className="text-[13px] text-on-surface-variant mt-2 font-medium">
+                      ({globalCancelStats.todayBreakfast} Sáng, {globalCancelStats.todayLunch} Trưa)
+                    </div>
+                  </div>
+                  <div className="bg-error-container/20 border border-error/10 p-4 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-on-surface-variant font-label-md">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
+                    <div className="flex items-end gap-2 mt-1">
+                      <span className="text-error font-headline-lg font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                      <span className="text-on-surface-variant font-body-md mb-1 pb-0.5">suất</span>
+                    </div>
+                    <div className="text-[13px] text-on-surface-variant mt-2 font-medium">
+                      ({globalCancelStats.tomorrowBreakfast} Sáng, {globalCancelStats.tomorrowLunch} Trưa)
+                    </div>
+                  </div>
+                </div>
+
                 <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-1">
                     <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Hủy Ăn</h2>
