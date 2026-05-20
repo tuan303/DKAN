@@ -112,6 +112,7 @@ async function startServer() {
 
   app.post("/api/gas", async (req, res) => {
     try {
+      console.log("Received gas body:", req.body);
       const gasUrl = "https://script.google.com/macros/s/AKfycbxwWwLIUDdFzDqIz5yWxnRWcYJDVMHl6yPr9tTkbyPzXiyubzF8D3rHTLeTjpcZxE51/exec";
       
       const response = await fetch(gasUrl, {

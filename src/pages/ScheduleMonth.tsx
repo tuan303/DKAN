@@ -451,7 +451,17 @@ export default function ScheduleMonth() {
             'Bữa hủy': cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
             'Nhà ăn': cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
             'Lý do': cancelReason,
-            'Thời gian khai báo hủy': timeString
+            'Thời gian khai báo hủy': timeString,
+            
+            // Send backward-compatible keys just in case GAS hasn't been deployed
+            employeeId: staffData.employeeId || '',
+            fullName: staffData.fullName || '',
+            department: staffData.department || '',
+            cancelDate: formattedDate,
+            cancelMeal: cancelMeal,
+            cancelReason: cancelReason,
+            cancelCanteen: cancelCanteen,
+            timestamp: timeString
           }),
         });
       } catch (err) {
