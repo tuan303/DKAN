@@ -435,16 +435,10 @@ export default function ScheduleMonth() {
       }
 
       try {
-        const now = new Date();
-        const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
-
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbxwWwLIUDdFzDqIz5yWxnRWcYJDVMHl6yPr9tTkbyPzXiyubzF8D3rHTLeTjpcZxE51/exec';
-
-        await fetch(gasUrl, {
+        await fetch('/api/gas', {
           method: 'POST',
-          mode: 'no-cors',
           headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             employeeId: staffData.employeeId || '',

@@ -112,26 +112,30 @@ async function startServer() {
 
   app.post("/api/gas", async (req, res) => {
     try {
-      const gasUrl = "https://script.google.com/macros/s/AKfycbyGFd2gDb0MKhn-JZDmmRneWZw_HNdf5GNm3ifQwtr5r3dPb3aP9DyLLGM9JadX4rtk/exec";
-      const formData = new URLSearchParams();
-      for (const key in req.body) {
-        if (req.body.hasOwnProperty(key)) {
-          formData.append(key, req.body[key]);
-        }
-      }
+      const gasUrl = "https://script.google.com/macros/s/AKfycbxwWwLIUDdFzDqIz5yWxnRWcYJDVMHl6yPr9tTkbyPzXiyubzF8D3rHTLeTjpcZxE51/exec";
+      
       const response = await fetch(gasUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/json",
         },
-        body: formData.toString(),
+        body: JSON.stringify(req.body),
       });
+
+      let responseText = "";
+      try {
+        responseText = await response.text();
+      } catch (e) {
+        console.error("Error reading response API GAS text:", e);
+      }
+
       if (!response.ok) {
-        return res.status(500).json({ error: "Failed to send to gas" });
+        console.error("GAS responded with non-200 status:", response.status, responseText);
+        return res.status(500).json({ error: "Failed to send to gas", details: responseText });
       }
       res.status(200).json({ success: true });
     } catch (err: any) {
-      console.error(err);
+      console.error("Error connecting to GAS:", err);
       res.status(500).json({ error: err.message });
     }
   });
