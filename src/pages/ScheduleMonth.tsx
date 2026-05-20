@@ -35,10 +35,21 @@ export default function ScheduleMonth() {
   
   const [userRegistrationForCancel, setUserRegistrationForCancel] = useState<any>(null);
   const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
+  
+  const [cancelExtendUntil, setCancelExtendUntil] = useState<string>('');
 
   const getMinCancelDate = () => {
     const d = new Date();
-    if (d.getHours() >= 16) {
+    let isLockedForTomorrow = d.getHours() >= 16;
+    
+    if (cancelExtendUntil) {
+      const extendDate = new Date(cancelExtendUntil);
+      if (d < extendDate) {
+        isLockedForTomorrow = false;
+      }
+    }
+
+    if (isLockedForTomorrow) {
       d.setDate(d.getDate() + 2);
     } else {
       d.setDate(d.getDate() + 1);
@@ -149,6 +160,11 @@ export default function ScheduleMonth() {
       const expiryDoc = await getDoc(doc(db, 'settings', 'monthlyExpiry'));
       if (expiryDoc.exists()) {
         setMonthlyExpiry(expiryDoc.data() as Record<string, string>);
+      }
+
+      const cancelConfigDoc = await getDoc(doc(db, 'settings', 'cancelConfig'));
+      if (cancelConfigDoc.exists()) {
+        setCancelExtendUntil(cancelConfigDoc.data().extendUntil || '');
       }
     } catch (err) {
       console.error(err);
@@ -337,9 +353,10 @@ export default function ScheduleMonth() {
 
     const minDateStr = getMinCancelDate();
     if (cancelDate < minDateStr) {
+      const lockTimeDisplay = cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16h00';
       setSubmitStatus({ 
         type: 'error', 
-        message: 'Không hợp lệ! Hủy ăn ngày mai phải đăng ký trước 16h00 ngày hôm nay.' 
+        message: `Không hợp lệ! Hủy ăn ngày mai phải đăng ký trước ${lockTimeDisplay} ngày hôm nay.` 
       });
       return;
     }
@@ -547,13 +564,14 @@ export default function ScheduleMonth() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
             <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-md">
-                <div className="flex bg-surface-variant/30 p-1.5 rounded-xl border border-outline-variant/50 w-full md:w-auto">
+              <div className="flex w-full border-b border-outline-variant mb-6 pt-2 px-2 bg-surface-variant/30 rounded-t-xl -mx-4 md:-mx-6 -mt-4 md:-mt-6 flex-wrap md:flex-nowrap">
                   <button 
                     onClick={() => setActiveMainTab('register')}
                     className={clsx(
-                      "flex-1 md:flex-none px-6 py-2.5 rounded-lg font-headline-sm font-bold text-[14px] transition-all duration-200 flex items-center justify-center gap-2",
-                      activeMainTab === 'register' ? "bg-primary text-white shadow" : "text-on-surface-variant hover:text-primary hover:bg-surface-variant/50"
+                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x border-transparent",
+                      activeMainTab === 'register' 
+                        ? "bg-surface border-outline-variant !border-b-surface text-primary z-10 -mb-[1px]" 
+                        : "bg-transparent text-on-surface-variant hover:bg-surface-variant hover:text-on-surface"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
@@ -562,14 +580,15 @@ export default function ScheduleMonth() {
                   <button 
                     onClick={() => setActiveMainTab('cancel')}
                     className={clsx(
-                      "flex-1 md:flex-none px-6 py-2.5 rounded-lg font-headline-sm font-bold text-[14px] transition-all duration-200 flex items-center justify-center gap-2",
-                      "bg-[#b00f2c] text-white shadow hover:bg-[#8a0b22] hover:shadow-md"
+                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x border-transparent",
+                      activeMainTab === 'cancel' 
+                        ? "bg-[#b00f2c] border-[#b00f2c] !border-b-[#b00f2c] text-white z-10 -mb-[1px]" 
+                        : "bg-transparent text-[#b00f2c] opacity-80 hover:bg-surface-variant hover:opacity-100"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">event_busy</span>
                     HỦY ĐĂNG KÝ ĂN
                   </button>
-                </div>
               </div>
 
               {activeMainTab === 'register' ? (
@@ -680,7 +699,7 @@ export default function ScheduleMonth() {
                         }}
                         className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                       />
-                      <span className="text-[12px] italic font-bold text-[#D21235] leading-tight">Yêu cầu hủy trước 16:00 ngày hôm trước</span>
+                      <span className="text-[12px] italic font-bold text-[#D21235] leading-tight">Yêu cầu hủy trước {cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16:00'} ngày hôm trước</span>
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="font-label-md text-on-surface">Bữa muốn hủy <span className="text-error">*</span></label>

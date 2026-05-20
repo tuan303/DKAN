@@ -136,6 +136,8 @@ export default function Admin() {
   // Settings states
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
   const [monthlyExpiry, setMonthlyExpiry] = useState<Record<string, string>>({});
+  const [cancelExtendUntil, setCancelExtendUntil] = useState<string>('');
+  const [isSavingCancelExtend, setIsSavingCancelExtend] = useState(false);
   const [events, setEvents] = useState<EventData[]>([]);
   const [newEventName, setNewEventName] = useState('');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -357,6 +359,11 @@ export default function Admin() {
       if (expiryConfig) {
         setMonthlyExpiry(expiryConfig.data() as Record<string, string>);
       }
+      
+      const cancelConfig = monthlyDoc.docs.find(d => d.id === 'cancelConfig');
+      if (cancelConfig) {
+        setCancelExtendUntil(cancelConfig.data().extendUntil || '');
+      }
 
       // Fetch Events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
@@ -401,7 +408,7 @@ export default function Admin() {
     return {
       ...reg,
       adjustedBreakfastCount: Math.max(0, (reg.breakfastCount || 0) - userCancelBreakfastCount),
-      adjustedLunchCount: Math.max(0, Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) - userCancelLunchCount)
+      adjustedLunchCount: Math.max(0, (reg.lunchCount || 0) - userCancelLunchCount)
     };
   });
 
@@ -427,7 +434,7 @@ export default function Admin() {
   const cancelledLunchToday = filteredCancelations.filter(c => c.cancelDate === selectedDateStr && (c.cancelMeal === 'lunch' || c.cancelMeal === 'both')).length;
 
   const dailyBreakfast = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0) - cancelledBreakfastToday);
-  const dailyLunch = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) > 0).length : 0) - cancelledLunchToday);
+  const dailyLunch = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.lunchCount || 0) > 0).length : 0) - cancelledLunchToday);
 
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
@@ -549,6 +556,17 @@ export default function Admin() {
     });
   };
 
+  const handleSaveCancelExtend = async () => {
+    setIsSavingCancelExtend(true);
+    try {
+      await setDoc(doc(db, 'settings', 'cancelConfig'), { extendUntil: cancelExtendUntil }, { merge: true });
+    } catch (err) {
+      console.error('Error saving cancel config:', err);
+    } finally {
+      setIsSavingCancelExtend(false);
+    }
+  };
+
   const handleAddEvent = async () => {
     if (!newEventName.trim()) return;
     try {
@@ -635,40 +653,40 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Tabs navigation */}
-        <div className="flex border-b border-outline-variant px-md md:px-0 mt-xs mb-sm overflow-x-auto whitespace-nowrap">
+        {/* Tabs navigation Chrome-style */}
+        <div className="flex px-md md:px-0 mt-xs pt-2 bg-surface-container-low border-b border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap md:gap-1 rounded-t-xl">
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'monthly' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('monthly')}
           >
             ĐK ĂN HÀNG THÁNG
           </button>
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'cancelations' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'cancelations' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('cancelations')}
           >
             ĐK HỦY ĂN
           </button>
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'events' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'events' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('events')}
           >
-            ĐĂNG KÝ ĂN SỰ KIỆN
+            ĐK ĂN SỰ KIỆN
           </button>
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'settings' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'settings' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('settings')}
           >
             CẤU HÌNH
           </button>
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'blocked' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'blocked' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('blocked')}
           >
             VI PHẠM
           </button>
           <button 
-            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'admins' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'admins' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             onClick={() => setActiveTab('admins')}
           >
             QUẢN TRỊ
@@ -1162,6 +1180,33 @@ export default function Admin() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Cancel Config Section */}
+            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col md:col-span-2 lg:col-span-1">
+              <div className="p-md border-b border-outline-variant bg-surface-container-low">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase">Cấu hình ĐK HỦY ĂN</h2>
+                <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Gia hạn thời gian khóa hủy ăn (Mặc định tự động khóa lúc 16:00 ngày hôm trước).</p>
+              </div>
+              <div className="p-md flex flex-col gap-sm">
+                <label className="font-label-md text-on-surface">Mở thêm thời gian khóa tự động đến:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="datetime-local"
+                    value={cancelExtendUntil}
+                    onChange={(e) => setCancelExtendUntil(e.target.value)}
+                    className="flex-1 bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                  />
+                  <button
+                    onClick={handleSaveCancelExtend}
+                    disabled={isSavingCancelExtend}
+                    className="px-4 py-2 bg-primary text-white rounded-lg font-label-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {isSavingCancelExtend ? 'Đang lưu...' : 'Lưu lại'}
+                  </button>
+                </div>
+                <p className="text-[12px] text-on-surface-variant italic">Nếu để trống, hệ thống sẽ giới hạn mặc định lúc 16:00 mỗi ngày.</p>
               </div>
             </div>
 
