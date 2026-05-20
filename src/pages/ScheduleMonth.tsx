@@ -435,19 +435,23 @@ export default function ScheduleMonth() {
       }
 
       try {
+        const now = new Date();
+        const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+
         await fetch('/api/gas', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            employeeId: staffData.employeeId || '',
-            fullName: staffData.fullName || '',
-            department: staffData.department || '',
-            cancelDate: formattedDate,
-            cancelMeal: cancelMeal,
-            cancelReason: cancelReason,
-            cancelCanteen: cancelCanteen
+            'Mã Nhân Viên': staffData.employeeId || '',
+            'Họ và Tên': staffData.fullName || '',
+            'Phòng ban/Tổ khối': staffData.department || '',
+            'Ngày hủy': formattedDate,
+            'Bữa hủy': cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
+            'Nhà ăn': cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
+            'Lý do': cancelReason,
+            'Thời gian khai báo hủy': timeString
           }),
         });
       } catch (err) {
