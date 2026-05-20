@@ -432,24 +432,24 @@ export default function ScheduleMonth() {
       }
 
       try {
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbyGFd2gDb0MKhn-JZDmmRneWZw_HNdf5GNm3ifQwtr5r3dPb3aP9DyLLGM9JadX4rtk/exec';
-        
-        const formParams = new URLSearchParams();
-        formParams.append('employeeId', staffData.employeeId || '');
-        formParams.append('fullName', staffData.fullName || '');
-        formParams.append('department', staffData.department || '');
-        formParams.append('cancelDate', formattedDate);
-        formParams.append('cancelMeal', cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'));
-        formParams.append('cancelReason', cancelReason);
-        formParams.append('cancelCanteen', cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học');
+        const now = new Date();
+        const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 
-        await fetch(gasUrl, {
+        await fetch('/api/gas', {
           method: 'POST',
-          mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
           },
-          body: formParams.toString(),
+          body: JSON.stringify({
+            'Mã Nhân Viên': staffData.employeeId || '',
+            'Họ và Tên': staffData.fullName || '',
+            'Phòng ban/Tổ khối': staffData.department || '',
+            'Ngày hủy': formattedDate,
+            'Bữa hủy': cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
+            'Nhà ăn': cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
+            'Lý do': cancelReason,
+            'Thời gian khai báo hủy': timeString
+          }),
         });
       } catch (err) {
         console.error('Failed to send data to Google Sheets', err);

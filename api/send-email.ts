@@ -48,6 +48,14 @@ export default async function handler(req: any, res: any) {
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
+    // Parse multiple comma-separated emails
+    const toList = to.split(',').map((email: string) => email.trim()).filter((email: string) => email.length > 0);
+    const toRecipients = toList.map((email: string) => ({
+      emailAddress: {
+        address: email,
+      },
+    }));
+
     // 2. Send Email
     const emailBody = {
       message: {
@@ -56,13 +64,7 @@ export default async function handler(req: any, res: any) {
           contentType: "HTML",
           content: html,
         },
-        toRecipients: [
-          {
-            emailAddress: {
-              address: to,
-            },
-          },
-        ],
+        toRecipients: toRecipients,
       },
       saveToSentItems: "true",
     };

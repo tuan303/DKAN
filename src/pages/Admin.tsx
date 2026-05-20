@@ -60,7 +60,7 @@ export default function Admin() {
   const [blockedEmailsInput, setBlockedEmailsInput] = useState('');
 
   // Tabs from URL
-  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'events' | 'settings' | 'admins' | 'blocked';
+  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'cancelations' | 'events' | 'settings' | 'admins' | 'blocked';
   const setActiveTab = (tab: string) => setSearchParams({ tab });
 
   // Settings states
@@ -360,6 +360,25 @@ export default function Admin() {
     xlsx.writeFile(workbook, `Bao_Cao_Dang_Ky_An_${selectedMonth}.xlsx`);
   };
 
+  const handleExportCancelationsExcel = () => {
+    const cancelExportData = filteredCancelations.map((c, index) => ({
+      'STT': index + 1,
+      'Mã Nhân Viên': c.employeeId || 'N/A',
+      'Họ và Tên': c.fullName || 'N/A',
+      'Phòng ban/Tổ khối': c.department || 'N/A',
+      'Ngày hủy': c.cancelDate || 'N/A',
+      'Bữa hủy': c.cancelMeal === 'both' ? 'Cả 2 bữa' : (c.cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
+      'Nhà ăn': c.cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
+      'Lý do': c.cancelReason || 'N/A',
+      'Thời gian khai báo hủy': formatTimestamp(c.timestamp)
+    }));
+
+    const cancelWorksheet = xlsx.utils.json_to_sheet(cancelExportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, cancelWorksheet, `Huy_An_${selectedMonth}`);
+    xlsx.writeFile(workbook, `Bao_Cao_Huy_An_${selectedMonth}.xlsx`);
+  };
+
   const handleExportEventExcel = () => {
     const event = events.find(e => e.id === selectedEventId);
     if (!event) return;
@@ -488,6 +507,12 @@ export default function Admin() {
             onClick={() => setActiveTab('monthly')}
           >
             ĐK ĂN HÀNG THÁNG
+          </button>
+          <button 
+            className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'cancelations' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            onClick={() => setActiveTab('cancelations')}
+          >
+            ĐK HỦY ĂN
           </button>
           <button 
             className={`px-4 py-3 font-label-lg transition-colors border-b-2 shrink-0 ${activeTab === 'events' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
@@ -646,40 +671,153 @@ export default function Admin() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
-                      <tr>
-                        <th className="p-md">STT</th>
-                        <th className="p-md">Mã NV</th>
-                        <th className="p-md">Tên</th>
-                        <th className="p-md">Phòng ban</th>
-                        <th className="p-md text-right">Sáng</th>
-                        <th className="p-md text-right">Trưa</th>
-                        <th className="p-md">Thời gian đăng ký</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant text-[14px]">
-                      {registrationsWithCancelations.length === 0 ? (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
-                          <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
-                            Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.
-                          </td>
+                          <th className="p-md">STT</th>
+                          <th className="p-md">Mã NV</th>
+                          <th className="p-md">Tên</th>
+                          <th className="p-md">Phòng ban</th>
+                          <th className="p-md text-right">Sáng</th>
+                          <th className="p-md text-right">Trưa</th>
+                          <th className="p-md">Thời gian đăng ký</th>
                         </tr>
-                      ) : (
-                        registrationsWithCancelations.map((reg, index) => (
-                          <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
-                            <td className="p-md">{index + 1}</td>
-                            <td className="p-md">{reg.employeeId || 'N/A'}</td>
-                            <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
-                            <td className="p-md">{reg.department || 'N/A'}</td>
-                            <td className="p-md text-right">{reg.adjustedBreakfastCount}</td>
-                            <td className="p-md text-right">{reg.adjustedLunchCount}</td>
-                            <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant text-[14px]">
+                        {registrationsWithCancelations.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
+                              Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.
+                            </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          registrationsWithCancelations.map((reg, index) => (
+                            <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
+                              <td className="p-md">{index + 1}</td>
+                              <td className="p-md">{reg.employeeId || 'N/A'}</td>
+                              <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
+                              <td className="p-md">{reg.department || 'N/A'}</td>
+                              <td className="p-md text-right">{reg.adjustedBreakfastCount}</td>
+                              <td className="p-md text-right">{reg.adjustedLunchCount}</td>
+                              <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'cancelations' && (
+          <div className="flex flex-col gap-md lg:gap-lg">
+            <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
+              <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Hủy Ăn</h2>
+                    <div className="flex items-center gap-2">
+                       <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                       <select 
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                       >
+                         {MONTHS.map(m => (
+                           <option key={m} value={`2026-${m}`}>Tháng {m}</option>
+                         ))}
+                       </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleExportCancelationsExcel}
+                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    Xuất Excel
+                  </button>
+                </div>
+
+                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant focus:outline-none">
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                      <input 
+                        type="text" 
+                        value={nameFilter}
+                        onChange={(e) => setNameFilter(e.target.value)}
+                        placeholder="Nhập tên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                      <input 
+                        type="text" 
+                        value={idFilter}
+                        onChange={(e) => setIdFilter(e.target.value)}
+                        placeholder="Nhập mã nhân viên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                      <input 
+                        type="text" 
+                        value={deptFilter}
+                        onChange={(e) => setDeptFilter(e.target.value)}
+                        placeholder="Nhập phòng ban..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
+                        <tr>
+                          <th className="p-md">STT</th>
+                          <th className="p-md">Mã NV</th>
+                          <th className="p-md">Tên</th>
+                          <th className="p-md">Phòng ban</th>
+                          <th className="p-md">Ngày hủy</th>
+                          <th className="p-md">Bữa hủy</th>
+                          <th className="p-md">Nhà ăn</th>
+                          <th className="p-md w-1/4">Lý do</th>
+                          <th className="p-md">Thời gian khai báo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant text-[14px]">
+                        {filteredCancelations.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="p-xl text-center text-on-surface-variant italic">
+                              Chưa có dữ liệu hủy đăng ký thỏa mãn điều kiện lọc.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredCancelations.map((c, index) => (
+                            <tr key={c.id || index} className="hover:bg-surface-container-lowest transition-colors">
+                              <td className="p-md">{index + 1}</td>
+                              <td className="p-md">{c.employeeId || 'N/A'}</td>
+                              <td className="p-md font-medium text-on-surface">{c.fullName}</td>
+                              <td className="p-md">{c.department || 'N/A'}</td>
+                              <td className="p-md font-bold text-[#D21235]">{c.cancelDate}</td>
+                              <td className="p-md">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  c.cancelMeal === 'both' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'
+                                }`}>
+                                  {c.cancelMeal === 'both' ? 'Cả 2 bữa' : (c.cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa')}
+                                </span>
+                              </td>
+                              <td className="p-md">{c.cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học'}</td>
+                              <td className="p-md text-on-surface-variant">{c.cancelReason}</td>
+                              <td className="p-md text-on-surface-variant text-xs">{formatTimestamp(c.timestamp)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                 </div>
               </div>
             </div>
