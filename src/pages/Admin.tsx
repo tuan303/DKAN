@@ -255,12 +255,23 @@ export default function Admin() {
     return matchesName && matchesId && matchesDept;
   });
 
-  const filteredCancelations = cancelations.filter(c => {
+  const filteredCancelations = [...cancelations]
+    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+    .filter(c => {
     const matchesName = (c.fullName || '').toLowerCase().includes(nameFilter.toLowerCase());
     const matchesId = (c.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
     const matchesDept = (c.department || '').toLowerCase().includes(deptFilter.toLowerCase());
     return matchesName && matchesId && matchesDept;
   });
+
+  const formatCancelDate = (dateStr: string) => {
+    if (!dateStr) return 'N/A';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
 
   const registrationsWithCancelations = filteredRegistrations.map(reg => {
     const userCancelations = filteredCancelations.filter(c => c.employeeId === reg.employeeId || c.email === reg.email || c.fullName === reg.fullName);
@@ -366,7 +377,7 @@ export default function Admin() {
       'Mã Nhân Viên': c.employeeId || 'N/A',
       'Họ và Tên': c.fullName || 'N/A',
       'Phòng ban/Tổ khối': c.department || 'N/A',
-      'Ngày hủy': c.cancelDate || 'N/A',
+      'Ngày hủy': formatCancelDate(c.cancelDate),
       'Bữa hủy': c.cancelMeal === 'both' ? 'Cả 2 bữa' : (c.cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
       'Nhà ăn': c.cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
       'Lý do': c.cancelReason || 'N/A',
@@ -802,7 +813,7 @@ export default function Admin() {
                               <td className="p-md">{c.employeeId || 'N/A'}</td>
                               <td className="p-md font-medium text-on-surface">{c.fullName}</td>
                               <td className="p-md">{c.department || 'N/A'}</td>
-                              <td className="p-md font-bold text-[#D21235]">{c.cancelDate}</td>
+                              <td className="p-md font-bold text-[#D21235]">{formatCancelDate(c.cancelDate)}</td>
                               <td className="p-md">
                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${
                                   c.cancelMeal === 'both' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'
