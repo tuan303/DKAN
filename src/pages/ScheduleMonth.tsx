@@ -438,24 +438,23 @@ export default function ScheduleMonth() {
         const now = new Date();
         const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbyGFd2gDb0MKhn-JZDmmRneWZw_HNdf5GNm3ifQwtr5r3dPb3aP9DyLLGM9JadX4rtk/exec';
-        const formParams = new URLSearchParams();
-        formParams.append('Mã Nhân Viên', staffData.employeeId || '');
-        formParams.append('Họ và Tên', staffData.fullName || '');
-        formParams.append('Phòng ban/Tổ khối', staffData.department || '');
-        formParams.append('Ngày hủy', formattedDate);
-        formParams.append('Bữa hủy', cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'));
-        formParams.append('Nhà ăn', cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học');
-        formParams.append('Lý do', cancelReason);
-        formParams.append('Thời gian khai báo hủy', timeString);
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbxwWwLIUDdFzDqIz5yWxnRWcYJDVMHl6yPr9tTkbyPzXiyubzF8D3rHTLeTjpcZxE51/exec';
 
         await fetch(gasUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'text/plain;charset=utf-8',
           },
-          body: formParams.toString(),
+          body: JSON.stringify({
+            employeeId: staffData.employeeId || '',
+            fullName: staffData.fullName || '',
+            department: staffData.department || '',
+            cancelDate: formattedDate,
+            cancelMeal: cancelMeal,
+            cancelReason: cancelReason,
+            cancelCanteen: cancelCanteen
+          }),
         });
       } catch (err) {
         console.error('Failed to send data to Google Sheets', err);
