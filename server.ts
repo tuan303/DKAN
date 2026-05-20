@@ -62,6 +62,12 @@ async function startServer() {
       const tokenData = await tokenResponse.json();
       const accessToken = tokenData.access_token;
 
+      const toRecipients = to.split(',').map((email: string) => ({
+        emailAddress: {
+          address: email.trim(),
+        },
+      }));
+
       // 2. Send Email
       const emailBody = {
         message: {
@@ -70,13 +76,7 @@ async function startServer() {
             contentType: "HTML",
             content: html,
           },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: to,
-              },
-            },
-          ],
+          toRecipients: toRecipients,
         },
         saveToSentItems: "true",
       };
@@ -109,6 +109,32 @@ async function startServer() {
     }
   });
 
+
+  app.post("/api/gas", async (req, res) => {
+    try {
+      const gasUrl = "https://script.google.com/macros/s/AKfycbyGFd2gDb0MKhn-JZDmmRneWZw_HNdf5GNm3ifQwtr5r3dPb3aP9DyLLGM9JadX4rtk/exec";
+      const formData = new URLSearchParams();
+      for (const key in req.body) {
+        if (req.body.hasOwnProperty(key)) {
+          formData.append(key, req.body[key]);
+        }
+      }
+      const response = await fetch(gasUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+      });
+      if (!response.ok) {
+        return res.status(500).json({ error: "Failed to send to gas" });
+      }
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

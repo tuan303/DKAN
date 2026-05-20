@@ -42,6 +42,7 @@ export default function Admin() {
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   const [eventRegistrations, setEventRegistrations] = useState<any[]>([]);
   const [admins, setAdmins] = useState<AdminData[]>([]);
+  const [cancelations, setCancelations] = useState<any[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2026-05'); 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
@@ -127,6 +128,17 @@ export default function Admin() {
         regData.push({ id: doc.id, ...doc.data() } as RegistrationData);
       });
       setRegistrations(regData);
+
+      const cancelQ = query(collection(db, 'cancel_registrations'));
+      const cancelSnapshot = await getDocs(cancelQ);
+      const cancelData: any[] = [];
+      cancelSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.cancelDate && data.cancelDate.startsWith(selectedMonth)) {
+          cancelData.push(data);
+        }
+      });
+      setCancelations(cancelData);
 
       const adminsSnapshot = await getDocs(collection(db, 'admins'));
       const adminData: AdminData[] = [];
@@ -243,8 +255,30 @@ export default function Admin() {
     return matchesName && matchesId && matchesDept;
   });
 
-  const totalBreakfast = filteredRegistrations.reduce((sum, reg) => sum + (reg.breakfastCount || 0), 0);
-  const totalLunch = filteredRegistrations.reduce((sum, reg) => sum + Math.max(reg.lunchCount || 0, reg.breakfastCount || 0), 0);
+  const filteredCancelations = cancelations.filter(c => {
+    const matchesName = (c.fullName || '').toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesId = (c.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
+    const matchesDept = (c.department || '').toLowerCase().includes(deptFilter.toLowerCase());
+    return matchesName && matchesId && matchesDept;
+  });
+
+  const registrationsWithCancelations = filteredRegistrations.map(reg => {
+    const userCancelations = filteredCancelations.filter(c => c.employeeId === reg.employeeId || c.email === reg.email || c.fullName === reg.fullName);
+    const userCancelBreakfastCount = userCancelations.filter(c => c.cancelMeal === 'breakfast' || c.cancelMeal === 'both').length;
+    const userCancelLunchCount = userCancelations.filter(c => c.cancelMeal === 'lunch' || c.cancelMeal === 'both').length;
+    
+    return {
+      ...reg,
+      adjustedBreakfastCount: Math.max(0, (reg.breakfastCount || 0) - userCancelBreakfastCount),
+      adjustedLunchCount: Math.max(0, Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) - userCancelLunchCount)
+    };
+  });
+
+  const totalCancelledBreakfastInMonth = filteredCancelations.filter(c => c.cancelMeal === 'breakfast' || c.cancelMeal === 'both').length;
+  const totalCancelledLunchInMonth = filteredCancelations.filter(c => c.cancelMeal === 'lunch' || c.cancelMeal === 'both').length;
+
+  const totalBreakfast = registrationsWithCancelations.reduce((sum, reg) => sum + reg.adjustedBreakfastCount, 0);
+  const totalLunch = registrationsWithCancelations.reduce((sum, reg) => sum + reg.adjustedLunchCount, 0);
 
   // Daily statistics calculations 
   const [yearStr, monthStr] = selectedMonth.split('-');
@@ -256,8 +290,13 @@ export default function Admin() {
   const selectedDateObj = new Date(selYear, selMonthIndex, cappedSelectedDay);
   const isSelectedDayWeekday = selectedDateObj.getDay() !== 0 && selectedDateObj.getDay() !== 6;
 
-  const dailyBreakfast = isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0;
-  const dailyLunch = isSelectedDayWeekday ? filteredRegistrations.filter(reg => Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) > 0).length : 0;
+  const selectedDateStr = `${selYear}-${String(selMonthIndex + 1).padStart(2, '0')}-${String(cappedSelectedDay).padStart(2, '0')}`;
+  
+  const cancelledBreakfastToday = filteredCancelations.filter(c => c.cancelDate === selectedDateStr && (c.cancelMeal === 'breakfast' || c.cancelMeal === 'both')).length;
+  const cancelledLunchToday = filteredCancelations.filter(c => c.cancelDate === selectedDateStr && (c.cancelMeal === 'lunch' || c.cancelMeal === 'both')).length;
+
+  const dailyBreakfast = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0) - cancelledBreakfastToday);
+  const dailyLunch = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => Math.max(reg.lunchCount || 0, reg.breakfastCount || 0) > 0).length : 0) - cancelledLunchToday);
 
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
@@ -305,13 +344,13 @@ export default function Admin() {
   };
 
   const handleExportExcel = () => {
-    const exportData = filteredRegistrations.map((reg, index) => ({
+    const exportData = registrationsWithCancelations.map((reg, index) => ({
       'STT': index + 1,
       'Mã Nhân Viên': reg.employeeId || 'N/A',
       'Họ và Tên': reg.fullName || 'N/A',
       'Phòng ban/Tổ khối': reg.department || 'N/A',
-      'ĐK Bữa sáng': reg.breakfastCount || 0,
-      'ĐK Bữa trưa': Math.max(reg.lunchCount || 0, reg.breakfastCount || 0),
+      'ĐK Bữa sáng': reg.adjustedBreakfastCount,
+      'ĐK Bữa trưa': reg.adjustedLunchCount,
       'Thời gian đăng ký': formatTimestamp(reg.timestamp)
     }));
 
@@ -620,21 +659,21 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant text-[14px]">
-                      {filteredRegistrations.length === 0 ? (
+                      {registrationsWithCancelations.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
                             Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.
                           </td>
                         </tr>
                       ) : (
-                        filteredRegistrations.map((reg, index) => (
+                        registrationsWithCancelations.map((reg, index) => (
                           <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
                             <td className="p-md">{index + 1}</td>
                             <td className="p-md">{reg.employeeId || 'N/A'}</td>
                             <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
                             <td className="p-md">{reg.department || 'N/A'}</td>
-                            <td className="p-md text-right">{reg.breakfastCount || 0}</td>
-                            <td className="p-md text-right">{Math.max(reg.lunchCount || 0, reg.breakfastCount || 0)}</td>
+                            <td className="p-md text-right">{reg.adjustedBreakfastCount}</td>
+                            <td className="p-md text-right">{reg.adjustedLunchCount}</td>
                             <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
                           </tr>
                         ))
