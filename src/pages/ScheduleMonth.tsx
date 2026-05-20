@@ -568,10 +568,10 @@ export default function ScheduleMonth() {
                   <button 
                     onClick={() => setActiveMainTab('register')}
                     className={clsx(
-                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x border-transparent",
+                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x",
                       activeMainTab === 'register' 
-                        ? "bg-surface border-outline-variant !border-b-surface text-primary z-10 -mb-[1px]" 
-                        : "bg-transparent text-on-surface-variant hover:bg-surface-variant hover:text-on-surface"
+                        ? "bg-primary border-primary !border-b-primary text-white z-10 -mb-[1px]" 
+                        : "bg-primary/70 border-transparent text-white hover:bg-primary"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
@@ -580,10 +580,10 @@ export default function ScheduleMonth() {
                   <button 
                     onClick={() => setActiveMainTab('cancel')}
                     className={clsx(
-                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x border-transparent",
+                      "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x",
                       activeMainTab === 'cancel' 
                         ? "bg-[#b00f2c] border-[#b00f2c] !border-b-[#b00f2c] text-white z-10 -mb-[1px]" 
-                        : "bg-transparent text-[#b00f2c] opacity-80 hover:bg-surface-variant hover:opacity-100"
+                        : "bg-[#b00f2c]/70 border-transparent text-white hover:bg-[#b00f2c]"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">event_busy</span>
