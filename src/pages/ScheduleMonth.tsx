@@ -563,11 +563,11 @@ export default function ScheduleMonth() {
                     onClick={() => setActiveMainTab('cancel')}
                     className={clsx(
                       "flex-1 md:flex-none px-6 py-2.5 rounded-lg font-headline-sm font-bold text-[14px] transition-all duration-200 flex items-center justify-center gap-2",
-                      activeMainTab === 'cancel' ? "bg-[#b00f2c] text-white shadow" : "text-[#b00f2c] opacity-80 hover:opacity-100 hover:bg-[#b00f2c]/10"
+                      "bg-[#b00f2c] text-white shadow hover:bg-[#8a0b22] hover:shadow-md"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">event_busy</span>
-                    HỦY ĐĂNG KÝ
+                    HỦY ĐĂNG KÝ ĂN
                   </button>
                 </div>
               </div>
