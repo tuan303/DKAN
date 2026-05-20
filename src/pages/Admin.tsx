@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -6,6 +6,72 @@ import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
+
+function useSortableData(items: any[], initialConfig = null) {
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(initialConfig);
+
+  const sortedItems = useMemo(() => {
+    let sortableItems = [...items];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        
+        if (aValue === undefined || aValue === null) aValue = '';
+        if (bValue === undefined || bValue === null) bValue = '';
+        
+        if (sortConfig.key === 'timestamp' || sortConfig.key === 'createdAt' || sortConfig.key === 'cancelTime') {
+          const timeA = new Date(aValue).getTime();
+          const timeB = new Date(bValue).getTime();
+          if (!isNaN(timeA) && !isNaN(timeB)) {
+            return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+          }
+        }
+
+        const numA = parseInt(aValue, 10);
+        const numB = parseInt(bValue, 10);
+        if (sortConfig.key === 'employeeId' || sortConfig.key === 'adjustedBreakfastCount' || sortConfig.key === 'adjustedLunchCount') {
+          if (!isNaN(numA) && !isNaN(numB)) {
+              return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+          }
+        }
+
+        const strA = String(aValue).toLowerCase();
+        const strB = String(bValue).toLowerCase();
+        
+        if (strA < strB) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (strA > strB) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [items, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  return { items: sortedItems, requestSort, sortConfig };
+}
+
+const SortIcon = ({ sortConfig, columnKey }: { sortConfig: any, columnKey: string }) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <span className="material-symbols-outlined text-[16px] text-outline opacity-40">unfold_more</span>;
+    }
+    return (
+      <span className="material-symbols-outlined text-[16px] text-primary">
+        {sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+      </span>
+    );
+};
 
 interface RegistrationData {
   id?: string;
@@ -330,7 +396,7 @@ export default function Admin() {
   };
 
   const registrationsWithCancelations = filteredRegistrations.map(reg => {
-    const userCancelations = filteredCancelations.filter(c => c.employeeId === reg.employeeId || c.email === reg.email || c.fullName === reg.fullName);
+    const userCancelations = filteredCancelations.filter(c => c.userId === reg.userId);
     const userCancelBreakfastCount = userCancelations.filter(c => c.cancelMeal === 'breakfast' || c.cancelMeal === 'both').length;
     const userCancelLunchCount = userCancelations.filter(c => c.cancelMeal === 'lunch' || c.cancelMeal === 'both').length;
     
@@ -543,6 +609,10 @@ export default function Admin() {
     }
   };
 
+  const { items: sortedMonthlyRegistrations, requestSort: requestSortMonthly, sortConfig: sortConfigMonthly } = useSortableData(registrationsWithCancelations);
+  const { items: sortedCancelations, requestSort: requestSortCancelations, sortConfig: sortConfigCancelations } = useSortableData(filteredCancelations);
+  const { items: sortedEventRegistrations, requestSort: requestSortEvent, sortConfig: sortConfigEvent } = useSortableData(eventRegistrations);
+
   if (!isAdmin || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -741,24 +811,36 @@ export default function Admin() {
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
-                          <th className="p-md">STT</th>
-                          <th className="p-md">Mã NV</th>
-                          <th className="p-md">Tên</th>
-                          <th className="p-md">Phòng ban</th>
-                          <th className="p-md text-right">Sáng</th>
-                          <th className="p-md text-right">Trưa</th>
-                          <th className="p-md">Thời gian đăng ký</th>
+                          <th className="p-md text-center">STT</th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('employeeId')}>
+                            <div className="flex items-center gap-1">Mã NV <SortIcon sortConfig={sortConfigMonthly} columnKey="employeeId" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('fullName')}>
+                            <div className="flex items-center gap-1">Tên <SortIcon sortConfig={sortConfigMonthly} columnKey="fullName" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('department')}>
+                            <div className="flex items-center gap-1">Phòng ban <SortIcon sortConfig={sortConfigMonthly} columnKey="department" /></div>
+                          </th>
+                          <th className="p-md text-right cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('adjustedBreakfastCount')}>
+                            <div className="flex items-center justify-end gap-1">Sáng <SortIcon sortConfig={sortConfigMonthly} columnKey="adjustedBreakfastCount" /></div>
+                          </th>
+                          <th className="p-md text-right cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('adjustedLunchCount')}>
+                            <div className="flex items-center justify-end gap-1">Trưa <SortIcon sortConfig={sortConfigMonthly} columnKey="adjustedLunchCount" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortMonthly('timestamp')}>
+                            <div className="flex items-center gap-1">Thời gian đăng ký <SortIcon sortConfig={sortConfigMonthly} columnKey="timestamp" /></div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant text-[14px]">
-                        {registrationsWithCancelations.length === 0 ? (
+                        {sortedMonthlyRegistrations.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
                               Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.
                             </td>
                           </tr>
                         ) : (
-                          registrationsWithCancelations.map((reg, index) => (
+                          sortedMonthlyRegistrations.map((reg, index) => (
                             <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
                               <td className="p-md">{index + 1}</td>
                               <td className="p-md">{reg.employeeId || 'N/A'}</td>
@@ -867,26 +949,42 @@ export default function Admin() {
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
-                          <th className="p-md">STT</th>
-                          <th className="p-md">Mã NV</th>
-                          <th className="p-md">Tên</th>
-                          <th className="p-md">Phòng ban</th>
-                          <th className="p-md">Ngày hủy</th>
-                          <th className="p-md">Bữa hủy</th>
-                          <th className="p-md">Nhà ăn</th>
-                          <th className="p-md w-1/4">Lý do</th>
-                          <th className="p-md">Thời gian khai báo</th>
+                          <th className="p-md text-center">STT</th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('employeeId')}>
+                            <div className="flex items-center gap-1">Mã NV <SortIcon sortConfig={sortConfigCancelations} columnKey="employeeId" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('fullName')}>
+                            <div className="flex items-center gap-1">Tên <SortIcon sortConfig={sortConfigCancelations} columnKey="fullName" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('department')}>
+                            <div className="flex items-center gap-1">Phòng ban <SortIcon sortConfig={sortConfigCancelations} columnKey="department" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('cancelDate')}>
+                            <div className="flex items-center gap-1">Ngày hủy <SortIcon sortConfig={sortConfigCancelations} columnKey="cancelDate" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('cancelMeal')}>
+                            <div className="flex items-center gap-1">Bữa hủy <SortIcon sortConfig={sortConfigCancelations} columnKey="cancelMeal" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('cancelCanteen')}>
+                            <div className="flex items-center gap-1">Nhà ăn <SortIcon sortConfig={sortConfigCancelations} columnKey="cancelCanteen" /></div>
+                          </th>
+                          <th className="p-md w-1/4 cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('cancelReason')}>
+                            <div className="flex items-center gap-1">Lý do <SortIcon sortConfig={sortConfigCancelations} columnKey="cancelReason" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortCancelations('timestamp')}>
+                            <div className="flex items-center gap-1">Thời gian khai báo <SortIcon sortConfig={sortConfigCancelations} columnKey="timestamp" /></div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant text-[14px]">
-                        {filteredCancelations.length === 0 ? (
+                        {sortedCancelations.length === 0 ? (
                           <tr>
                             <td colSpan={9} className="p-xl text-center text-on-surface-variant italic">
                               Chưa có dữ liệu hủy đăng ký thỏa mãn điều kiện lọc.
                             </td>
                           </tr>
                         ) : (
-                          filteredCancelations.map((c, index) => (
+                          sortedCancelations.map((c, index) => (
                             <tr key={c.id || index} className="hover:bg-surface-container-lowest transition-colors">
                               <td className="p-md">{index + 1}</td>
                               <td className="p-md">{c.employeeId || 'N/A'}</td>
@@ -981,24 +1079,36 @@ export default function Admin() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                     <tr>
-                      <th className="p-md">STT</th>
-                      <th className="p-md">Mã NV</th>
-                      <th className="p-md">Họ và Tên</th>
-                      <th className="p-md">Email</th>
-                      <th className="p-md">Phòng ban</th>
-                      <th className="p-md">Lựa chọn</th>
-                      <th className="p-md">Thời gian đăng ký</th>
+                      <th className="p-md text-center">STT</th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('employeeId')}>
+                        <div className="flex items-center gap-1">Mã NV <SortIcon sortConfig={sortConfigEvent} columnKey="employeeId" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('fullName')}>
+                        <div className="flex items-center gap-1">Họ và Tên <SortIcon sortConfig={sortConfigEvent} columnKey="fullName" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('email')}>
+                        <div className="flex items-center gap-1">Email <SortIcon sortConfig={sortConfigEvent} columnKey="email" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('department')}>
+                        <div className="flex items-center gap-1">Phòng ban <SortIcon sortConfig={sortConfigEvent} columnKey="department" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('choice')}>
+                        <div className="flex items-center gap-1">Lựa chọn <SortIcon sortConfig={sortConfigEvent} columnKey="choice" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortEvent('timestamp')}>
+                        <div className="flex items-center gap-1">Thời gian đăng ký <SortIcon sortConfig={sortConfigEvent} columnKey="timestamp" /></div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant text-[14px]">
-                    {eventRegistrations.length === 0 ? (
+                    {sortedEventRegistrations.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
                           {!selectedEventId ? 'Vui lòng chọn sự kiện để xem danh sách.' : 'Chưa có dữ liệu đăng ký cho sự kiện này.'}
                         </td>
                       </tr>
                     ) : (
-                      eventRegistrations.map((reg, index) => (
+                      sortedEventRegistrations.map((reg, index) => (
                         <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
                           <td className="p-md">{index + 1}</td>
                           <td className="p-md">{reg.employeeId || 'N/A'}</td>
