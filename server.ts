@@ -121,6 +121,7 @@ async function startServer() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(req.body),
+        redirect: "follow"
       });
 
       let responseText = "";

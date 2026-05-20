@@ -21,11 +21,9 @@ function useSortableData(items: any[], initialConfig = null) {
         if (bValue === undefined || bValue === null) bValue = '';
         
         if (sortConfig.key === 'timestamp' || sortConfig.key === 'createdAt' || sortConfig.key === 'cancelTime') {
-          const timeA = new Date(aValue).getTime();
-          const timeB = new Date(bValue).getTime();
-          if (!isNaN(timeA) && !isNaN(timeB)) {
-            return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
-          }
+          const timeA = aValue ? new Date(aValue).getTime() : 0;
+          const timeB = bValue ? new Date(bValue).getTime() : 0;
+          return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
         }
 
         const numA = parseInt(aValue, 10);
