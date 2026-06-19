@@ -114,14 +114,18 @@ export default function Admin() {
   });
 
   const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('2026-05'); 
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const currentDate = new Date();
+  const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr); 
+  const [selectedDay, setSelectedDay] = useState(currentDate.getDate());
   const [selectedEventId, setSelectedEventId] = useState('');
   
   // Filters for Monthly
   const [nameFilter, setNameFilter] = useState('');
   const [idFilter, setIdFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [cancelDateFilter, setCancelDateFilter] = useState('');
 
   const [addingAdmin, setAddingAdmin] = useState(false);
 
@@ -382,15 +386,6 @@ export default function Admin() {
     return matchesName && matchesId && matchesDept;
   });
 
-  const filteredCancelations = [...cancelations]
-    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
-    .filter(c => {
-    const matchesName = (c.fullName || '').toLowerCase().includes(nameFilter.toLowerCase());
-    const matchesId = (c.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
-    const matchesDept = (c.department || '').toLowerCase().includes(deptFilter.toLowerCase());
-    return matchesName && matchesId && matchesDept;
-  });
-
   const formatCancelDate = (dateStr: string) => {
     if (!dateStr) return 'N/A';
     const parts = dateStr.split('-');
@@ -399,6 +394,17 @@ export default function Admin() {
     }
     return dateStr;
   };
+
+  const filteredCancelations = [...cancelations]
+    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+    .filter(c => {
+    const matchesName = (c.fullName || '').toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesId = (c.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
+    const matchesDept = (c.department || '').toLowerCase().includes(deptFilter.toLowerCase());
+    const formattedDateStr = formatCancelDate(c.cancelDate || '');
+    const matchesDate = formattedDateStr.includes(cancelDateFilter) || (c.cancelDate || '').includes(cancelDateFilter);
+    return matchesName && matchesId && matchesDept && matchesDate;
+  });
 
   const registrationsWithCancelations = filteredRegistrations.map(reg => {
     const userCancelations = filteredCancelations.filter(c => c.userId === reg.userId);
@@ -697,31 +703,31 @@ export default function Admin() {
           <div className="flex flex-col gap-md lg:gap-lg">
             {/* Bento Grid Layout - Summary Statistics */}
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+              <div className="bg-[#d21235] rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-[#b00f2c] flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-lg font-bold text-on-surface-variant uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
                 <div>
-                  <span className="font-headline-lg text-headline-lg text-on-surface">{totalBreakfast}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  <span className="font-headline-lg text-headline-lg text-white">{totalBreakfast}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-1">suất</span>
                 </div>
-                <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '100%' }}></div>
+                <div className="w-full bg-white/20 rounded-full h-2 mt-auto">
+                  <div className="bg-white h-2 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
 
-              <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+              <div className="bg-[#d21235] rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-[#b00f2c] flex flex-col gap-md">
                 <div className="flex justify-between items-center">
-                  <span className="font-label-lg font-bold text-on-surface-variant uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
                 <div>
-                  <span className="font-headline-lg text-headline-lg text-on-surface">{totalLunch}</span>
-                  <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  <span className="font-headline-lg text-headline-lg text-white">{totalLunch}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-1">suất</span>
                 </div>
-                 <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
-                  <div className="bg-secondary h-2 rounded-full" style={{ width: '100%' }}></div>
+                 <div className="w-full bg-white/20 rounded-full h-2 mt-auto">
+                  <div className="bg-white h-2 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
             </div>
@@ -731,7 +737,7 @@ export default function Admin() {
               <div className="bg-surface-container-lowest rounded-xl p-md lg:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none m-0">Thống Kê Theo Ngày</h2>
+                    <h2 className="font-headline-sm text-headline-sm text-[#23328c] uppercase focus:outline-none m-0">THỐNG KÊ THEO NGÀY</h2>
                     <select 
                       value={selectedDay}
                       onChange={(e) => setSelectedDay(parseInt(e.target.value))}
@@ -743,16 +749,16 @@ export default function Admin() {
                     </select>
                   </div>
                   <div className="flex gap-4 flex-wrap w-full md:w-auto">
-                    <div className="flex items-center justify-between md:justify-start gap-4 bg-primary-container text-on-primary-container px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-primary/10">
+                    <div className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+                        <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                         <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyBreakfast}</span>
                     </div>
-                    <div className="flex items-center justify-between md:justify-start gap-4 bg-secondary-container text-on-secondary-container px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-secondary/10">
+                    <div className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+                        <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                         <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyLunch}</span>
@@ -881,23 +887,23 @@ export default function Admin() {
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
               <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-md border-b border-outline-variant bg-surface-bright grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-error-container/20 border border-error/10 p-4 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-on-surface-variant font-label-md">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
+                  <div className="bg-[#23328c] border border-blue-800 p-4 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-white/90 font-label-md">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
                     <div className="flex items-end gap-2 mt-1">
-                      <span className="text-error font-headline-lg font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                      <span className="text-on-surface-variant font-body-md mb-1 pb-0.5">suất</span>
+                      <span className="text-white font-headline-lg font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                      <span className="text-white/90 font-body-md mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[13px] text-on-surface-variant mt-2 font-medium">
+                    <div className="text-[13px] text-white/80 mt-2 font-medium">
                       ({globalCancelStats.todayBreakfast} Sáng, {globalCancelStats.todayLunch} Trưa)
                     </div>
                   </div>
-                  <div className="bg-error-container/20 border border-error/10 p-4 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-on-surface-variant font-label-md">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
+                  <div className="bg-[#23328c] border border-blue-800 p-4 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-white/90 font-label-md">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
                     <div className="flex items-end gap-2 mt-1">
-                      <span className="text-error font-headline-lg font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                      <span className="text-on-surface-variant font-body-md mb-1 pb-0.5">suất</span>
+                      <span className="text-white font-headline-lg font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                      <span className="text-white/90 font-body-md mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[13px] text-on-surface-variant mt-2 font-medium">
+                    <div className="text-[13px] text-white/80 mt-2 font-medium">
                       ({globalCancelStats.tomorrowBreakfast} Sáng, {globalCancelStats.tomorrowLunch} Trưa)
                     </div>
                   </div>
@@ -928,7 +934,7 @@ export default function Admin() {
                   </button>
                 </div>
 
-                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant focus:outline-none">
+                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-4 gap-md border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1">
                       <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
                       <input 
@@ -956,6 +962,15 @@ export default function Admin() {
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Ngày</label>
+                      <input 
+                        type="date" 
+                        value={cancelDateFilter}
+                        onChange={(e) => setCancelDateFilter(e.target.value)}
                         className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
                       />
                    </div>
