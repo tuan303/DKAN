@@ -205,7 +205,13 @@ export default function Admin() {
         registrationsUnsubscribe = onSnapshot(q, (querySnapshot) => {
           const regData: RegistrationData[] = [];
           querySnapshot.forEach((doc) => {
-            regData.push({ id: doc.id, ...doc.data() } as RegistrationData);
+            const data = doc.data() as RegistrationData;
+            // Retroactive fix: If breakfast was registered but lunch wasn't (due to previous bug), 
+            // it means "Sáng + Trưa" was selected.
+            if ((data.breakfastCount || 0) > 0 && (data.lunchCount || 0) === 0) {
+              data.lunchCount = data.breakfastCount;
+            }
+            regData.push({ id: doc.id, ...data });
           });
           setRegistrations(regData);
         });
@@ -887,23 +893,23 @@ export default function Admin() {
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
               <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-md border-b border-outline-variant bg-surface-bright grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-[#23328c] border border-blue-800 p-4 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-white/90 font-label-md">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
-                    <div className="flex items-end gap-2 mt-1">
-                      <span className="text-white font-headline-lg font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                      <span className="text-white/90 font-body-md mb-1 pb-0.5">suất</span>
+                  <div className="bg-[#23328c] border border-blue-800 p-6 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-white/90 text-[18px] font-medium">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
+                    <div className="flex items-end gap-2 mt-2">
+                      <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                      <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[13px] text-white/80 mt-2 font-medium">
+                    <div className="text-[16px] text-white/80 mt-3 font-medium">
                       ({globalCancelStats.todayBreakfast} Sáng, {globalCancelStats.todayLunch} Trưa)
                     </div>
                   </div>
-                  <div className="bg-[#23328c] border border-blue-800 p-4 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-white/90 font-label-md">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
-                    <div className="flex items-end gap-2 mt-1">
-                      <span className="text-white font-headline-lg font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                      <span className="text-white/90 font-body-md mb-1 pb-0.5">suất</span>
+                  <div className="bg-[#23328c] border border-blue-800 p-6 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-white/90 text-[18px] font-medium">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
+                    <div className="flex items-end gap-2 mt-2">
+                      <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                      <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[13px] text-white/80 mt-2 font-medium">
+                    <div className="text-[16px] text-white/80 mt-3 font-medium">
                       ({globalCancelStats.tomorrowBreakfast} Sáng, {globalCancelStats.tomorrowLunch} Trưa)
                     </div>
                   </div>

@@ -135,7 +135,11 @@ export default function ScheduleMonth() {
         const regDocRef = doc(db, 'registrations', `${user.uid}_${yyyy}-${mm}`);
         const regDocSnap = await getDoc(regDocRef);
         if (regDocSnap.exists()) {
-          setUserRegistrationForCancel(regDocSnap.data());
+          const data = regDocSnap.data();
+          if ((data.breakfastCount || 0) > 0 && (data.lunchCount || 0) === 0) {
+            data.lunchCount = data.breakfastCount;
+          }
+          setUserRegistrationForCancel(data);
         } else {
           setUserRegistrationForCancel(null);
         }
@@ -221,7 +225,7 @@ export default function ScheduleMonth() {
     
     // Calculate meals counts
     const breakfastCount = breakfastChoice === 'yes' ? weekdaysCount : 0;
-    const lunchCount = lunchChoice === 'yes' ? weekdaysCount : 0;
+    const lunchCount = (breakfastChoice === 'yes' || lunchChoice === 'yes') ? weekdaysCount : 0;
 
     try {
       let staffData: any = {};
