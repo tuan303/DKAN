@@ -12,6 +12,11 @@ interface EventData {
   isOpen: boolean;
 }
 
+import DatePickerDefault from "react-multi-date-picker";
+import "react-multi-date-picker/styles/layouts/mobile.css";
+
+const DatePicker = (DatePickerDefault as any).default || DatePickerDefault;
+
 export default function ScheduleMonth() {
   const [breakfastChoice, setBreakfastChoice] = useState('');
   const [lunchChoice, setLunchChoice] = useState('');
@@ -27,7 +32,7 @@ export default function ScheduleMonth() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [activeMainTab, setActiveMainTab] = useState<'register' | 'cancel'>('register');
-  const [cancelDate, setCancelDate] = useState('');
+  const [cancelDates, setCancelDates] = useState<any[]>([]);
   const [cancelMeal, setCancelMeal] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCanteen, setCancelCanteen] = useState('');
@@ -37,6 +42,24 @@ export default function ScheduleMonth() {
   const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
   
   const [cancelExtendUntil, setCancelExtendUntil] = useState<string>('');
+
+  const getStandardDateString = (d: any) => {
+    if (d?.year && d?.month?.number && d?.day) {
+      return `${d.year}-${String(d.month.number).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+    }
+    const dObj = new Date(d);
+    if (!isNaN(dObj.getTime())) {
+      return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
+    }
+    if (typeof d === 'string') {
+      const parts = d.split('/');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      return d;
+    }
+    return '';
+  };
 
   const getMinCancelDate = () => {
     const d = new Date();
@@ -123,12 +146,16 @@ export default function ScheduleMonth() {
 
   useEffect(() => {
     const fetchCancelMonthRegistration = async () => {
-      if (!cancelDate) return;
+      if (!cancelDates || cancelDates.length === 0) {
+        setUserRegistrationForCancel(null);
+        return;
+      }
+      const firstDateStr = getStandardDateString(cancelDates[0]);
       const user = auth.currentUser;
       if (!user) return;
       
       setIsCheckingRegistration(true);
-      const dateParts = cancelDate.split('-');
+      const dateParts = firstDateStr.split('-');
       const yyyy = dateParts[0];
       const mm = (parseInt(dateParts[1], 10)).toString().padStart(2, '0');
       try {
@@ -150,7 +177,7 @@ export default function ScheduleMonth() {
       }
     };
     fetchCancelMonthRegistration();
-  }, [cancelDate]);
+  }, [cancelDates]);
 
   const fetchConfigAndEvents = async () => {
     try {
@@ -350,17 +377,21 @@ export default function ScheduleMonth() {
   };
 
   const handleCancel = async () => {
-    if (!cancelDate || !cancelMeal || !cancelReason || !cancelCanteen) {
+    if (!cancelDates || cancelDates.length === 0 || !cancelMeal || !cancelReason || !cancelCanteen) {
       setSubmitStatus({ type: 'error', message: 'Vui lòng điền đầy đủ thông tin hủy đăng ký ăn.' });
       return;
     }
 
     const minDateStr = getMinCancelDate();
-    if (cancelDate < minDateStr) {
+    const invalidDates = cancelDates
+      .map(d => getStandardDateString(d))
+      .filter(d => d < minDateStr);
+
+    if (invalidDates.length > 0) {
       const lockTimeDisplay = cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16h00';
       setSubmitStatus({ 
         type: 'error', 
-        message: `Không hợp lệ! Hủy ăn ngày mai phải đăng ký trước ${lockTimeDisplay} ngày hôm nay.` 
+        message: `Không hợp lệ! Hủy ăn ngày mai phải đăng ký trước ${lockTimeDisplay} ngày hôm nay. (Ngày bị lỗi: ${invalidDates.join(', ')})` 
       });
       return;
     }
@@ -382,52 +413,54 @@ export default function ScheduleMonth() {
          department: 'N/A'
       };
 
-      const cancelDocRef = doc(db, 'cancel_registrations', `${user.uid}_${cancelDate}`);
-      const cancelDocSnap = await getDoc(cancelDocRef);
+      const dateStrings = cancelDates.map(d => getStandardDateString(d));
+      const alreadyCanceledDates: string[] = [];
+      const formattedDates: string[] = [];
 
-      if (cancelDocSnap.exists()) {
-        const data = cancelDocSnap.data();
-        let dateStr = '';
-        if (data.timestamp) {
-          const date = new Date(data.timestamp);
-          const hh = date.getHours().toString().padStart(2, '0');
-          const mm = date.getMinutes().toString().padStart(2, '0');
-          const dd = date.getDate().toString().padStart(2, '0');
-          const MM = (date.getMonth() + 1).toString().padStart(2, '0');
-          const yy = date.getFullYear().toString().slice(2);
-          dateStr = `${hh}:${mm} ngày ${dd}/${MM}/${yy}`;
+      for (const dateStr of dateStrings) {
+        const cancelDocRef = doc(db, 'cancel_registrations', `${user.uid}_${dateStr}`);
+        const cancelDocSnap = await getDoc(cancelDocRef);
+        if (cancelDocSnap.exists()) {
+          alreadyCanceledDates.push(dateStr);
+        } else {
+          const dateParts = dateStr.split('-');
+          formattedDates.push(`${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`);
         }
-        
-        const dateParts = cancelDate.split('-');
-        const formattedDateForMsg = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-        
+      }
+
+      if (alreadyCanceledDates.length > 0) {
         setSubmitStatus({
           type: 'info',
-          message: `Thầy/Cô đã đăng ký hủy ăn cho ngày ${formattedDateForMsg} (thực hiện lúc ${dateStr})`
+          message: `Một số ngày đã được đăng ký hủy từ trước: ${alreadyCanceledDates.join(', ')}. Vui lòng bỏ chọn các ngày này.`
         });
         setIsCanceling(false);
         return;
       }
 
-      const dateParts = cancelDate.split('-');
-      const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-
-      await setDoc(cancelDocRef, {
-        userId: user.uid,
-        fullName: staffData.fullName,
-        employeeId: staffData.employeeId,
-        department: staffData.department,
-        email: user.email,
-        cancelDate,
-        formattedDate,
-        cancelMeal,
-        cancelReason,
-        cancelCanteen,
-        timestamp: new Date().toISOString()
+      const promises = dateStrings.map(async (dateStr, index) => {
+        const cancelDocRef = doc(db, 'cancel_registrations', `${user.uid}_${dateStr}`);
+        const formattedDate = formattedDates[index];
+        await setDoc(cancelDocRef, {
+          userId: user.uid,
+          fullName: staffData.fullName,
+          employeeId: staffData.employeeId,
+          department: staffData.department,
+          email: user.email,
+          cancelDate: dateStr,
+          formattedDate,
+          cancelMeal,
+          cancelReason,
+          cancelCanteen,
+          timestamp: new Date().toISOString()
+        });
       });
+
+      await Promise.all(promises);
 
       const toEmail = userEmail || staffData.email || user?.email || 'tuan303@gmail.com';
       const toRecipients = `dinhduong@hoangmaistarschool.edu.vn, ${toEmail}`;
+      const formattedDateList = formattedDates.join('<br>');
+      const formattedDateListText = formattedDates.join(', ');
 
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -457,7 +490,7 @@ export default function ScheduleMonth() {
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
                   <td style="padding: 12px; background-color: #f8fafc; font-weight: bold;">Ngày Hủy:</td>
-                  <td style="padding: 12px; color: #D21235; font-weight: bold;">${formattedDate}</td>
+                  <td style="padding: 12px; color: #D21235; font-weight: bold;">${formattedDateList}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
                   <td style="padding: 12px; background-color: #f8fafc; font-weight: bold;">Bữa Hủy:</td>
@@ -489,41 +522,44 @@ export default function ScheduleMonth() {
         const now = new Date();
         const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 
-        await fetch('/api/gas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            'Mã Nhân Viên': staffData.employeeId || '',
-            'Họ và Tên': staffData.fullName || '',
-            'Phòng ban/Tổ khối': staffData.department || '',
-            'Ngày hủy': formattedDate,
-            'Bữa hủy': cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
-            'Nhà ăn': cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
-            'Lý do': cancelReason,
-            'Thời gian khai báo hủy': timeString,
-            
-            // Send backward-compatible keys just in case GAS hasn't been deployed
-            employeeId: staffData.employeeId || '',
-            fullName: staffData.fullName || '',
-            department: staffData.department || '',
-            cancelDate: formattedDate,
-            cancelMeal: cancelMeal,
-            cancelReason: cancelReason,
-            cancelCanteen: cancelCanteen,
-            timestamp: timeString
-          }),
+        const gasPromises = dateStrings.map(async (dateStr, index) => {
+          return fetch('/api/gas', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              'Mã Nhân Viên': staffData.employeeId || '',
+              'Họ và Tên': staffData.fullName || '',
+              'Phòng ban/Tổ khối': staffData.department || '',
+              'Ngày hủy': formattedDates[index],
+              'Bữa hủy': cancelMeal === 'both' ? 'Cả 2 bữa' : (cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa'),
+              'Nhà ăn': cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học',
+              'Lý do': cancelReason,
+              'Thời gian khai báo hủy': timeString,
+              
+              // Send backward-compatible keys just in case GAS hasn't been deployed
+              employeeId: staffData.employeeId || '',
+              fullName: staffData.fullName || '',
+              department: staffData.department || '',
+              cancelDate: formattedDates[index],
+              cancelMeal: cancelMeal,
+              cancelReason: cancelReason,
+              cancelCanteen: cancelCanteen,
+              timestamp: timeString
+            }),
+          });
         });
+        await Promise.all(gasPromises);
       } catch (err) {
         console.error('Failed to send data to Google Sheets', err);
       }
 
       setSubmitStatus({
         type: 'success',
-        message: 'Gửi yêu cầu hủy đăng ký thành công! (Dữ liệu đã được lưu trữ & Gửi email)'
+        message: 'Gửi yêu cầu hủy đăng ký thành công cho các ngày: ' + formattedDateListText
       });
-      setCancelDate('');
+      setCancelDates([]);
       setCancelMeal('');
       setCancelReason('');
       setCancelCanteen('');
@@ -684,24 +720,28 @@ export default function ScheduleMonth() {
                   <div className="p-md bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-2 relative">
                       <label className="font-label-md text-on-surface">Ngày hủy suất ăn <span className="text-error">*</span></label>
-                      <input 
-                        type="date" 
-                        value={cancelDate}
-                        min={getMinCancelDate()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            const day = new Date(val).getDay();
+                      <DatePicker 
+                        multiple
+                        value={cancelDates}
+                        onChange={(dates) => {
+                          const validDates = [];
+                          for (const d of (dates as any[] || [])) {
+                            const dateObj = new Date(getStandardDateString(d));
+                            const day = dateObj.getDay();
                             if (day === 0 || day === 6) {
                               setSubmitStatus({ type: 'error', message: 'Không thể chọn Thứ 7 hoặc Chủ Nhật (ngày nghỉ) để hủy ăn.' });
-                              setCancelDate('');
                               return;
                             }
+                            validDates.push(d);
                           }
                           setSubmitStatus(null);
-                          setCancelDate(val);
+                          setCancelDates(validDates);
                         }}
-                        className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                        format="DD/MM/YYYY"
+                        placeholder="Chọn các ngày hủy (có thể chọn nhiều)"
+                        minDate={getMinCancelDate()}
+                        containerClassName="w-full"
+                        inputClass="w-full bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                       />
                       <span className="text-[12px] italic font-bold text-[#D21235] leading-tight">Yêu cầu hủy trước {cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16:00'} ngày hôm trước</span>
                     </div>
@@ -711,15 +751,15 @@ export default function ScheduleMonth() {
                         value={cancelMeal}
                         onChange={(e) => setCancelMeal(e.target.value)}
                         className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!cancelDate || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
+                        disabled={cancelDates.length === 0 || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                       >
                         <option value="">-- Chọn bữa --</option>
                         {userRegistrationForCancel?.breakfastCount > 0 && <option value="breakfast">Bữa sáng</option>}
                         {userRegistrationForCancel?.lunchCount > 0 && <option value="lunch">Bữa trưa</option>}
                         {userRegistrationForCancel?.breakfastCount > 0 && userRegistrationForCancel?.lunchCount > 0 && <option value="both">Cả 2 bữa (Sáng + Trưa)</option>}
                       </select>
-                      {cancelDate && !isCheckingRegistration && (!userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)) && (
-                        <span className="text-[12px] italic font-bold text-error leading-tight">Bạn chưa đăng ký ăn trong tháng này.</span>
+                      {cancelDates.length > 0 && !isCheckingRegistration && (!userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)) && (
+                        <span className="text-[12px] italic font-bold text-error leading-tight">Bạn chưa đăng ký ăn trong tháng của ngày đầu tiên đã chọn.</span>
                       )}
                     </div>
                     <div className="flex flex-col gap-2 md:col-span-2">
@@ -817,7 +857,7 @@ export default function ScheduleMonth() {
                   </div>
                   <button 
                     onClick={handleCancel}
-                    disabled={isCanceling || !cancelDate || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
+                    disabled={isCanceling || cancelDates.length === 0 || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                     className={clsx(
                       "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
                       "bg-error text-on-error hover:bg-[#b00f2c] active:scale-95"
