@@ -770,7 +770,7 @@ export default function Admin() {
           <div className="flex flex-col gap-md lg:gap-lg">
             {/* Bento Grid Layout - Summary Statistics */}
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg shadow-lg border border-white/10 flex flex-col gap-md relative overflow-hidden">
+              <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">bakery_dining</span>
                 </div>
@@ -779,7 +779,7 @@ export default function Admin() {
                   <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
                 <div className="relative z-10">
-                  <span className="font-headline-lg text-headline-lg text-white font-black drop-shadow-sm">{totalBreakfast}</span>
+                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{totalBreakfast}</span>
                   <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
                 </div>
                 <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
@@ -787,7 +787,7 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg shadow-lg border border-white/10 flex flex-col gap-md relative overflow-hidden">
+              <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">lunch_dining</span>
                 </div>
@@ -796,7 +796,7 @@ export default function Admin() {
                   <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
                 <div className="relative z-10">
-                  <span className="font-headline-lg text-headline-lg text-white font-black drop-shadow-sm">{totalLunch}</span>
+                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{totalLunch}</span>
                   <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
                 </div>
                  <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
@@ -969,59 +969,66 @@ export default function Admin() {
 
         {activeTab === 'cancelations' && (
           <div className="flex flex-col gap-md lg:gap-lg">
+            <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
+              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <span className="material-symbols-outlined text-[100px]">event_busy</span>
+                </div>
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">ĐÃ HỦY ĂN HÔM NAY ({globalCancelStats.todayStr})</span>
+                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>event_busy</span>
+                </div>
+                <div className="relative z-10">
+                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                </div>
+                <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
+                  <button onClick={() => {
+                    const d = new Date();
+                    setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                    setCancelMealFilter('breakfast');
+                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.todayBreakfast} Sáng</button>
+                  <span className="opacity-50">|</span>
+                  <button onClick={() => {
+                    const d = new Date();
+                    setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                    setCancelMealFilter('lunch');
+                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.todayLunch} Trưa</button>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <span className="material-symbols-outlined text-[100px]">next_plan</span>
+                </div>
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">ĐÃ HỦY ĂN NGÀY MAI ({globalCancelStats.tomorrowStr})</span>
+                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>next_plan</span>
+                </div>
+                <div className="relative z-10">
+                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                </div>
+                <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
+                  <button onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                    setCancelMealFilter('breakfast');
+                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.tomorrowBreakfast} Sáng</button>
+                  <span className="opacity-50">|</span>
+                  <button onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                    setCancelMealFilter('lunch');
+                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.tomorrowLunch} Trưa</button>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
               <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
-                <div className="p-lg md:p-xl border-b border-outline-variant bg-surface-container-lowest grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] border border-white/10 p-8 rounded-2xl flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
-                      <span className="material-symbols-outlined text-[120px]">event_busy</span>
-                    </div>
-                    <span className="text-white/90 text-[18px] font-medium relative z-10 drop-shadow-sm">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
-                    <div className="flex items-end gap-2 mt-3 relative z-10">
-                      <span className="text-white text-[48px] font-black leading-none drop-shadow-sm">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                      <span className="text-white/90 text-[18px] mb-2 pb-0.5 font-medium">suất</span>
-                    </div>
-                    <div className="text-[16px] text-white/80 mt-4 font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5">
-                      <button onClick={() => {
-                        const d = new Date();
-                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                        setCancelMealFilter('breakfast');
-                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.todayBreakfast} Sáng</button>
-                      <span className="opacity-50">|</span>
-                      <button onClick={() => {
-                        const d = new Date();
-                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                        setCancelMealFilter('lunch');
-                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.todayLunch} Trưa</button>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] border border-white/10 p-8 rounded-2xl flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
-                      <span className="material-symbols-outlined text-[120px]">next_plan</span>
-                    </div>
-                    <span className="text-white/90 text-[18px] font-medium relative z-10 drop-shadow-sm">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
-                    <div className="flex items-end gap-2 mt-3 relative z-10">
-                      <span className="text-white text-[48px] font-black leading-none drop-shadow-sm">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                      <span className="text-white/90 text-[18px] mb-2 pb-0.5 font-medium">suất</span>
-                    </div>
-                    <div className="text-[16px] text-white/80 mt-4 font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5">
-                      <button onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() + 1);
-                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                        setCancelMealFilter('breakfast');
-                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.tomorrowBreakfast} Sáng</button>
-                      <span className="opacity-50">|</span>
-                      <button onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() + 1);
-                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                        setCancelMealFilter('lunch');
-                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.tomorrowLunch} Trưa</button>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
                     <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Hủy Ăn</h2>
