@@ -722,46 +722,46 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Tabs navigation Chrome-style */}
-        <div className="flex px-md md:px-0 mt-xs pt-2 bg-surface-container-low border-b border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap md:gap-1 rounded-t-xl">
+        {/* Tabs navigation */}
+        <div className="flex px-1 py-1 mt-xs bg-surface-container-low border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit shadow-sm">
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'monthly' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'monthly' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('monthly')}
           >
             ĐK ĂN HÀNG THÁNG
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'cancelations' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'cancelations' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('cancelations')}
           >
             ĐK HỦY ĂN
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'events' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'events' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('events')}
           >
             ĐK ĂN SỰ KIỆN
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'daily_stats' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'daily_stats' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('daily_stats')}
           >
             DS ĐK THEO NGÀY
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'settings' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'settings' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('settings')}
           >
             CẤU HÌNH
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'blocked' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'blocked' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('blocked')}
           >
             VI PHẠM
           </button>
           <button 
-            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'admins' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'admins' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('admins')}
           >
             QUẢN TRỊ
@@ -772,45 +772,51 @@ export default function Admin() {
           <div className="flex flex-col gap-md lg:gap-lg">
             {/* Bento Grid Layout - Summary Statistics */}
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-[#d21235] rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-[#b00f2c] flex flex-col gap-md">
-                <div className="flex justify-between items-center">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg shadow-lg border border-white/10 flex flex-col gap-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <span className="material-symbols-outlined text-[100px]">bakery_dining</span>
                 </div>
-                <div>
-                  <span className="font-headline-lg text-headline-lg text-white">{totalBreakfast}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-1">suất</span>
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
-                <div className="w-full bg-white/20 rounded-full h-2 mt-auto">
-                  <div className="bg-white h-2 rounded-full" style={{ width: '100%' }}></div>
+                <div className="relative z-10">
+                  <span className="font-headline-lg text-headline-lg text-white font-black drop-shadow-sm">{totalBreakfast}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                </div>
+                <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
+                  <div className="bg-white h-1.5 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
 
-              <div className="bg-[#d21235] rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-[#b00f2c] flex flex-col gap-md">
-                <div className="flex justify-between items-center">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg shadow-lg border border-white/10 flex flex-col gap-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <span className="material-symbols-outlined text-[100px]">lunch_dining</span>
                 </div>
-                <div>
-                  <span className="font-headline-lg text-headline-lg text-white">{totalLunch}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-1">suất</span>
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
-                 <div className="w-full bg-white/20 rounded-full h-2 mt-auto">
-                  <div className="bg-white h-2 rounded-full" style={{ width: '100%' }}></div>
+                <div className="relative z-10">
+                  <span className="font-headline-lg text-headline-lg text-white font-black drop-shadow-sm">{totalLunch}</span>
+                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                </div>
+                 <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
+                  <div className="bg-white h-1.5 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
             </div>
 
             {/* Daily Statistics */}
-            <div className="px-md md:px-0">
-              <div className="bg-surface-container-lowest rounded-xl p-md lg:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
+            <div className="px-md md:px-0 mt-2">
+              <div className="bg-gradient-to-r from-surface-container-lowest to-surface rounded-2xl p-md lg:p-lg shadow-sm border border-outline-variant flex flex-col gap-md">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-headline-sm text-headline-sm text-[#23328c] uppercase focus:outline-none m-0">THỐNG KÊ THEO NGÀY</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none m-0 tracking-wide font-black">THỐNG KÊ THEO NGÀY</h2>
                     <select 
                       value={selectedDay}
                       onChange={(e) => setSelectedDay(parseInt(e.target.value))}
-                      className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-sm outline-none font-bold text-primary ml-2 cursor-pointer shadow-sm"
+                      className="bg-white border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-4 py-2 text-[14px] outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
                     >
                       {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
                         <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
@@ -823,11 +829,11 @@ export default function Admin() {
                         setDailyFilterByMeal('breakfast');
                         setActiveTab('daily_stats');
                       }}
-                      className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] hover:bg-[#1b2774] transition-colors text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800 focus:outline-none"
+                      className="flex items-center justify-between md:justify-start gap-4 bg-gradient-to-r from-[#23328c] to-[#1a2569] hover:from-[#1b2774] hover:to-[#121a4a] transition-all text-white px-5 py-2.5 rounded-xl flex-1 md:flex-initial shadow-md border border-white/10 focus:outline-none transform hover:-translate-y-0.5"
                     >
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
-                        <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
+                        <span className="font-label-md font-bold text-[13px] tracking-wide">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyBreakfast}</span>
                     </button>
@@ -836,11 +842,11 @@ export default function Admin() {
                         setDailyFilterByMeal('lunch');
                         setActiveTab('daily_stats');
                       }}
-                      className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] hover:bg-[#1b2774] transition-colors text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800 focus:outline-none"
+                      className="flex items-center justify-between md:justify-start gap-4 bg-gradient-to-r from-[#23328c] to-[#1a2569] hover:from-[#1b2774] hover:to-[#121a4a] transition-all text-white px-5 py-2.5 rounded-xl flex-1 md:flex-initial shadow-md border border-white/10 focus:outline-none transform hover:-translate-y-0.5"
                     >
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
-                        <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
+                        <span className="font-label-md font-bold text-[13px] tracking-wide">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyLunch}</span>
                     </button>
@@ -851,61 +857,61 @@ export default function Admin() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-md lg:gap-lg px-md md:px-0">
               {/* Main Content - Registration List */}
-              <div className="lg:col-span-3 bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
-                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
-                  <div className="flex flex-col gap-1">
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
+              <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
                     <div className="flex items-center gap-2">
-                       <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                       <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                        className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
                        >
                          {MONTHS.map(m => (
-                           <option key={m} value={`2026-${m}`}>Tháng {m}</option>
+                           <option key={m} value={`2026-${m}`}>Tháng {m}/2026</option>
                          ))}
                        </select>
                     </div>
                   </div>
                   <button 
                     onClick={handleExportExcel}
-                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
+                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
-                    Xuất Excel
+                    <span className="font-bold tracking-wide">Xuất Excel</span>
                   </button>
                 </div>
 
-                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant focus:outline-none">
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-3 gap-lg border-b border-outline-variant focus:outline-none">
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
-                        placeholder="Nhập tên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        placeholder="Nhập tên nhân viên..."
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
@@ -966,129 +972,133 @@ export default function Admin() {
         {activeTab === 'cancelations' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
-              <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
-                <div className="p-md border-b border-outline-variant bg-surface-bright grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-[#23328c] border border-blue-800 p-6 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-white/90 text-[18px] font-medium">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
-                    <div className="flex items-end gap-2 mt-2">
-                      <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                      <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
+              <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-lg md:p-xl border-b border-outline-variant bg-surface-container-lowest grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] border border-white/10 p-8 rounded-2xl flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                      <span className="material-symbols-outlined text-[120px]">event_busy</span>
                     </div>
-                    <div className="text-[16px] text-white/80 mt-3 font-medium flex gap-2">
-                      (
+                    <span className="text-white/90 text-[18px] font-medium relative z-10 drop-shadow-sm">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
+                    <div className="flex items-end gap-2 mt-3 relative z-10">
+                      <span className="text-white text-[48px] font-black leading-none drop-shadow-sm">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                      <span className="text-white/90 text-[18px] mb-2 pb-0.5 font-medium">suất</span>
+                    </div>
+                    <div className="text-[16px] text-white/80 mt-4 font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5">
                       <button onClick={() => {
                         const d = new Date();
                         setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                         setCancelMealFilter('breakfast');
-                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.todayBreakfast} Sáng</button>, 
+                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.todayBreakfast} Sáng</button>
+                      <span className="opacity-50">|</span>
                       <button onClick={() => {
                         const d = new Date();
                         setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                         setCancelMealFilter('lunch');
-                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.todayLunch} Trưa</button>
-                      )
+                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.todayLunch} Trưa</button>
                     </div>
                   </div>
-                  <div className="bg-[#23328c] border border-blue-800 p-6 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-white/90 text-[18px] font-medium">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
-                    <div className="flex items-end gap-2 mt-2">
-                      <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                      <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
+                  <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] border border-white/10 p-8 rounded-2xl flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                      <span className="material-symbols-outlined text-[120px]">next_plan</span>
                     </div>
-                    <div className="text-[16px] text-white/80 mt-3 font-medium flex gap-2">
-                      (
+                    <span className="text-white/90 text-[18px] font-medium relative z-10 drop-shadow-sm">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
+                    <div className="flex items-end gap-2 mt-3 relative z-10">
+                      <span className="text-white text-[48px] font-black leading-none drop-shadow-sm">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                      <span className="text-white/90 text-[18px] mb-2 pb-0.5 font-medium">suất</span>
+                    </div>
+                    <div className="text-[16px] text-white/80 mt-4 font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5">
                       <button onClick={() => {
                         const d = new Date();
                         d.setDate(d.getDate() + 1);
                         setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                         setCancelMealFilter('breakfast');
-                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.tomorrowBreakfast} Sáng</button>, 
+                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.tomorrowBreakfast} Sáng</button>
+                      <span className="opacity-50">|</span>
                       <button onClick={() => {
                         const d = new Date();
                         d.setDate(d.getDate() + 1);
                         setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                         setCancelMealFilter('lunch');
-                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.tomorrowLunch} Trưa</button>
-                      )
+                      }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.tomorrowLunch} Trưa</button>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
-                  <div className="flex flex-col gap-1">
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Hủy Ăn</h2>
+                <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Hủy Ăn</h2>
                     <div className="flex items-center gap-2">
-                       <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                       <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                        className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
                        >
                          {MONTHS.map(m => (
-                           <option key={m} value={`2026-${m}`}>Tháng {m}</option>
+                           <option key={m} value={`2026-${m}`}>Tháng {m}/2026</option>
                          ))}
                        </select>
                     </div>
                   </div>
                   <button 
                     onClick={handleExportCancelationsExcel}
-                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
+                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
-                    Xuất Excel
+                    <span className="font-bold tracking-wide">Xuất Excel</span>
                   </button>
                 </div>
 
-                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-5 gap-md border-b border-outline-variant focus:outline-none">
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-5 gap-lg border-b border-outline-variant focus:outline-none">
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
-                        placeholder="Nhập tên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        placeholder="Nhập tên nhân viên..."
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Bữa</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Bữa</label>
                       <select 
                         value={cancelMealFilter}
                         onChange={(e) => setCancelMealFilter(e.target.value as any)}
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none cursor-pointer"
                       >
                         <option value="all">Tất cả</option>
                         <option value="breakfast">Bữa sáng</option>
                         <option value="lunch">Bữa trưa</option>
                       </select>
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Ngày</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Ngày</label>
                       <input 
                         type="date" 
                         value={cancelDateFilter}
                         onChange={(e) => setCancelDateFilter(e.target.value)}
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
@@ -1165,47 +1175,53 @@ export default function Admin() {
             {/* Event Summary */}
             {selectedEventId && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg px-md md:px-0">
-                <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
-                  <div className="flex justify-between items-center">
-                    <span className="font-label-lg font-bold text-[#065f46] uppercase tracking-wider">CÓ ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                <div className="bg-gradient-to-br from-[#d1fae5] to-[#a7f3d0] rounded-2xl p-lg shadow-lg border border-[#34d399]/20 flex flex-col gap-md relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                    <span className="material-symbols-outlined text-[100px]">restaurant</span>
+                  </div>
+                  <div className="flex justify-between items-center relative z-10">
+                    <span className="font-label-lg font-bold text-[#065f46] uppercase tracking-wider drop-shadow-sm">CÓ ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
                     <span className="material-symbols-outlined text-[#065f46]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
                   </div>
-                  <div>
-                    <span className="font-headline-lg text-headline-lg text-on-surface">{eventRegistrations.filter(r => r.choice === 'yes').length}</span>
-                    <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  <div className="relative z-10">
+                    <span className="font-headline-lg text-headline-lg text-[#065f46] font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'yes').length}</span>
+                    <span className="font-body-md text-body-md text-[#065f46]/90 ml-2 font-medium">suất</span>
                   </div>
-                   <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
-                    <div className="bg-[#065f46] h-2 rounded-full" style={{ width: '100%' }}></div>
+                   <div className="w-full bg-[#065f46]/20 rounded-full h-1.5 mt-auto relative z-10">
+                    <div className="bg-[#065f46] h-1.5 rounded-full" style={{ width: '100%' }}></div>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant flex flex-col gap-md">
-                  <div className="flex justify-between items-center">
-                    <span className="font-label-lg font-bold text-on-error-container uppercase tracking-wider">KHÔNG ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
-                    <span className="material-symbols-outlined text-on-error-container" style={{ fontVariationSettings: "'FILL' 1" }}>no_meals</span>
+                <div className="bg-gradient-to-br from-[#fee2e2] to-[#fecaca] rounded-2xl p-lg shadow-lg border border-[#f87171]/20 flex flex-col gap-md relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                    <span className="material-symbols-outlined text-[100px]">no_meals</span>
                   </div>
-                  <div>
-                    <span className="font-headline-lg text-headline-lg text-on-surface">{eventRegistrations.filter(r => r.choice === 'no').length}</span>
-                    <span className="font-body-md text-body-md text-on-surface-variant ml-1">suất</span>
+                  <div className="flex justify-between items-center relative z-10">
+                    <span className="font-label-lg font-bold text-[#991b1b] uppercase tracking-wider drop-shadow-sm">KHÔNG ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                    <span className="material-symbols-outlined text-[#991b1b]" style={{ fontVariationSettings: "'FILL' 1" }}>no_meals</span>
                   </div>
-                   <div className="w-full bg-surface-variant rounded-full h-2 mt-auto">
-                    <div className="bg-error h-2 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="relative z-10">
+                    <span className="font-headline-lg text-headline-lg text-[#991b1b] font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'no').length}</span>
+                    <span className="font-body-md text-body-md text-[#991b1b]/90 ml-2 font-medium">suất</span>
+                  </div>
+                   <div className="w-full bg-[#991b1b]/20 rounded-full h-1.5 mt-auto relative z-10">
+                    <div className="bg-[#991b1b] h-1.5 rounded-full" style={{ width: '100%' }}></div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Event Registration List */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col px-md md:px-0">
-              <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
-                <div className="flex flex-col gap-1">
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase pr-4 focus:outline-none">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col px-md md:px-0 mx-md md:mx-0">
+              <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
+                <div className="flex flex-col gap-2 w-full md:w-auto">
+                  <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase pr-4 focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
                   <div className="flex items-center gap-2">
-                     <span className="font-label-sm text-on-surface-variant">Sự kiện:</span>
+                     <span className="font-label-sm text-on-surface-variant font-medium">Sự kiện:</span>
                      <select 
                       value={selectedEventId}
                       onChange={(e) => setSelectedEventId(e.target.value)}
-                      className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none max-w-[250px]"
+                      className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer max-w-[250px] w-full"
                      >
                        <option value="">-- Chọn sự kiện --</option>
                        {events.map(event => (
@@ -1217,10 +1233,10 @@ export default function Admin() {
                 <button 
                   onClick={handleExportEventExcel}
                   disabled={!selectedEventId}
-                  className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center disabled:opacity-50"
+                  className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
                 >
                   <span className="material-symbols-outlined text-[20px]">download</span>
-                  Xuất Excel Sự Kiện
+                  <span className="font-bold tracking-wide">Xuất Excel Sự Kiện</span>
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -1282,17 +1298,17 @@ export default function Admin() {
         {activeTab === 'daily_stats' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
-              <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
-                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
-                  <div className="flex flex-col gap-1">
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mt-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                        <span className="font-label-sm text-on-surface-variant font-medium">Tháng:</span>
                         <select 
                           value={selectedMonth}
                           onChange={(e) => setSelectedMonth(e.target.value)}
-                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                          className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer"
                         >
                           {MONTHS.map(m => (
                             <option key={m} value={`2026-${m}`}>Tháng {m}</option>
@@ -1300,11 +1316,11 @@ export default function Admin() {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-label-sm text-on-surface-variant">Ngày:</span>
+                        <span className="font-label-sm text-on-surface-variant font-medium">Ngày:</span>
                         <select 
                           value={selectedDay}
                           onChange={(e) => setSelectedDay(parseInt(e.target.value))}
-                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none font-bold text-primary"
+                          className="bg-surface border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] cursor-pointer"
                         >
                           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
                             <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
@@ -1312,11 +1328,11 @@ export default function Admin() {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-label-sm text-on-surface-variant">Bữa:</span>
+                        <span className="font-label-sm text-on-surface-variant font-medium">Bữa:</span>
                         <select 
                           value={dailyFilterByMeal}
                           onChange={(e) => setDailyFilterByMeal(e.target.value as any)}
-                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none font-bold text-primary"
+                          className="bg-surface border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] cursor-pointer"
                         >
                           <option value="all">Tất cả</option>
                           <option value="breakfast">Bữa sáng</option>
@@ -1327,42 +1343,42 @@ export default function Admin() {
                   </div>
                   <button 
                     onClick={handleExportDailyExcel}
-                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
+                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
-                    Xuất Excel
+                    <span className="font-bold tracking-wide">Xuất Excel</span>
                   </button>
                 </div>
 
-                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant focus:outline-none">
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-3 gap-lg border-b border-outline-variant focus:outline-none">
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
-                        placeholder="Nhập tên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        placeholder="Nhập tên nhân viên..."
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
