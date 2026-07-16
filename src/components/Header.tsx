@@ -35,7 +35,16 @@ export function Header() {
         </Link>
         
         {!isRegister ? (
-          <>
+          <div className="flex items-center gap-4">
+            {location.pathname === '/quantri' && (
+              <Link 
+                to="/schedule"
+                className="hidden md:flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-full font-label-md transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                Quay về giao diện đăng ký ăn
+              </Link>
+            )}
             {/* Desktop User Info */}
             <div 
               className="hidden md:flex items-center gap-md cursor-pointer group"
@@ -48,13 +57,23 @@ export function Header() {
             </div>
 
             {/* Mobile User Info */}
-            <div 
-              className="md:hidden w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all active:scale-95"
-              onClick={() => window.dispatchEvent(new Event('open-account-modal'))}
-            >
-              {initials}
+            <div className="flex items-center gap-2 md:hidden">
+              {location.pathname === '/quantri' && (
+                <Link 
+                  to="/schedule"
+                  className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                </Link>
+              )}
+              <div 
+                className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-label-md text-label-md cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all active:scale-95"
+                onClick={() => window.dispatchEvent(new Event('open-account-modal'))}
+              >
+                {initials}
+              </div>
             </div>
-          </>
+          </div>
         ) : (
           <div className="flex items-center gap-sm">
             <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant">

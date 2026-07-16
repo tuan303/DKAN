@@ -4,7 +4,6 @@ import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
-import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 
 function useSortableData(items: any[], initialConfig = null) {
@@ -710,9 +709,8 @@ export default function Admin() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md md:pl-64">
+    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md">
       <Header />
-      <Navigation />
       
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-sm md:p-lg lg:p-xl flex flex-col gap-md md:gap-lg mt-16 md:mt-2">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-sm border-b md:border-b-0 border-outline-variant pb-md md:pb-0 px-md md:px-0 mt-md md:mt-0">
