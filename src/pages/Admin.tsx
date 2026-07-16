@@ -127,6 +127,8 @@ export default function Admin() {
   const [deptFilter, setDeptFilter] = useState('');
   const [cancelDateFilter, setCancelDateFilter] = useState('');
 
+  const [dailyFilterByMeal, setDailyFilterByMeal] = useState<'all'|'breakfast'|'lunch'>('all');
+
   const [addingAdmin, setAddingAdmin] = useState(false);
 
   // Blocked users
@@ -134,7 +136,7 @@ export default function Admin() {
   const [blockedEmailsInput, setBlockedEmailsInput] = useState('');
 
   // Tabs from URL
-  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'cancelations' | 'events' | 'settings' | 'admins' | 'blocked';
+  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'cancelations' | 'events' | 'daily_stats' | 'settings' | 'admins' | 'blocked';
   const setActiveTab = (tab: string) => setSearchParams({ tab });
 
   // Settings states
@@ -448,6 +450,33 @@ export default function Admin() {
   const dailyBreakfast = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.breakfastCount || 0) > 0).length : 0) - cancelledBreakfastToday);
   const dailyLunch = Math.max(0, (isSelectedDayWeekday ? filteredRegistrations.filter(reg => (reg.lunchCount || 0) > 0).length : 0) - cancelledLunchToday);
 
+  const dailyRegistrationsBase = isSelectedDayWeekday ? filteredRegistrations.reduce((acc, reg) => {
+    const hasCancelledBreakfast = filteredCancelations.some(c => c.cancelDate === selectedDateStr && c.userId === reg.userId && (c.cancelMeal === 'breakfast' || c.cancelMeal === 'both'));
+    const hasCancelledLunch = filteredCancelations.some(c => c.cancelDate === selectedDateStr && c.userId === reg.userId && (c.cancelMeal === 'lunch' || c.cancelMeal === 'both'));
+    
+    const eatsBreakfast = (reg.breakfastCount || 0) > 0 && !hasCancelledBreakfast;
+    const eatsLunch = (reg.lunchCount || 0) > 0 && !hasCancelledLunch;
+    
+    if (eatsBreakfast || eatsLunch) {
+      acc.push({
+        ...reg,
+        eatsBreakfast,
+        eatsLunch
+      });
+    }
+    return acc;
+  }, [] as any[]) : [];
+
+  const dailyRegistrations = dailyRegistrationsBase.filter((reg: any) => {
+    if (dailyFilterByMeal === 'breakfast' && !reg.eatsBreakfast) return false;
+    if (dailyFilterByMeal === 'lunch' && !reg.eatsLunch) return false;
+    
+    const matchesName = reg.fullName.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesId = (reg.employeeId || '').toLowerCase().includes(idFilter.toLowerCase());
+    const matchesDept = (reg.department || '').toLowerCase().includes(deptFilter.toLowerCase());
+    return matchesName && matchesId && matchesDept;
+  });
+
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim() || !newAdminEmail.includes('@')) return;
     setAddingAdmin(true);
@@ -527,6 +556,30 @@ export default function Admin() {
     const workbook = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(workbook, cancelWorksheet, `Huy_An_${selectedMonth}`);
     xlsx.writeFile(workbook, `Bao_Cao_Huy_An_${selectedMonth}.xlsx`);
+  };
+
+  const handleExportDailyExcel = () => {
+    const exportData = dailyRegistrations.map((reg, index) => {
+      const rowData: any = {
+        'STT': index + 1,
+        'Mã Nhân Viên': reg.employeeId || 'N/A',
+        'Họ và Tên': reg.fullName || 'N/A',
+        'Phòng ban/Tổ khối': reg.department || 'N/A',
+      };
+      if (dailyFilterByMeal === 'all' || dailyFilterByMeal === 'breakfast') {
+        rowData['Bữa sáng'] = reg.eatsBreakfast ? 'Có ăn' : 'Không ăn';
+      }
+      if (dailyFilterByMeal === 'all' || dailyFilterByMeal === 'lunch') {
+        rowData['Bữa trưa'] = reg.eatsLunch ? 'Có ăn' : 'Không ăn';
+      }
+      rowData['Thời gian đăng ký ban đầu'] = formatTimestamp(reg.timestamp);
+      return rowData;
+    });
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, `DS_${selectedDateStr}`);
+    xlsx.writeFile(workbook, `Danh_Sach_An_Ngay_${selectedDateStr}.xlsx`);
   };
 
   const handleExportEventExcel = () => {
@@ -638,6 +691,7 @@ export default function Admin() {
   };
 
   const { items: sortedMonthlyRegistrations, requestSort: requestSortMonthly, sortConfig: sortConfigMonthly } = useSortableData(registrationsWithCancelations);
+  const { items: sortedDailyRegistrations, requestSort: requestSortDaily, sortConfig: sortConfigDaily } = useSortableData(dailyRegistrations);
   const { items: sortedCancelations, requestSort: requestSortCancelations, sortConfig: sortConfigCancelations } = useSortableData(filteredCancelations);
   const { items: sortedEventRegistrations, requestSort: requestSortEvent, sortConfig: sortConfigEvent } = useSortableData(eventRegistrations);
 
@@ -684,6 +738,12 @@ export default function Admin() {
             onClick={() => setActiveTab('events')}
           >
             ĐK ĂN SỰ KIỆN
+          </button>
+          <button 
+            className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'daily_stats' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
+            onClick={() => setActiveTab('daily_stats')}
+          >
+            DS ĐK THEO NGÀY
           </button>
           <button 
             className={`relative px-5 py-2.5 font-label-md transition-all rounded-t-xl shrink-0 flex items-center justify-center min-w-[140px] max-w-[200px] border-t border-x border-transparent ${activeTab === 'settings' ? 'bg-background text-primary border-outline-variant !border-b-background z-10 shadow-[0_-2px_6px_rgba(0,0,0,0.02)] -mb-[1px]' : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
@@ -755,20 +815,32 @@ export default function Admin() {
                     </select>
                   </div>
                   <div className="flex gap-4 flex-wrap w-full md:w-auto">
-                    <div className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800">
+                    <button 
+                      onClick={() => {
+                        setDailyFilterByMeal('breakfast');
+                        setActiveTab('daily_stats');
+                      }}
+                      className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] hover:bg-[#1b2774] transition-colors text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800 focus:outline-none"
+                    >
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                         <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyBreakfast}</span>
-                    </div>
-                    <div className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800">
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setDailyFilterByMeal('lunch');
+                        setActiveTab('daily_stats');
+                      }}
+                      className="flex items-center justify-between md:justify-start gap-4 bg-[#23328c] hover:bg-[#1b2774] transition-colors text-white px-4 py-2 rounded-lg flex-1 md:flex-initial shadow-sm border border-blue-800 focus:outline-none"
+                    >
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                         <span className="font-label-md font-bold text-[13px]">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
                       </div>
                       <span className="font-headline-md font-black">{dailyLunch}</span>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1163,6 +1235,159 @@ export default function Admin() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'daily_stats' && (
+          <div className="flex flex-col gap-md lg:gap-lg">
+            <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
+              <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+                <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-label-sm text-on-surface-variant">Tháng:</span>
+                        <select 
+                          value={selectedMonth}
+                          onChange={(e) => setSelectedMonth(e.target.value)}
+                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none"
+                        >
+                          {MONTHS.map(m => (
+                            <option key={m} value={`2026-${m}`}>Tháng {m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-label-sm text-on-surface-variant">Ngày:</span>
+                        <select 
+                          value={selectedDay}
+                          onChange={(e) => setSelectedDay(parseInt(e.target.value))}
+                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none font-bold text-primary"
+                        >
+                          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-label-sm text-on-surface-variant">Bữa:</span>
+                        <select 
+                          value={dailyFilterByMeal}
+                          onChange={(e) => setDailyFilterByMeal(e.target.value as any)}
+                          className="bg-surface border border-outline-variant rounded px-2 py-0.5 text-sm outline-none font-bold text-primary"
+                        >
+                          <option value="all">Tất cả</option>
+                          <option value="breakfast">Bữa sáng</option>
+                          <option value="lunch">Bữa trưa</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleExportDailyExcel}
+                    className="flex items-center gap-2 bg-[#21a366] hover:bg-[#107c41] text-white px-4 py-2 rounded-lg font-label-md transition-colors w-full md:w-auto justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    Xuất Excel
+                  </button>
+                </div>
+
+                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-3 gap-md border-b border-outline-variant focus:outline-none">
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
+                      <input 
+                        type="text" 
+                        value={nameFilter}
+                        onChange={(e) => setNameFilter(e.target.value)}
+                        placeholder="Nhập tên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Mã NV</label>
+                      <input 
+                        type="text" 
+                        value={idFilter}
+                        onChange={(e) => setIdFilter(e.target.value)}
+                        placeholder="Nhập mã nhân viên..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Phòng ban</label>
+                      <input 
+                        type="text" 
+                        value={deptFilter}
+                        onChange={(e) => setDeptFilter(e.target.value)}
+                        placeholder="Nhập phòng ban..."
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      />
+                   </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
+                        <tr>
+                          <th className="p-md text-center">STT</th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortDaily('employeeId')}>
+                            <div className="flex items-center gap-1">Mã NV <SortIcon sortConfig={sortConfigDaily} columnKey="employeeId" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortDaily('fullName')}>
+                            <div className="flex items-center gap-1">Tên <SortIcon sortConfig={sortConfigDaily} columnKey="fullName" /></div>
+                          </th>
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortDaily('department')}>
+                            <div className="flex items-center gap-1">Phòng ban <SortIcon sortConfig={sortConfigDaily} columnKey="department" /></div>
+                          </th>
+                          {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'breakfast') && (
+                            <th className="p-md cursor-pointer hover:bg-surface-container select-none text-center" onClick={() => requestSortDaily('eatsBreakfast')}>
+                              <div className="flex items-center justify-center gap-1">Sáng <SortIcon sortConfig={sortConfigDaily} columnKey="eatsBreakfast" /></div>
+                            </th>
+                          )}
+                          {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'lunch') && (
+                            <th className="p-md cursor-pointer hover:bg-surface-container select-none text-center" onClick={() => requestSortDaily('eatsLunch')}>
+                              <div className="flex items-center justify-center gap-1">Trưa <SortIcon sortConfig={sortConfigDaily} columnKey="eatsLunch" /></div>
+                            </th>
+                          )}
+                          <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortDaily('timestamp')}>
+                            <div className="flex items-center gap-1">Thời gian ĐK ban đầu <SortIcon sortConfig={sortConfigDaily} columnKey="timestamp" /></div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant text-[14px]">
+                        {sortedDailyRegistrations.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="p-xl text-center text-on-surface-variant italic">
+                              {!isSelectedDayWeekday ? 'Ngày được chọn là Thứ 7 hoặc Chủ Nhật (không có lịch ăn).' : 'Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.'}
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedDailyRegistrations.map((reg: any, index: number) => (
+                            <tr key={reg.id || index} className="hover:bg-surface-container-lowest transition-colors">
+                              <td className="p-md text-center">{index + 1}</td>
+                              <td className="p-md">{reg.employeeId || 'N/A'}</td>
+                              <td className="p-md font-medium text-on-surface">{reg.fullName}</td>
+                              <td className="p-md">{reg.department || 'N/A'}</td>
+                              {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'breakfast') && (
+                                <td className="p-md text-center">
+                                   {reg.eatsBreakfast ? <span className="material-symbols-outlined text-[#21a366]">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
+                                </td>
+                              )}
+                              {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'lunch') && (
+                                <td className="p-md text-center">
+                                   {reg.eatsLunch ? <span className="material-symbols-outlined text-[#21a366]">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
+                                </td>
+                              )}
+                              <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                </div>
               </div>
             </div>
           </div>

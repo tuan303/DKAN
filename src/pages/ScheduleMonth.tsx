@@ -723,7 +723,7 @@ export default function ScheduleMonth() {
                       <DatePicker 
                         multiple
                         value={cancelDates}
-                        onChange={(dates) => {
+                        onChange={(dates: any) => {
                           const validDates = [];
                           for (const d of (dates as any[] || [])) {
                             const dateObj = new Date(getStandardDateString(d));
