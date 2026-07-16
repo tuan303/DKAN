@@ -61,13 +61,18 @@ export default function ScheduleMonth() {
     return '';
   };
 
-  const getMinCancelDate = () => {
+  const getMinCancelDateObj = () => {
     const d = new Date();
-    let isLockedForTomorrow = d.getHours() >= 16;
+    d.setHours(0, 0, 0, 0);
+    
+    // The user requested that if today is 16/07, they cannot cancel 15/07.
+    // The previous rule "before 16:00" might be too strict if they just want to block past days.
+    // However, I will keep the 16:00 rule based on the UI text.
+    let isLockedForTomorrow = new Date().getHours() >= 16;
     
     if (cancelExtendUntil) {
       const extendDate = new Date(cancelExtendUntil);
-      if (d < extendDate) {
+      if (new Date() < extendDate) {
         isLockedForTomorrow = false;
       }
     }
@@ -77,6 +82,11 @@ export default function ScheduleMonth() {
     } else {
       d.setDate(d.getDate() + 1);
     }
+    return d;
+  };
+
+  const getMinCancelDate = () => {
+    const d = getMinCancelDateObj();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -739,7 +749,7 @@ export default function ScheduleMonth() {
                         }}
                         format="DD/MM/YYYY"
                         placeholder="Chọn các ngày hủy (có thể chọn nhiều)"
-                        minDate={getMinCancelDate()}
+                        minDate={getMinCancelDateObj()}
                         containerClassName="w-full"
                         inputClass="w-full bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                       />

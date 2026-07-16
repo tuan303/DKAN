@@ -729,6 +729,12 @@ export default function Admin() {
             ĐK ĂN HÀNG THÁNG
           </button>
           <button 
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'daily_stats' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
+            onClick={() => setActiveTab('daily_stats')}
+          >
+            DS ĐK THEO NGÀY
+          </button>
+          <button 
             className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'cancelations' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('cancelations')}
           >
@@ -741,22 +747,16 @@ export default function Admin() {
             ĐK ĂN SỰ KIỆN
           </button>
           <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'daily_stats' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('daily_stats')}
+            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'blocked' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
+            onClick={() => setActiveTab('blocked')}
           >
-            DS ĐK THEO NGÀY
+            VI PHẠM
           </button>
           <button 
             className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'settings' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
             onClick={() => setActiveTab('settings')}
           >
             CẤU HÌNH
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'blocked' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('blocked')}
-          >
-            VI PHẠM
           </button>
           <button 
             className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'admins' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
