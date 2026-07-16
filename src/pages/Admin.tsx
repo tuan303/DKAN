@@ -126,6 +126,8 @@ export default function Admin() {
   const [idFilter, setIdFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [cancelDateFilter, setCancelDateFilter] = useState('');
+  const [cancelMealFilter, setCancelMealFilter] = useState<'all'|'breakfast'|'lunch'>('all');
+
 
   const [dailyFilterByMeal, setDailyFilterByMeal] = useState<'all'|'breakfast'|'lunch'>('all');
 
@@ -411,7 +413,8 @@ export default function Admin() {
     const matchesDept = (c.department || '').toLowerCase().includes(deptFilter.toLowerCase());
     const formattedDateStr = formatCancelDate(c.cancelDate || '');
     const matchesDate = formattedDateStr.includes(cancelDateFilter) || (c.cancelDate || '').includes(cancelDateFilter);
-    return matchesName && matchesId && matchesDept && matchesDate;
+    const matchesMeal = cancelMealFilter === 'all' || c.cancelMeal === 'both' || c.cancelMeal === cancelMealFilter;
+    return matchesName && matchesId && matchesDept && matchesDate && matchesMeal;
   });
 
   const registrationsWithCancelations = filteredRegistrations.map(reg => {
@@ -971,8 +974,19 @@ export default function Admin() {
                       <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
                       <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[16px] text-white/80 mt-3 font-medium">
-                      ({globalCancelStats.todayBreakfast} Sáng, {globalCancelStats.todayLunch} Trưa)
+                    <div className="text-[16px] text-white/80 mt-3 font-medium flex gap-2">
+                      (
+                      <button onClick={() => {
+                        const d = new Date();
+                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                        setCancelMealFilter('breakfast');
+                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.todayBreakfast} Sáng</button>, 
+                      <button onClick={() => {
+                        const d = new Date();
+                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                        setCancelMealFilter('lunch');
+                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.todayLunch} Trưa</button>
+                      )
                     </div>
                   </div>
                   <div className="bg-[#23328c] border border-blue-800 p-6 rounded-xl flex flex-col items-center justify-center">
@@ -981,8 +995,21 @@ export default function Admin() {
                       <span className="text-white text-[40px] font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
                       <span className="text-white/90 text-[18px] mb-1 pb-0.5">suất</span>
                     </div>
-                    <div className="text-[16px] text-white/80 mt-3 font-medium">
-                      ({globalCancelStats.tomorrowBreakfast} Sáng, {globalCancelStats.tomorrowLunch} Trưa)
+                    <div className="text-[16px] text-white/80 mt-3 font-medium flex gap-2">
+                      (
+                      <button onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                        setCancelMealFilter('breakfast');
+                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.tomorrowBreakfast} Sáng</button>, 
+                      <button onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                        setCancelMealFilter('lunch');
+                      }} className="hover:underline hover:text-white transition-colors">{globalCancelStats.tomorrowLunch} Trưa</button>
+                      )
                     </div>
                   </div>
                 </div>
@@ -1012,7 +1039,7 @@ export default function Admin() {
                   </button>
                 </div>
 
-                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-4 gap-md border-b border-outline-variant focus:outline-none">
+                <div className="p-md bg-surface-bright grid grid-cols-1 md:grid-cols-5 gap-md border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1">
                       <label className="font-label-sm text-on-surface-variant">Lọc theo Tên</label>
                       <input 
@@ -1042,6 +1069,18 @@ export default function Admin() {
                         placeholder="Nhập phòng ban..."
                         className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
                       />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="font-label-sm text-on-surface-variant">Lọc theo Bữa</label>
+                      <select 
+                        value={cancelMealFilter}
+                        onChange={(e) => setCancelMealFilter(e.target.value as any)}
+                        className="bg-surface border border-outline-variant rounded px-3 py-1.5 text-[14px]"
+                      >
+                        <option value="all">Tất cả</option>
+                        <option value="breakfast">Bữa sáng</option>
+                        <option value="lunch">Bữa trưa</option>
+                      </select>
                    </div>
                    <div className="flex flex-col gap-1">
                       <label className="font-label-sm text-on-surface-variant">Lọc theo Ngày</label>
