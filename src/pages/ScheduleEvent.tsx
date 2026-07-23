@@ -168,7 +168,7 @@ export default function ScheduleEvent() {
                     <p style="margin-top: 0;"><u>Lưu ý</u>:</p>
                     <ul style="margin-bottom: 0; padding-left: 20px;">
                       <li>Nếu có bất kỳ thắc mắc hoặc cần điều chỉnh đăng ký, vui lòng liên hệ trực tiếp với Bộ phận Dinh dưỡng.</li>
-                      <li>Trường hợp muốn hủy ăn phải báo với bộ phận Dinh dưỡng trước 16h00 ngày hôm trước.</li>
+                      <li>Để hủy đăng ký suất ăn, thầy/cô vui lòng thực hiện thao tác tại mục Hủy ăn trên hệ thống trước 16h00 của ngày hôm trước.</li>
                     </ul>
                   </div>
                   <p style="font-weight: bold; margin-top: 30px; color: #333;">Trân trọng,<br>BỘ PHẬN DINH DƯỠNG</p>
