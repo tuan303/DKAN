@@ -94,7 +94,7 @@ interface EventData {
   expiresAt?: string;
 }
 
-const SUPER_ADMIN = 'tuantm@hoangmaistarschool.edu.vn';
+const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 export default function Admin() {
@@ -158,7 +158,7 @@ export default function Admin() {
       }
       
       try {
-        let isUserAdmin = user.email === SUPER_ADMIN;
+        let isUserAdmin = !!user.email && SUPER_ADMINS.includes(user.email);
         
         if (!isUserAdmin && user.email) {
           // First check by standard doc ID
@@ -1729,13 +1729,15 @@ export default function Admin() {
                 
                 <div className="p-md space-y-md">
                   <div className="space-y-sm max-h-[500px] overflow-y-auto focus:outline-none">
-                    <div className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant">
-                      <div className="flex items-center gap-sm">
-                        <span className="material-symbols-outlined text-[18px] text-primary">admin_panel_settings</span>
-                        <span className="font-body-md text-body-md text-[14px]">{SUPER_ADMIN}</span>
+                    {SUPER_ADMINS.map(sa => (
+                      <div key={sa} className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant">
+                        <div className="flex items-center gap-sm">
+                          <span className="material-symbols-outlined text-[18px] text-primary">admin_panel_settings</span>
+                          <span className="font-body-md text-body-md text-[14px]">{sa}</span>
+                        </div>
+                        <span className="font-label-sm px-2 py-0.5 bg-primary-container text-on-primary-container rounded">Super Admin</span>
                       </div>
-                      <span className="font-label-sm px-2 py-0.5 bg-primary-container text-on-primary-container rounded">Super Admin</span>
-                    </div>
+                    ))}
                     {admins.map((admin, index) => (
                       <div key={index} className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant">
                         <div className="flex items-center gap-sm">
@@ -1744,7 +1746,7 @@ export default function Admin() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
-                          {auth.currentUser?.email === SUPER_ADMIN && admin.id && (
+                          {auth.currentUser?.email && SUPER_ADMINS.includes(auth.currentUser.email) && admin.id && (
                             adminToDelete?.id === admin.id ? (
                               <div className="flex items-center gap-1">
                                 <button
