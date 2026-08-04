@@ -6,15 +6,31 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Email đã chuẩn hoá (bỏ khoảng trắng, chữ thường). Trả '' nếu token không có email.
+    function userEmail() {
+      return isSignedIn() && request.auth.token.email is string
+        ? request.auth.token.email.trim().lower()
+        : '';
+    }
+
+    // Admin = super admin, HOẶC có doc trong `admins`.
+    // Doc id của `admins` do app sinh ra theo công thức:
+    //   email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')
+    // (xem handleAddAdmin trong src/pages/Admin.tsx). Nhờ nhánh này, thêm quản trị
+    // viên từ tab QUẢN TRỊ là có quyền ghi ngay, không phải deploy lại rules.
+    // Danh sách super admin cố định chỉ để khởi tạo / cứu hộ khi mất quyền,
+    // phải khớp với SUPER_ADMINS trong src/pages/Admin.tsx.
     function isAdmin() {
+      let email = userEmail();
+      let adminDocId = email.replace('[^a-z0-9]', '_');
       return isSignedIn() && (
+        email in [
+          'tuantm@hoangmaistarschool.edu.vn',
+          'tuyetkta@hoangmaistarschool.edu.vn',
+          'tuan303@gmail.com'
+        ] ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == 'tuantm@hoangmaistarschool.edu.vn' ||
-          request.auth.token.email.lower() == 'tuyetkta@hoangmaistarschool.edu.vn' ||
-          request.auth.token.email.lower() == 'tuyetkta@hoangmaidstarschool.edu.vn' ||
-          request.auth.token.email.lower() == 'tuan303@gmail.com'
-        ))
+        (email != '' && exists(/databases/$(database)/documents/admins/$(adminDocId)))
       );
     }
 
@@ -22,7 +38,7 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (request.auth.uid == uid || isAdmin());
     }
 
-    match /admins/{uid} {
+    match /admins/{adminId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }

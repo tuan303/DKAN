@@ -94,7 +94,9 @@ interface EventData {
   expiresAt?: string;
 }
 
-const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaidstarschool.edu.vn', 'tuan303@gmail.com'];
+// Phải khớp với hàm isSuperAdmin() trong firestore.rules, nếu không giao diện sẽ
+// cho vào trang quản trị nhưng Firestore lại từ chối mọi thao tác ghi.
+const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 export default function Admin() {
@@ -620,7 +622,25 @@ export default function Admin() {
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), type === 'error' ? 6000 : 3000);
+  };
+
+  // Diễn giải lỗi Firebase ra tiếng Việt để biết ngay là lỗi quyền hay lỗi mạng.
+  const describeFirebaseError = (err: any) => {
+    const code = err?.code ? String(err.code) : '';
+    if (code.includes('permission-denied') || code.includes('insufficient')) {
+      return `Tài khoản ${auth.currentUser?.email || ''} chưa được cấp quyền ghi trên Firestore. Cần cập nhật Firestore Rules.`;
+    }
+    if (code.includes('unauthenticated')) {
+      return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.';
+    }
+    if (code.includes('unavailable') || code.includes('deadline-exceeded')) {
+      return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.';
+    }
+    if (code.includes('not-found')) {
+      return 'Không tìm thấy dữ liệu cấu hình trên máy chủ.';
+    }
+    return code ? `Mã lỗi: ${code}` : (err?.message || 'Lỗi không xác định');
   };
 
   const handleSaveMonthExpiry = async (month: string) => {
@@ -628,22 +648,29 @@ export default function Admin() {
     try {
       const newExpiry = { ...monthlyExpiry };
       await setDoc(doc(db, 'settings', 'monthlyExpiry'), newExpiry, { merge: true });
-      showToast('Đã lưu cấu hình thời gian thành công!', 'success');
+      showToast(`Đã lưu thời gian khóa của tháng ${month}!`, 'success');
     } catch (err) {
       console.error('Lỗi khi lưu cấu hình:', err);
-      showToast('Có lỗi xảy ra khi lưu cấu hình. Vui lòng thử lại!', 'error');
+      showToast(`Không lưu được cấu hình. ${describeFirebaseError(err)}`, 'error');
     } finally {
       setSavingMonths(prev => ({ ...prev, [month]: false }));
     }
   };
 
   const handleToggleMonth = async (month: string) => {
-    const newStatus = !monthlyStatus[month];
-    const newMonthlyStatus = { ...monthlyStatus, [month]: newStatus };
-    setMonthlyStatus(newMonthlyStatus);
-    await updateDoc(doc(db, 'settings', 'monthlyConfig'), {
-      [month]: newStatus
-    });
+    const oldStatus = !!monthlyStatus[month];
+    const newStatus = !oldStatus;
+    setMonthlyStatus({ ...monthlyStatus, [month]: newStatus });
+    try {
+      // setDoc + merge thay cho updateDoc: vẫn chạy được khi doc cấu hình chưa tồn tại.
+      await setDoc(doc(db, 'settings', 'monthlyConfig'), { [month]: newStatus }, { merge: true });
+      showToast(`Đã ${newStatus ? 'MỞ' : 'KHÓA'} đăng ký tháng ${month}.`, 'success');
+    } catch (err) {
+      console.error('Lỗi khi đổi trạng thái tháng:', err);
+      // Trả giao diện về đúng trạng thái thật trên máy chủ.
+      setMonthlyStatus(prev => ({ ...prev, [month]: oldStatus }));
+      showToast(`Không đổi được trạng thái tháng ${month}. ${describeFirebaseError(err)}`, 'error');
+    }
   };
 
   const handleSaveCancelExtend = async () => {
@@ -653,7 +680,7 @@ export default function Admin() {
       showToast('Đã lưu cấu hình hủy ăn thành công!', 'success');
     } catch (err) {
       console.error('Error saving cancel config:', err);
-      showToast('Có lỗi xảy ra khi lưu cấu hình hủy ăn. Vui lòng thử lại!', 'error');
+      showToast(`Không lưu được cấu hình hủy ăn. ${describeFirebaseError(err)}`, 'error');
     } finally {
       setIsSavingCancelExtend(false);
     }
@@ -746,15 +773,15 @@ export default function Admin() {
     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-lg shadow-lg border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+        <div className={`fixed top-4 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
           toast.type === 'success' 
             ? 'bg-tertiary-container border-tertiary text-on-tertiary-container'
             : 'bg-error-container border-error text-on-error-container'
         }`}>
-          <span className="material-symbols-outlined text-[20px]">
+          <span className="material-symbols-outlined text-[20px] shrink-0">
             {toast.type === 'success' ? 'check_circle' : 'error'}
           </span>
-          <p className="font-label-md">{toast.message}</p>
+          <p className="font-label-md leading-5">{toast.message}</p>
         </div>
       )}
 
@@ -1511,34 +1538,38 @@ export default function Admin() {
               </div>
               <div className="p-md grid grid-cols-2 md:grid-cols-3 gap-md focus:outline-none">
                 {MONTHS.map(month => (
-                  <div key={month} className="flex flex-col bg-surface p-sm rounded-lg border border-outline-variant gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-label-md">Tháng {month}</span>
-                      <button 
+                  <div key={month} className="flex flex-col min-w-0 bg-surface p-sm rounded-lg border border-outline-variant gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-label-md truncate">Tháng {month}</span>
+                      <button
                         onClick={() => handleToggleMonth(month)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${monthlyStatus[month] ? 'bg-primary' : 'bg-surface-variant'}`}
+                        title={monthlyStatus[month] ? 'Đang mở đăng ký — bấm để khóa' : 'Đang khóa — bấm để mở đăng ký'}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${monthlyStatus[month] ? 'bg-primary' : 'bg-surface-container-high'}`}
                       >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                     </div>
                     {monthlyStatus[month] && (
-                      <div className="flex flex-col gap-1 mt-1 border-t border-outline-variant pt-2">
+                      <div className="flex flex-col gap-1.5 mt-1 border-t border-outline-variant pt-2">
                         <label className="text-[11px] text-on-surface-variant">Tự động khóa lúc:</label>
-                        <div className="flex gap-2">
-                          <input 
-                            type="datetime-local"
-                            value={monthlyExpiry[month] || ''}
-                            onChange={(e) => handleSetMonthExpiry(month, e.target.value)}
-                            className="text-xs p-1 bg-surface-bright border border-outline-variant rounded text-on-surface flex-1 focus:outline-none focus:border-primary"
-                          />
-                          <button
-                            onClick={() => handleSaveMonthExpiry(month)}
-                            disabled={savingMonths[month]}
-                            className="px-2 py-1 bg-primary text-white text-xs rounded font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                          >
-                            {savingMonths[month] ? '...' : 'Lưu'}
-                          </button>
-                        </div>
+                        {/* Input và nút Lưu xếp dọc: ô datetime-local có bề rộng tối thiểu khá lớn,
+                            để cùng hàng sẽ tràn ra ngoài thẻ tháng ở lưới 2–3 cột. */}
+                        <input
+                          type="datetime-local"
+                          value={monthlyExpiry[month] || ''}
+                          onChange={(e) => handleSetMonthExpiry(month, e.target.value)}
+                          className="w-full min-w-0 text-xs px-2 py-1.5 bg-surface-bright border border-outline-variant rounded-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <button
+                          onClick={() => handleSaveMonthExpiry(month)}
+                          disabled={savingMonths[month]}
+                          className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 bg-primary text-on-primary text-xs rounded-md font-medium hover:bg-primary/90 active:bg-primary/80 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <span className={`material-symbols-outlined text-[15px] ${savingMonths[month] ? 'animate-spin' : ''}`}>
+                            {savingMonths[month] ? 'progress_activity' : 'save'}
+                          </span>
+                          {savingMonths[month] ? 'Đang lưu...' : 'Lưu'}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1554,18 +1585,21 @@ export default function Admin() {
               </div>
               <div className="p-md flex flex-col gap-sm">
                 <label className="font-label-md text-on-surface">Mở thêm thời gian khóa tự động đến:</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="datetime-local"
                     value={cancelExtendUntil}
                     onChange={(e) => setCancelExtendUntil(e.target.value)}
-                    className="flex-1 bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                    className="flex-1 min-w-0 bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                   />
                   <button
                     onClick={handleSaveCancelExtend}
                     disabled={isSavingCancelExtend}
-                    className="px-4 py-2 bg-primary text-white rounded-lg font-label-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md hover:bg-primary/90 active:bg-primary/80 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
+                    <span className={`material-symbols-outlined text-[18px] ${isSavingCancelExtend ? 'animate-spin' : ''}`}>
+                      {isSavingCancelExtend ? 'progress_activity' : 'save'}
+                    </span>
                     {isSavingCancelExtend ? 'Đang lưu...' : 'Lưu lại'}
                   </button>
                 </div>
