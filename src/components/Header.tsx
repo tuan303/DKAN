@@ -27,7 +27,9 @@ export function Header() {
   }, []);
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-surface-container-lowest border-b border-outline-variant shadow-xs h-16">
+    // inset-x-0: thiếu left-0 thì header fixed lấy vị trí tĩnh, bị đẩy sang
+    // phải đúng bằng pl-64 của sidebar và tràn mất phần tài khoản bên phải.
+    <header className="fixed top-0 inset-x-0 z-50 bg-surface-container-lowest border-b border-outline-variant shadow-xs h-16">
       {/* Dải màu nhận diện: navy - đỏ - vàng - lá */}
       <div className="absolute inset-x-0 top-0 h-[3px] flex" aria-hidden="true">
         <span className="flex-[4] bg-primary" />

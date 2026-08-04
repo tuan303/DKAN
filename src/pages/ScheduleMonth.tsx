@@ -120,6 +120,10 @@ export default function ScheduleMonth() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user && user.email) {
         setUserEmail(user.email);
+      } else if (!user) {
+        // Đăng xuất hoặc hết phiên: đưa về trang đăng nhập thay vì đứng lại
+        // ở màn hình không còn quyền đọc dữ liệu.
+        window.location.replace('/login');
       }
     });
 

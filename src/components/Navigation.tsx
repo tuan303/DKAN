@@ -10,6 +10,8 @@ export function Navigation({ className }: { className?: string }) {
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<{name: string, email: string, employeeId?: string, department?: string} | null>(null);
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
 
@@ -81,10 +83,19 @@ export function Navigation({ className }: { className?: string }) {
   }, []);
 
   const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
     try {
       await auth.signOut();
+      setShowAccountModal(false);
+      // Nạp lại hẳn trang /login thay vì chuyển route: đăng xuất xong mọi
+      // listener Firestore đang mở đều mất quyền đọc, tải lại là sạch nhất.
+      window.location.replace('/login');
     } catch (error) {
       console.error('Error signing out:', error);
+      setSignOutError('Không đăng xuất được. Vui lòng kiểm tra kết nối mạng rồi thử lại.');
+      setSigningOut(false);
     }
   };
 
@@ -304,19 +315,29 @@ export function Navigation({ className }: { className?: string }) {
                 </Link>
               )}
               
+              {signOutError && (
+                <p className="text-[13px] text-on-error-container bg-error-container border border-error/25 rounded-lg px-3 py-2">
+                  {signOutError}
+                </p>
+              )}
+
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setShowAccountModal(false)}
-                  className="flex-1 h-12 rounded-[14px] font-bold text-[15px] text-on-surface bg-surface border border-outline-variant hover:bg-surface-container transition-all focus:ring-2 focus:ring-primary/20 outline-none"
+                  disabled={signingOut}
+                  className="flex-1 h-12 rounded-lg font-bold text-[15px] text-on-surface bg-surface border border-outline-variant hover:bg-surface-container transition-all disabled:opacity-60 disabled:cursor-not-allowed outline-none"
                 >
                   Đóng
                 </button>
-                <button 
+                <button
                   onClick={handleSignOut}
-                  className="flex-1 flex items-center justify-center gap-2 bg-error text-on-error hover:brightness-110 font-bold text-[15px] h-12 rounded-[14px] transition-all shadow-sm focus:ring-2 focus:ring-error/50 outline-none"
+                  disabled={signingOut}
+                  className="flex-1 flex items-center justify-center gap-2 bg-error text-on-error hover:bg-error-dark font-bold text-[15px] h-12 rounded-lg transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed outline-none"
                 >
-                  <span className="material-symbols-outlined text-[20px]">logout</span>
-                  Đăng xuất
+                  <span className={`material-symbols-outlined text-[20px] ${signingOut ? 'animate-spin' : ''}`}>
+                    {signingOut ? 'progress_activity' : 'logout'}
+                  </span>
+                  {signingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
               </div>
             </div>
