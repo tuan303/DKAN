@@ -7,11 +7,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      let userEmail = request.auth.token.email.lower();
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'tuantm@hoangmaistarschool.edu.vn' ||
-        request.auth.token.email == 'tuyetkta@hoangmaistarschool.edu.vn' ||
-        request.auth.token.email == 'tuan303@gmail.com'
+        userEmail == 'tuantm@hoangmaistarschool.edu.vn' ||
+        userEmail == 'tuyetkta@hoangmaistarschool.edu.vn' ||
+        userEmail == 'tuan303@gmail.com'
       );
     }
 

@@ -608,10 +608,24 @@ export default function Admin() {
     xlsx.writeFile(workbook, safeFileName);
   };
 
-  const handleSetMonthExpiry = async (month: string, dateStr: string) => {
-    const newExpiry = { ...monthlyExpiry, [month]: dateStr };
-    setMonthlyExpiry(newExpiry);
-    await setDoc(doc(db, 'settings', 'monthlyExpiry'), newExpiry, { merge: true });
+  const [savingMonths, setSavingMonths] = useState<Record<string, boolean>>({});
+
+  const handleSetMonthExpiry = (month: string, dateStr: string) => {
+    setMonthlyExpiry(prev => ({ ...prev, [month]: dateStr }));
+  };
+
+  const handleSaveMonthExpiry = async (month: string) => {
+    setSavingMonths(prev => ({ ...prev, [month]: true }));
+    try {
+      const newExpiry = { ...monthlyExpiry };
+      await setDoc(doc(db, 'settings', 'monthlyExpiry'), newExpiry, { merge: true });
+      alert('Đã lưu cấu hình thời gian thành công!');
+    } catch (err) {
+      console.error('Lỗi khi lưu cấu hình:', err);
+      alert('Có lỗi xảy ra khi lưu cấu hình. Vui lòng thử lại!');
+    } finally {
+      setSavingMonths(prev => ({ ...prev, [month]: false }));
+    }
   };
 
   const handleToggleMonth = async (month: string) => {
@@ -1476,12 +1490,21 @@ export default function Admin() {
                     {monthlyStatus[month] && (
                       <div className="flex flex-col gap-1 mt-1 border-t border-outline-variant pt-2">
                         <label className="text-[11px] text-on-surface-variant">Tự động khóa lúc:</label>
-                        <input 
-                          type="datetime-local"
-                          value={monthlyExpiry[month] || ''}
-                          onChange={(e) => handleSetMonthExpiry(month, e.target.value)}
-                          className="text-xs p-1 bg-surface-bright border border-outline-variant rounded text-on-surface w-full focus:outline-none focus:border-primary"
-                        />
+                        <div className="flex gap-2">
+                          <input 
+                            type="datetime-local"
+                            value={monthlyExpiry[month] || ''}
+                            onChange={(e) => handleSetMonthExpiry(month, e.target.value)}
+                            className="text-xs p-1 bg-surface-bright border border-outline-variant rounded text-on-surface flex-1 focus:outline-none focus:border-primary"
+                          />
+                          <button
+                            onClick={() => handleSaveMonthExpiry(month)}
+                            disabled={savingMonths[month]}
+                            className="px-2 py-1 bg-primary text-white text-xs rounded font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                          >
+                            {savingMonths[month] ? '...' : 'Lưu'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
