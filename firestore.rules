@@ -7,12 +7,14 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      let userEmail = request.auth.token.email.lower();
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        userEmail == 'tuantm@hoangmaistarschool.edu.vn' ||
-        userEmail == 'tuyetkta@hoangmaistarschool.edu.vn' ||
-        userEmail == 'tuan303@gmail.com'
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'tuantm@hoangmaistarschool.edu.vn' ||
+          request.auth.token.email.lower() == 'tuyetkta@hoangmaistarschool.edu.vn' ||
+          request.auth.token.email.lower() == 'tuyetkta@hoangmaidstarschool.edu.vn' ||
+          request.auth.token.email.lower() == 'tuan303@gmail.com'
+        ))
       );
     }
 

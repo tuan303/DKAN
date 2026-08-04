@@ -94,7 +94,7 @@ interface EventData {
   expiresAt?: string;
 }
 
-const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn'];
+const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaidstarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 export default function Admin() {
@@ -158,7 +158,7 @@ export default function Admin() {
       }
       
       try {
-        let isUserAdmin = !!user.email && SUPER_ADMINS.includes(user.email);
+        let isUserAdmin = !!user.email && SUPER_ADMINS.includes(user.email.toLowerCase());
         
         if (!isUserAdmin && user.email) {
           // First check by standard doc ID
@@ -1803,7 +1803,7 @@ export default function Admin() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
-                          {auth.currentUser?.email && SUPER_ADMINS.includes(auth.currentUser.email) && admin.id && (
+                          {auth.currentUser?.email && SUPER_ADMINS.includes(auth.currentUser.email.toLowerCase()) && admin.id && (
                             adminToDelete?.id === admin.id ? (
                               <div className="flex items-center gap-1">
                                 <button
