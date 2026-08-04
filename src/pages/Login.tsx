@@ -41,11 +41,18 @@ export default function Login() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased">
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#f0f4f9] overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-transform duration-1000" 
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary-container/50 via-surface-container to-brand-cream/60 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-transform duration-1000"
           style={{ backgroundImage: "url('https://hoangmaistarschool.edu.vn/thongtin/dka.png')" }}
         />
+        {/* Dải màu nhận diện chạy dọc mép phải */}
+        <div className="absolute inset-y-0 right-0 w-[6px] flex flex-col" aria-hidden="true">
+          <span className="flex-[4] bg-primary" />
+          <span className="flex-[2] bg-secondary" />
+          <span className="flex-1 bg-warning" />
+          <span className="flex-1 bg-tertiary" />
+        </div>
       </div>
       <div className="w-full lg:w-1/2 flex items-center justify-center p-md sm:p-xl bg-surface relative z-10 shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] h-[100dvh] lg:h-screen overflow-hidden">
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center justify-center z-20">
@@ -54,12 +61,13 @@ export default function Login() {
         <div className="max-w-[420px] w-full flex flex-col h-full justify-between pt-12">
           <div className="flex-1 flex flex-col justify-center gap-y-8 md:gap-y-12">
             <div className="flex flex-col items-center text-center gap-y-3 sm:gap-y-4">
-              <div className="h-14 w-14 md:h-16 md:w-16 bg-primary rounded-2xl flex items-center justify-center text-on-primary shadow-sm mb-1">
+              <div className="h-14 w-14 md:h-16 md:w-16 bg-primary rounded-xl flex items-center justify-center text-on-primary shadow-md mb-1">
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "30px" }}>restaurant</span>
               </div>
               <div>
-                <h1 className="font-headline-sm text-[18px] md:text-headline-sm font-bold text-on-surface mb-xs uppercase tracking-tight">NSHM - HỆ THỐNG ĐĂNG KÝ SUẤT ĂN</h1>
-                <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant line-clamp-2 md:line-clamp-none">
+                <h1 className="text-headline-sm md:text-headline-md text-primary mb-xs uppercase">Hệ thống đăng ký suất ăn</h1>
+                <span className="inline-block w-10 h-[3px] rounded-full bg-secondary mb-3" aria-hidden="true" />
+                <p className="text-body-sm md:text-body-md text-on-surface-variant line-clamp-2 md:line-clamp-none">
                   Đăng nhập để đăng ký suất ăn hàng tháng và các sự kiện của nhà trường.
                 </p>
               </div>
@@ -67,14 +75,15 @@ export default function Login() {
             
             <div className="flex flex-col gap-y-4">
               {error && (
-                <div className="bg-error-container text-on-error-container p-sm rounded-lg font-body-md text-body-md">
-                  {error}
+                <div className="bg-error-container text-on-error-container border border-error/25 p-sm rounded-lg text-body-md flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[20px] shrink-0">error</span>
+                  <span>{error}</span>
                 </div>
               )}
-              <button 
+              <button
                 onClick={handleMicrosoftLogin}
                 disabled={loading}
-                className="w-full bg-surface-container-lowest border border-outline-variant hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg px-margin py-3 md:py-md flex items-center justify-center gap-md transition-all duration-200 shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)] hover:shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-75 disabled:cursor-not-allowed"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/40 hover:bg-surface-container-low text-on-surface text-label-lg rounded-lg px-margin py-3 md:py-md flex items-center justify-center gap-md transition-all duration-200 shadow-xs hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
                   <path d="M0 0h10v10H0z" fill="#f25022"></path>
@@ -86,15 +95,15 @@ export default function Login() {
               </button>
               <div className="flex items-center gap-sm">
                 <div className="h-px bg-outline-variant flex-1"></div>
-                <span className="font-label-sm text-[10px] md:text-[11px] font-bold text-primary uppercase tracking-widest text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
+                <span className="text-label-sm text-primary uppercase tracking-[0.16em] text-center">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
                 <div className="h-px bg-outline-variant flex-1"></div>
               </div>
               <div className="text-center flex flex-col justify-center">
-                <p className="font-body-md text-body-sm md:text-body-md text-on-surface-variant text-[12px] md:text-[14px] px-4">
+                <p className="text-body-sm md:text-body-md text-on-surface-variant px-4">
                   Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
                 </p>
                 <div className="mt-1">
-                  <a className="font-label-md text-label-md text-primary hover:text-on-tertiary-fixed-variant transition-colors underline-offset-4 hover:underline" href="https://zalo.me/664388665648927162" target="_blank" rel="noopener noreferrer">
+                  <a className="text-label-md text-secondary hover:text-secondary-dark transition-colors underline-offset-4 hover:underline" href="https://zalo.me/664388665648927162" target="_blank" rel="noopener noreferrer">
                     Cần hỗ trợ?
                   </a>
                 </div>

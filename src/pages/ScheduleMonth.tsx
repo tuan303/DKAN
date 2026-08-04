@@ -591,17 +591,17 @@ export default function ScheduleMonth() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐK ĂN HÀNG THÁNG</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn bữa ăn thầy/cô muốn đăng ký ăn tại trường</p>
+              <h2 className="text-headline-md md:text-headline-lg text-headline-lg text-primary">ĐK ĂN HÀNG THÁNG</h2>
+              <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn bữa ăn thầy/cô muốn đăng ký ăn tại trường</p>
             </div>
             {/* Month Selector */}
-            <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-[0_2px_4px_-1px_rgba(26,54,93,0.03)]">
+            <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-xs">
               <button 
                 onClick={handlePrevMonth}
                 className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
-              <span className="font-headline-sm text-headline-sm text-primary min-w-[120px] text-center">Tháng {monthString}, {selectedYear}</span>
+              <span className="text-headline-sm text-primary min-w-[120px] text-center">Tháng {monthString}, {selectedYear}</span>
               <button 
                 onClick={handleNextMonth}
                 className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
@@ -632,8 +632,8 @@ export default function ScheduleMonth() {
                     className={clsx(
                       "relative px-6 py-2.5 rounded-t-lg font-headline-sm font-bold text-[14px] transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[240px] border-t border-x",
                       activeMainTab === 'cancel' 
-                        ? "bg-[#b00f2c] border-[#b00f2c] !border-b-[#b00f2c] text-white z-10 -mb-[1px]" 
-                        : "bg-[#b00f2c]/70 border-transparent text-white hover:bg-[#b00f2c]"
+                        ? "bg-secondary-dark border-secondary-dark !border-b-secondary-dark text-white z-10 -mb-[1px]" 
+                        : "bg-secondary-dark/70 border-transparent text-white hover:bg-secondary-dark"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">event_busy</span>
@@ -644,7 +644,7 @@ export default function ScheduleMonth() {
               {activeMainTab === 'register' ? (
                 <div className="space-y-md">
                   <div className="space-y-sm">
-                    <h4 className="font-headline-sm text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG {monthString}/{selectedYear}</h4>
+                    <h4 className="text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG {monthString}/{selectedYear}</h4>
                     
                     {/* Day Row 1 */}
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
@@ -654,7 +654,7 @@ export default function ScheduleMonth() {
                           </div>
                           <div>
                             <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA SÁNG + TRƯA</h5>
-                            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
+                            <p className="text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
                         
@@ -670,7 +670,7 @@ export default function ScheduleMonth() {
                               }}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
-                            <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                            <span className="text-label-md text-on-surface select-none">Có ăn</span>
                           </label>
                           <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
                             <input 
@@ -680,7 +680,7 @@ export default function ScheduleMonth() {
                               onChange={() => setBreakfastChoice('no')}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
-                            <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                            <span className="text-label-md text-on-surface select-none">Không ăn</span>
                           </label>
                         </div>
                       </div>
@@ -693,7 +693,7 @@ export default function ScheduleMonth() {
                           </div>
                           <div>
                             <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ CHỈ ĂN BỮA TRƯA</h5>
-                            <p className="font-body-md text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
+                            <p className="text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
                         
@@ -709,7 +709,7 @@ export default function ScheduleMonth() {
                               }}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
-                            <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                            <span className="text-label-md text-on-surface select-none">Có ăn</span>
                           </label>
                           <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
                             <input 
@@ -719,7 +719,7 @@ export default function ScheduleMonth() {
                               onChange={() => setLunchChoice('no')}
                               className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer" 
                             />
-                            <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                            <span className="text-label-md text-on-surface select-none">Không ăn</span>
                           </label>
                         </div>
                       </div>
@@ -753,7 +753,7 @@ export default function ScheduleMonth() {
                         containerClassName="w-full"
                         inputClass="w-full bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
                       />
-                      <span className="text-[12px] italic font-bold text-[#D21235] leading-tight">Yêu cầu hủy trước {cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16:00'} ngày hôm trước</span>
+                      <span className="text-[12px] italic font-bold text-secondary leading-tight">Yêu cầu hủy trước {cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16:00'} ngày hôm trước</span>
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="font-label-md text-on-surface">Bữa muốn hủy <span className="text-error">*</span></label>
@@ -799,20 +799,20 @@ export default function ScheduleMonth() {
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
+            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-sm flex flex-col mb-24 h-max">
               {activeMainTab === 'register' ? (
                 <>
-                  <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
+                  <h3 className="text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
                   
                   {isUserBlocked && (
-                    <div className="mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 bg-error-container text-error">
+                    <div className="mb-4 p-sm rounded-lg text-body-md flex items-start gap-2 bg-error-container text-error">
                       <span className="material-symbols-outlined text-[18px] mt-0.5">error</span>
                       <p>Thầy/Cô đã vi phạm quy định chấm ăn! Không được đăng ký ăn trong tháng này.</p>
                     </div>
                   )}
 
                   {!isMonthOpen && !isUserBlocked && (
-                    <div className="mb-4 p-sm rounded-lg font-body-md text-body-md flex items-start gap-2 bg-error-container text-error opacity-80">
+                    <div className="mb-4 p-sm rounded-lg text-body-md flex items-start gap-2 bg-error-container text-error opacity-80">
                       <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
                       <p>Tháng này hiện không mở đăng ký. Vui lòng liên hệ Bộ phận Dinh dưỡng để được hỗ trợ.</p>
                     </div>
@@ -822,19 +822,19 @@ export default function ScheduleMonth() {
                     <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                       <div className="flex items-center gap-sm">
                         <span className="material-symbols-outlined text-on-surface-variant">free_breakfast</span>
-                        <span className="font-body-md text-body-md text-on-surface">Bữa sáng</span>
+                        <span className="text-body-md text-on-surface">Bữa sáng</span>
                       </div>
-                      <span className="font-headline-md text-headline-md text-primary">
-                        {breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                      <span className="text-headline-md text-primary">
+                        {breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="text-body-md text-on-surface-variant">suất</span>
                       </span>
                     </div>
                     <div className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                       <div className="flex items-center gap-sm">
                         <span className="material-symbols-outlined text-on-surface-variant">restaurant</span>
-                        <span className="font-body-md text-body-md text-on-surface">Bữa trưa</span>
+                        <span className="text-body-md text-on-surface">Bữa trưa</span>
                       </div>
-                      <span className="font-headline-md text-headline-md text-primary">
-                        {breakfastChoice === 'yes' || lunchChoice === 'yes' ? weekdaysCount : 0} <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                      <span className="text-headline-md text-primary">
+                        {breakfastChoice === 'yes' || lunchChoice === 'yes' ? weekdaysCount : 0} <span className="text-body-md text-on-surface-variant">suất</span>
                       </span>
                     </div>
                   </div>
@@ -843,7 +843,7 @@ export default function ScheduleMonth() {
                     onClick={handleRegister}
                     disabled={isSubmitting || isUserBlocked}
                     className={clsx(
-                      "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
+                      "w-full mt-xl text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
                       (!isMonthOpen || isUserBlocked)
                         ? "bg-surface-variant text-on-surface-variant opacity-70 hover:opacity-80" 
                         : "bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95"
@@ -859,7 +859,7 @@ export default function ScheduleMonth() {
                 </>
               ) : (
                 <>
-                  <h3 className="font-headline-sm text-headline-sm text-error mb-lg pb-sm border-b border-outline-variant">Xác nhận</h3>
+                  <h3 className="text-headline-sm text-error mb-lg pb-sm border-b border-outline-variant">Xác nhận</h3>
                   <div className="space-y-md flex-1">
                     <p className="font-body-md text-on-surface-variant text-[14px]">
                       Vui lòng kiểm tra kỹ các thông tin trước khi xác nhận hủy ăn. Sau khi gửi, thông tin sẽ được ghi nhận và gửi đến Bộ phận Dinh dưỡng.
@@ -869,8 +869,8 @@ export default function ScheduleMonth() {
                     onClick={handleCancel}
                     disabled={isCanceling || cancelDates.length === 0 || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                     className={clsx(
-                      "w-full mt-xl font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
-                      "bg-error text-on-error hover:bg-[#b00f2c] active:scale-95"
+                      "w-full mt-xl text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
+                      "bg-error text-on-error hover:bg-secondary-dark active:scale-95"
                     )}
                   >
                     {isCanceling ? (
@@ -897,7 +897,7 @@ export default function ScheduleMonth() {
             <div className="p-xl text-center flex flex-col items-center">
               <div className={clsx(
                 "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
-                submitStatus.type === 'success' ? "bg-green-100 text-green-600" : (submitStatus.type === 'info' ? "bg-blue-100 text-blue-600" : "bg-error-container text-on-error-container")
+                submitStatus.type === 'success' ? "bg-tertiary-container text-on-tertiary-container" : (submitStatus.type === 'info' ? "bg-primary-container text-on-primary-container" : "bg-error-container text-on-error-container")
               )}>
                 <span className="material-symbols-outlined text-[48px]">
                   {submitStatus.type === 'success' ? 'check_circle' : (submitStatus.type === 'info' ? 'info' : 'error')}
@@ -905,14 +905,14 @@ export default function ScheduleMonth() {
               </div>
               
               <h3 className={clsx(
-                "font-headline-sm text-headline-sm mb-sm",
-                submitStatus.type === 'success' ? "text-green-800" : (submitStatus.type === 'info' ? "text-blue-800" : "text-error")
+                "text-headline-sm mb-sm",
+                submitStatus.type === 'success' ? "text-on-tertiary-container" : (submitStatus.type === 'info' ? "text-on-primary-container" : "text-error")
               )}>
                 {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
               </h3>
               
               <p className={clsx(
-                "font-body-md text-body-md mb-xl",
+                "text-body-md mb-xl",
                 submitStatus.type === 'error' ? "text-error" : "text-on-surface-variant"
               )}>
                 {submitStatus.message}
@@ -921,10 +921,10 @@ export default function ScheduleMonth() {
               <button 
                 onClick={() => setSubmitStatus(null)}
                 className={clsx(
-                  "w-full py-3 rounded-xl font-label-lg text-label-lg transition-colors shadow-sm",
+                  "w-full py-3 rounded-xl text-label-lg transition-colors shadow-sm",
                   submitStatus.type === 'success' 
                     ? "bg-primary text-on-primary hover:bg-primary/90" 
-                    : (submitStatus.type === 'info' ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-error text-on-error hover:bg-error/90")
+                    : (submitStatus.type === 'info' ? "bg-primary text-on-primary hover:bg-primary-dark" : "bg-error text-on-error hover:bg-error/90")
                 )}
               >
                 Đóng

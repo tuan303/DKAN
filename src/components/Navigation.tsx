@@ -165,7 +165,7 @@ export function Navigation({ className }: { className?: string }) {
             className="flex w-full items-center gap-md px-md py-sm rounded-lg transition-colors text-on-surface-variant hover:bg-surface-container"
           >
             <span className="material-symbols-outlined">{link.icon}</span>
-            <span className="font-label-md text-label-md">{link.label}</span>
+            <span className="text-label-md">{link.label}</span>
           </button>
         );
       }
@@ -184,7 +184,7 @@ export function Navigation({ className }: { className?: string }) {
           <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}>
             {link.icon}
           </span>
-          <span className="font-label-md text-label-md">{link.label}</span>
+          <span className="text-label-md">{link.label}</span>
         </Link>
       );
     });
@@ -200,7 +200,7 @@ export function Navigation({ className }: { className?: string }) {
       </aside>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-evenly items-center h-[72px] bg-surface pb-safe border-t border-outline-variant shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:hidden">
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-evenly items-center h-[72px] bg-surface-container-lowest pb-safe border-t border-outline-variant shadow-[0_-4px_12px_-2px_rgb(35_50_140_/_0.08)] md:hidden">
         {renderLinkItems(true)}
       </nav>
 
@@ -208,7 +208,7 @@ export function Navigation({ className }: { className?: string }) {
       {showAccountModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowAccountModal(false)}></div>
-          <div className="bg-surface relative w-[min(calc(100vw-32px),380px)] rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant flex flex-col max-h-[85vh]">
+          <div className="bg-surface-container-lowest relative w-[min(calc(100vw-32px),380px)] rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant flex flex-col max-h-[85vh]">
             
             {/* Header Pattern */}
             <div className="px-6 pt-8 pb-5 flex flex-col items-center flex-shrink-0 bg-surface z-10 border-b border-outline-variant/40">
@@ -216,7 +216,7 @@ export function Navigation({ className }: { className?: string }) {
                 <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center shadow-sm">
                   <span className="material-symbols-outlined text-[40px]">person</span>
                 </div>
-                <div className="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-[3px] border-surface rounded-full flex items-center justify-center"></div>
+                <div className="absolute bottom-0 right-0 w-6 h-6 bg-tertiary border-[3px] border-surface rounded-full flex items-center justify-center"></div>
               </div>
               <h3 className="text-[20px] font-bold text-on-surface tracking-tight text-center w-full truncate px-2">
                 {userInfo?.name || auth.currentUser?.displayName || 'Tài khoản nhân viên'}
@@ -269,7 +269,7 @@ export function Navigation({ className }: { className?: string }) {
                         Tháng {month}
                       </span>
                       {isOpen ? (
-                        <div className="px-3 py-1.5 bg-green-100/80 text-green-700 rounded-full text-[12px] font-bold flex items-center gap-1.5 shrink-0">
+                        <div className="px-3 py-1.5 bg-tertiary-container/80 text-on-tertiary-container rounded-full text-[12px] font-bold flex items-center gap-1.5 shrink-0">
                           <span className="material-symbols-outlined text-[15px]">check_circle</span>
                           Mở đăng ký
                         </div>

@@ -213,15 +213,15 @@ export default function ScheduleEvent() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="font-headline-lg-mobile md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
+              <h2 className="text-headline-md md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
+              <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mt-xl mb-md border-b border-outline-variant pb-md">
-                <h3 className="font-headline-sm text-headline-sm text-primary">DANH SÁCH SỰ KIỆN</h3>
+                <h3 className="text-headline-sm text-primary">DANH SÁCH SỰ KIỆN</h3>
               </div>
 
               <div className="space-y-sm">
@@ -255,7 +255,7 @@ export default function ScheduleEvent() {
                           onChange={() => setEventChoices({...eventChoices, [evt.id]: 'yes'})}
                           className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
                         />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Có ăn</span>
+                        <span className="text-label-md text-on-surface select-none">Có ăn</span>
                       </label>
                       <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors`}>
                         <input 
@@ -265,7 +265,7 @@ export default function ScheduleEvent() {
                           onChange={() => setEventChoices({...eventChoices, [evt.id]: 'no'})}
                           className="w-5 h-5 border-outline-variant text-primary focus:ring-primary focus:ring-2 bg-surface cursor-pointer disabled:cursor-not-allowed" 
                         />
-                        <span className="font-label-md text-label-md text-on-surface select-none">Không ăn</span>
+                        <span className="text-label-md text-on-surface select-none">Không ăn</span>
                       </label>
                     </div>
                   </div>
@@ -274,8 +274,8 @@ export default function ScheduleEvent() {
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] flex flex-col mb-24 h-max">
-              <h3 className="font-headline-sm text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Thông tin xác nhận</h3>
+            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-sm flex flex-col mb-24 h-max">
+              <h3 className="text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Thông tin xác nhận</h3>
               
               <div className="space-y-md flex-1">
                 {events.filter(e => eventChoices[e.id] === 'yes').length === 0 ? (
@@ -284,14 +284,14 @@ export default function ScheduleEvent() {
                   <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                     <div className="flex items-center gap-sm">
                       <span className="material-symbols-outlined text-primary">event</span>
-                      <span className="font-body-md text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">
+                      <span className="text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">
                         {e.name.split(' ').length > 3 
                           ? e.name.split(' ').slice(0, 3).join(' ') + '...' 
                           : e.name}
                       </span>
                     </div>
-                    <span className="font-headline-md text-headline-md text-primary ml-2">
-                      1 <span className="font-body-md text-body-md text-on-surface-variant">suất</span>
+                    <span className="text-headline-md text-primary ml-2">
+                      1 <span className="text-body-md text-on-surface-variant">suất</span>
                     </span>
                   </div>
                 ))}
@@ -299,7 +299,7 @@ export default function ScheduleEvent() {
               <button 
                 onClick={handleRegister}
                 disabled={isSubmitting || events.length === 0}
-                className={`w-full mt-xl text-on-primary font-headline-sm text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${events.length === 0 ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
+                className={`w-full mt-xl text-on-primary text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${events.length === 0 ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
               >
                 {isSubmitting ? (
                   <span className="material-symbols-outlined animate-spin">refresh</span>
@@ -323,7 +323,7 @@ export default function ScheduleEvent() {
             <div className="p-xl text-center flex flex-col items-center">
               <div className={clsx(
                 "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
-                submitStatus.type === 'success' ? "bg-green-100 text-green-600" : "bg-error-container text-on-error-container"
+                submitStatus.type === 'success' ? "bg-tertiary-container text-on-tertiary-container" : "bg-error-container text-on-error-container"
               )}>
                 <span className="material-symbols-outlined text-[48px]">
                   {submitStatus.type === 'success' ? 'check_circle' : 'error'}
@@ -331,14 +331,14 @@ export default function ScheduleEvent() {
               </div>
               
               <h3 className={clsx(
-                "font-headline-sm text-headline-sm mb-sm",
-                submitStatus.type === 'success' ? "text-green-800" : "text-error"
+                "text-headline-sm mb-sm",
+                submitStatus.type === 'success' ? "text-on-tertiary-container" : "text-error"
               )}>
                 {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
               </h3>
               
               <p className={clsx(
-                "font-body-md text-body-md mb-xl",
+                "text-body-md mb-xl",
                 submitStatus.type === 'error' ? "text-error" : "text-on-surface-variant"
               )}>
                 {submitStatus.message}
@@ -347,7 +347,7 @@ export default function ScheduleEvent() {
               <button 
                 onClick={() => setSubmitStatus(null)}
                 className={clsx(
-                  "w-full py-3 rounded-xl font-label-lg text-label-lg transition-colors shadow-sm",
+                  "w-full py-3 rounded-xl text-label-lg transition-colors shadow-sm",
                   submitStatus.type === 'success' 
                     ? "bg-primary text-on-primary hover:bg-primary/90" 
                     : "bg-error text-on-error hover:bg-error/90"

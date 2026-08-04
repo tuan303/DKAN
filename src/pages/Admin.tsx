@@ -99,6 +99,18 @@ interface EventData {
 const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
+type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'settings' | 'admins';
+
+const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
+  { key: 'monthly', label: 'ĐK ăn hàng tháng', icon: 'calendar_month' },
+  { key: 'daily_stats', label: 'DS ĐK theo ngày', icon: 'list_alt' },
+  { key: 'cancelations', label: 'ĐK hủy ăn', icon: 'event_busy' },
+  { key: 'events', label: 'ĐK ăn sự kiện', icon: 'celebration' },
+  { key: 'blocked', label: 'Vi phạm', icon: 'gavel' },
+  { key: 'settings', label: 'Cấu hình', icon: 'settings' },
+  { key: 'admins', label: 'Quản trị', icon: 'admin_panel_settings' },
+];
+
 export default function Admin() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,8 +151,8 @@ export default function Admin() {
   const [blockedEmailsInput, setBlockedEmailsInput] = useState('');
 
   // Tabs from URL
-  const activeTab = (searchParams.get('tab') || 'monthly') as 'monthly' | 'cancelations' | 'events' | 'daily_stats' | 'settings' | 'admins' | 'blocked';
-  const setActiveTab = (tab: string) => setSearchParams({ tab });
+  const activeTab = (searchParams.get('tab') || 'monthly') as AdminTabKey;
+  const setActiveTab = (tab: AdminTabKey) => setSearchParams({ tab });
 
   // Settings states
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
@@ -763,7 +775,7 @@ export default function Admin() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-md">
           <span className="material-symbols-outlined animate-spin text-[48px] text-primary">progress_activity</span>
-          <p className="font-body-md text-body-md text-on-surface-variant">Đang tải dữ liệu quản trị...</p>
+          <p className="text-body-md text-on-surface-variant">Đang tải dữ liệu quản trị...</p>
         </div>
       </div>
     );
@@ -771,9 +783,9 @@ export default function Admin() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative">
-      {/* Toast Notification */}
+      {/* Toast — top-20 để nằm dưới thanh header cố định (h-16), không đè lên */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+        <div className={`fixed top-20 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
           toast.type === 'success' 
             ? 'bg-tertiary-container border-tertiary text-on-tertiary-container'
             : 'bg-error-container border-error text-on-error-container'
@@ -789,93 +801,84 @@ export default function Admin() {
       
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-sm md:p-lg lg:p-xl flex flex-col gap-md md:gap-lg mt-16 md:mt-2">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-sm border-b md:border-b-0 border-outline-variant pb-md md:pb-0 px-md md:px-0 mt-md md:mt-0">
-          <div>
-            <h1 className="font-headline-lg-mobile md:text-headline-lg text-primary md:text-on-surface">Quản Trị Hệ Thống</h1>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1 text-[13px] md:text-[14px]">Quản lý đăng ký suất ăn và tài khoản quản trị.</p>
+          <div className="flex items-center gap-3">
+            <span className="hidden md:block w-1 h-11 rounded-full bg-secondary shrink-0" aria-hidden="true" />
+            <div>
+              <h1 className="text-headline-md md:text-headline-lg text-primary">Quản Trị Hệ Thống</h1>
+              <p className="text-body-sm md:text-body-md text-on-surface-variant mt-0.5">Quản lý đăng ký suất ăn và tài khoản quản trị.</p>
+            </div>
           </div>
         </div>
 
         {/* Tabs navigation */}
-        <div className="flex px-1 py-1 mt-xs bg-surface-container-low border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit shadow-sm">
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'monthly' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('monthly')}
-          >
-            ĐK ĂN HÀNG THÁNG
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'daily_stats' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('daily_stats')}
-          >
-            DS ĐK THEO NGÀY
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'cancelations' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('cancelations')}
-          >
-            ĐK HỦY ĂN
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'events' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('events')}
-          >
-            ĐK ĂN SỰ KIỆN
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'blocked' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('blocked')}
-          >
-            VI PHẠM
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'settings' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            CẤU HÌNH
-          </button>
-          <button 
-            className={`px-5 py-2 font-label-md transition-all rounded-lg shrink-0 flex items-center justify-center ${activeTab === 'admins' ? 'bg-primary text-on-primary shadow' : 'bg-transparent text-on-surface hover:bg-surface-variant/50'}`}
-            onClick={() => setActiveTab('admins')}
-          >
-            QUẢN TRỊ
-          </button>
+        <div
+          role="tablist"
+          aria-label="Khu vực quản trị"
+          className="flex gap-1 px-1 py-1 mt-xs bg-surface-container-lowest border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit shadow-xs"
+        >
+          {ADMIN_TABS.map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={isActive}
+                title={tab.label}
+                className={`px-4 py-2 text-label-md uppercase tracking-wide transition-colors rounded-lg shrink-0 inline-flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-primary text-on-primary shadow-sm'
+                    : 'bg-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                }`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <span
+                  className="material-symbols-outlined text-[18px]"
+                  style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
+                >
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {activeTab === 'monthly' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             {/* Bento Grid Layout - Summary Statistics */}
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
-                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <span className="material-symbols-outlined text-[100px]">bakery_dining</span>
+              {/* Bữa sáng = navy, bữa trưa = đỏ trường: phân biệt được ngay mà vẫn đúng nhận diện */}
+              <div className="bg-gradient-to-br from-primary to-primary-darker rounded-xl p-lg md:p-8 shadow-md flex flex-col justify-center gap-md relative overflow-hidden min-h-[200px]">
+                <div className="absolute -top-2 -right-2 opacity-[0.12] pointer-events-none" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[120px] leading-none">bakery_dining</span>
                 </div>
-                <div className="flex justify-between items-center relative z-10">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN SÁNG THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+                <div className="flex justify-between items-start gap-3 relative z-10">
+                  <span className="text-label-md text-on-primary/90 uppercase tracking-wider">Tổng suất đăng ký ăn sáng · Tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-on-primary/80 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
                 </div>
-                <div className="relative z-10">
-                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{totalBreakfast}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                <div className="relative z-10 flex items-baseline gap-2">
+                  <span className="text-[44px] font-extrabold text-on-primary leading-none tabular">{totalBreakfast}</span>
+                  <span className="text-body-md text-on-primary/80">suất</span>
                 </div>
-                <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
-                  <div className="bg-white h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                <div className="w-full bg-black/20 rounded-full h-1 mt-auto relative z-10">
+                  <div className="bg-on-primary h-1 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-[#23328c] to-[#121b5e] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
-                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <span className="material-symbols-outlined text-[100px]">lunch_dining</span>
+              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-xl p-lg md:p-8 shadow-md flex flex-col justify-center gap-md relative overflow-hidden min-h-[200px]">
+                <div className="absolute -top-2 -right-2 opacity-[0.12] pointer-events-none" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[120px] leading-none">lunch_dining</span>
                 </div>
-                <div className="flex justify-between items-center relative z-10">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">TỔNG SỐ SUẤT ĐĂNG KÝ ĂN TRƯA THÁNG: {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+                <div className="flex justify-between items-start gap-3 relative z-10">
+                  <span className="text-label-md text-on-secondary/90 uppercase tracking-wider">Tổng suất đăng ký ăn trưa · Tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
+                  <span className="material-symbols-outlined text-on-secondary/80 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
                 </div>
-                <div className="relative z-10">
-                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{totalLunch}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                <div className="relative z-10 flex items-baseline gap-2">
+                  <span className="text-[44px] font-extrabold text-on-secondary leading-none tabular">{totalLunch}</span>
+                  <span className="text-body-md text-on-secondary/80">suất</span>
                 </div>
-                 <div className="w-full bg-black/20 rounded-full h-1.5 mt-auto relative z-10">
-                  <div className="bg-white h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                <div className="w-full bg-black/20 rounded-full h-1 mt-auto relative z-10">
+                  <div className="bg-on-secondary h-1 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
             </div>
@@ -885,11 +888,11 @@ export default function Admin() {
               <div className="bg-gradient-to-r from-surface-container-lowest to-surface rounded-2xl p-md lg:p-lg shadow-sm border border-outline-variant flex flex-col gap-md">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none m-0 tracking-wide font-black">THỐNG KÊ THEO NGÀY</h2>
+                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none m-0 tracking-wide font-black">THỐNG KÊ THEO NGÀY</h2>
                     <select 
                       value={selectedDay}
                       onChange={(e) => setSelectedDay(parseInt(e.target.value))}
-                      className="bg-white border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-4 py-2 text-[14px] outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
+                      className="bg-surface-container-lowest border border-primary/20 hover:border-primary/40 transition-colors rounded-lg px-4 py-2 text-[14px] outline-none font-bold text-primary shadow-sm cursor-pointer"
                     >
                       {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
                         <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
@@ -902,26 +905,26 @@ export default function Admin() {
                         setDailyFilterByMeal('breakfast');
                         setActiveTab('daily_stats');
                       }}
-                      className="flex items-center justify-between md:justify-start gap-4 bg-gradient-to-r from-[#23328c] to-[#1a2569] hover:from-[#1b2774] hover:to-[#121a4a] transition-all text-white px-5 py-2.5 rounded-xl flex-1 md:flex-initial shadow-md border border-white/10 focus:outline-none transform hover:-translate-y-0.5"
+                      className="flex items-center justify-between md:justify-start gap-4 bg-primary hover:bg-primary-dark transition-colors text-on-primary px-5 py-2.5 rounded-lg flex-1 md:flex-initial shadow-sm focus:outline-none"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
-                        <span className="font-label-md font-bold text-[13px] tracking-wide">TỔNG ĐĂNG KÝ ĂN SÁNG:</span>
+                        <span className="material-symbols-outlined text-[20px] text-on-primary/80" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
+                        <span className="text-label-md uppercase tracking-wide">Tổng đăng ký ăn sáng</span>
                       </div>
-                      <span className="font-headline-md font-black">{dailyBreakfast}</span>
+                      <span className="text-headline-sm tabular">{dailyBreakfast}</span>
                     </button>
                     <button 
                       onClick={() => {
                         setDailyFilterByMeal('lunch');
                         setActiveTab('daily_stats');
                       }}
-                      className="flex items-center justify-between md:justify-start gap-4 bg-gradient-to-r from-[#23328c] to-[#1a2569] hover:from-[#1b2774] hover:to-[#121a4a] transition-all text-white px-5 py-2.5 rounded-xl flex-1 md:flex-initial shadow-md border border-white/10 focus:outline-none transform hover:-translate-y-0.5"
+                      className="flex items-center justify-between md:justify-start gap-4 bg-secondary hover:bg-secondary-dark transition-colors text-on-secondary px-5 py-2.5 rounded-lg flex-1 md:flex-initial shadow-sm focus:outline-none"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px] text-white/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
-                        <span className="font-label-md font-bold text-[13px] tracking-wide">TỔNG ĐĂNG KÝ ĂN TRƯA:</span>
+                        <span className="material-symbols-outlined text-[20px] text-on-secondary/80" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
+                        <span className="text-label-md uppercase tracking-wide">Tổng đăng ký ăn trưa</span>
                       </div>
-                      <span className="font-headline-md font-black">{dailyLunch}</span>
+                      <span className="text-headline-sm tabular">{dailyLunch}</span>
                     </button>
                   </div>
                 </div>
@@ -930,16 +933,16 @@ export default function Admin() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-md lg:gap-lg px-md md:px-0">
               {/* Main Content - Registration List */}
-              <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+              <div className="lg:col-span-3 bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
+                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
                     <div className="flex items-center gap-2">
                        <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
+                        className="bg-surface border border-outline-variant hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary shadow-sm cursor-pointer"
                        >
                          {MONTHS.map(m => (
                            <option key={m} value={`2026-${m}`}>Tháng {m}/2026</option>
@@ -949,7 +952,7 @@ export default function Admin() {
                   </div>
                   <button 
                     onClick={handleExportExcel}
-                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
+                    className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     <span className="font-bold tracking-wide">Xuất Excel</span>
@@ -958,33 +961,33 @@ export default function Admin() {
 
                 <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-3 gap-lg border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
                         placeholder="Nhập tên nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
@@ -1045,7 +1048,7 @@ export default function Admin() {
         {activeTab === 'cancelations' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">event_busy</span>
                 </div>
@@ -1055,7 +1058,7 @@ export default function Admin() {
                 </div>
                 <div className="relative z-10">
                   <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                  <span className="text-body-md text-white/90 ml-2 font-medium">suất</span>
                 </div>
                 <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
                   <button onClick={() => {
@@ -1072,7 +1075,7 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-[#d21235] to-[#9b0d27] rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">next_plan</span>
                 </div>
@@ -1082,7 +1085,7 @@ export default function Admin() {
                 </div>
                 <div className="relative z-10">
                   <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                  <span className="font-body-md text-body-md text-white/90 ml-2 font-medium">suất</span>
+                  <span className="text-body-md text-white/90 ml-2 font-medium">suất</span>
                 </div>
                 <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
                   <button onClick={() => {
@@ -1103,16 +1106,16 @@ export default function Admin() {
             </div>
 
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
-              <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+              <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Hủy Ăn</h2>
+                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Hủy Ăn</h2>
                     <div className="flex items-center gap-2">
                        <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer"
+                        className="bg-surface border border-outline-variant hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary shadow-sm cursor-pointer"
                        >
                          {MONTHS.map(m => (
                            <option key={m} value={`2026-${m}`}>Tháng {m}/2026</option>
@@ -1122,7 +1125,7 @@ export default function Admin() {
                   </div>
                   <button 
                     onClick={handleExportCancelationsExcel}
-                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
+                    className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     <span className="font-bold tracking-wide">Xuất Excel</span>
@@ -1131,41 +1134,41 @@ export default function Admin() {
 
                 <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-5 gap-lg border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
                         placeholder="Nhập tên nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Bữa</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Bữa</label>
                       <select 
                         value={cancelMealFilter}
                         onChange={(e) => setCancelMealFilter(e.target.value as any)}
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none cursor-pointer"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none cursor-pointer"
                       >
                         <option value="all">Tất cả</option>
                         <option value="breakfast">Bữa sáng</option>
@@ -1173,12 +1176,12 @@ export default function Admin() {
                       </select>
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Ngày</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Ngày</label>
                       <input 
                         type="date" 
                         value={cancelDateFilter}
                         onChange={(e) => setCancelDateFilter(e.target.value)}
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
@@ -1228,7 +1231,7 @@ export default function Admin() {
                               <td className="p-md">{c.employeeId || 'N/A'}</td>
                               <td className="p-md font-medium text-on-surface">{c.fullName}</td>
                               <td className="p-md">{c.department || 'N/A'}</td>
-                              <td className="p-md font-bold text-[#D21235]">{formatCancelDate(c.cancelDate)}</td>
+                              <td className="p-md font-bold text-secondary">{formatCancelDate(c.cancelDate)}</td>
                               <td className="p-md">
                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${
                                   c.cancelMeal === 'both' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'
@@ -1255,53 +1258,53 @@ export default function Admin() {
             {/* Event Summary */}
             {selectedEventId && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg px-md md:px-0">
-                <div className="bg-gradient-to-br from-[#d1fae5] to-[#a7f3d0] rounded-2xl p-lg shadow-lg border border-[#34d399]/20 flex flex-col gap-md relative overflow-hidden">
+                <div className="bg-gradient-to-br from-tertiary-container to-tertiary-container-strong rounded-2xl p-lg shadow-lg border border-tertiary/20 flex flex-col gap-md relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                     <span className="material-symbols-outlined text-[100px]">restaurant</span>
                   </div>
                   <div className="flex justify-between items-center relative z-10">
-                    <span className="font-label-lg font-bold text-[#065f46] uppercase tracking-wider drop-shadow-sm">CÓ ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
-                    <span className="material-symbols-outlined text-[#065f46]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
+                    <span className="font-label-lg font-bold text-on-tertiary-container uppercase tracking-wider drop-shadow-sm">CÓ ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                    <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
                   </div>
                   <div className="relative z-10">
-                    <span className="font-headline-lg text-headline-lg text-[#065f46] font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'yes').length}</span>
-                    <span className="font-body-md text-body-md text-[#065f46]/90 ml-2 font-medium">suất</span>
+                    <span className="text-headline-lg text-on-tertiary-container font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'yes').length}</span>
+                    <span className="text-body-md text-on-tertiary-container/90 ml-2 font-medium">suất</span>
                   </div>
-                   <div className="w-full bg-[#065f46]/20 rounded-full h-1.5 mt-auto relative z-10">
-                    <div className="bg-[#065f46] h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                   <div className="w-full bg-on-tertiary-container/20 rounded-full h-1.5 mt-auto relative z-10">
+                    <div className="bg-on-tertiary-container h-1.5 rounded-full" style={{ width: '100%' }}></div>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-[#fee2e2] to-[#fecaca] rounded-2xl p-lg shadow-lg border border-[#f87171]/20 flex flex-col gap-md relative overflow-hidden">
+                <div className="bg-gradient-to-br from-error-container to-error-container-strong rounded-2xl p-lg shadow-lg border border-error/20 flex flex-col gap-md relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                     <span className="material-symbols-outlined text-[100px]">no_meals</span>
                   </div>
                   <div className="flex justify-between items-center relative z-10">
-                    <span className="font-label-lg font-bold text-[#991b1b] uppercase tracking-wider drop-shadow-sm">KHÔNG ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
-                    <span className="material-symbols-outlined text-[#991b1b]" style={{ fontVariationSettings: "'FILL' 1" }}>no_meals</span>
+                    <span className="font-label-lg font-bold text-on-error-container uppercase tracking-wider drop-shadow-sm">KHÔNG ĂN ({events.find(e => e.id === selectedEventId)?.name || ''})</span>
+                    <span className="material-symbols-outlined text-on-error-container" style={{ fontVariationSettings: "'FILL' 1" }}>no_meals</span>
                   </div>
                   <div className="relative z-10">
-                    <span className="font-headline-lg text-headline-lg text-[#991b1b] font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'no').length}</span>
-                    <span className="font-body-md text-body-md text-[#991b1b]/90 ml-2 font-medium">suất</span>
+                    <span className="text-headline-lg text-on-error-container font-black drop-shadow-sm">{eventRegistrations.filter(r => r.choice === 'no').length}</span>
+                    <span className="text-body-md text-on-error-container/90 ml-2 font-medium">suất</span>
                   </div>
-                   <div className="w-full bg-[#991b1b]/20 rounded-full h-1.5 mt-auto relative z-10">
-                    <div className="bg-[#991b1b] h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                   <div className="w-full bg-on-error-container/20 rounded-full h-1.5 mt-auto relative z-10">
+                    <div className="bg-on-error-container h-1.5 rounded-full" style={{ width: '100%' }}></div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Event Registration List */}
-            <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col px-md md:px-0 mx-md md:mx-0">
+            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col px-md md:px-0 mx-md md:mx-0">
               <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                 <div className="flex flex-col gap-2 w-full md:w-auto">
-                  <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase pr-4 focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
+                  <h2 className="font-headline-sm text-[18px] text-primary uppercase pr-4 focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
                   <div className="flex items-center gap-2">
                      <span className="font-label-sm text-on-surface-variant font-medium">Sự kiện:</span>
                      <select 
                       value={selectedEventId}
                       onChange={(e) => setSelectedEventId(e.target.value)}
-                      className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] shadow-sm cursor-pointer max-w-[250px] w-full"
+                      className="bg-surface border border-outline-variant hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary shadow-sm cursor-pointer max-w-[250px] w-full"
                      >
                        <option value="">-- Chọn sự kiện --</option>
                        {events.map(event => (
@@ -1313,7 +1316,7 @@ export default function Admin() {
                 <button 
                   onClick={handleExportEventExcel}
                   disabled={!selectedEventId}
-                  className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
+                  className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
                 >
                   <span className="material-symbols-outlined text-[20px]">download</span>
                   <span className="font-bold tracking-wide">Xuất Excel Sự Kiện</span>
@@ -1360,7 +1363,7 @@ export default function Admin() {
                           <td className="p-md">{reg.email}</td>
                           <td className="p-md">{reg.department || 'N/A'}</td>
                           <td className="p-md">
-                             <span className={`px-2 py-1 rounded text-[12px] font-medium ${reg.choice === 'yes' ? 'bg-[#d1fae5] text-[#065f46]' : 'bg-error-container text-on-error-container'}`}>
+                             <span className={`px-2 py-1 rounded text-[12px] font-medium ${reg.choice === 'yes' ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-error-container text-on-error-container'}`}>
                                 {reg.choice === 'yes' ? 'Có ăn' : 'Không ăn'}
                              </span>
                           </td>
@@ -1378,17 +1381,17 @@ export default function Admin() {
         {activeTab === 'daily_stats' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="grid grid-cols-1 gap-md lg:gap-lg px-md md:px-0">
-              <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+              <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-[#23328c] uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
+                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mt-2">
                       <div className="flex items-center gap-2">
                         <span className="font-label-sm text-on-surface-variant font-medium">Tháng:</span>
                         <select 
                           value={selectedMonth}
                           onChange={(e) => setSelectedMonth(e.target.value)}
-                          className="bg-surface border border-outline-variant hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer"
+                          className="bg-surface border border-outline-variant hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none cursor-pointer"
                         >
                           {MONTHS.map(m => (
                             <option key={m} value={`2026-${m}`}>Tháng {m}</option>
@@ -1400,7 +1403,7 @@ export default function Admin() {
                         <select 
                           value={selectedDay}
                           onChange={(e) => setSelectedDay(parseInt(e.target.value))}
-                          className="bg-surface border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] cursor-pointer"
+                          className="bg-surface border border-primary/20 hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary cursor-pointer"
                         >
                           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
                             <option key={d} value={d}>Ngày {d.toString().padStart(2, '0')}/{monthStr}</option>
@@ -1412,7 +1415,7 @@ export default function Admin() {
                         <select 
                           value={dailyFilterByMeal}
                           onChange={(e) => setDailyFilterByMeal(e.target.value as any)}
-                          className="bg-surface border border-[#23328c]/20 hover:border-[#23328c]/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-[#23328c] cursor-pointer"
+                          className="bg-surface border border-primary/20 hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary cursor-pointer"
                         >
                           <option value="all">Tất cả</option>
                           <option value="breakfast">Bữa sáng</option>
@@ -1423,7 +1426,7 @@ export default function Admin() {
                   </div>
                   <button 
                     onClick={handleExportDailyExcel}
-                    className="flex items-center gap-2 bg-gradient-to-r from-[#21a366] to-[#168852] hover:from-[#1b8c56] hover:to-[#127244] shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
+                    className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     <span className="font-bold tracking-wide">Xuất Excel</span>
@@ -1432,33 +1435,33 @@ export default function Admin() {
 
                 <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-3 gap-lg border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Tên</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Tên</label>
                       <input 
                         type="text" 
                         value={nameFilter}
                         onChange={(e) => setNameFilter(e.target.value)}
                         placeholder="Nhập tên nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Mã NV</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Mã NV</label>
                       <input 
                         type="text" 
                         value={idFilter}
                         onChange={(e) => setIdFilter(e.target.value)}
                         placeholder="Nhập mã nhân viên..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                    <div className="flex flex-col gap-1.5">
-                      <label className="font-label-sm text-[#23328c] font-bold">Lọc theo Phòng ban</label>
+                      <label className="font-label-sm text-primary font-bold">Lọc theo Phòng ban</label>
                       <input 
                         type="text" 
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
                         placeholder="Nhập phòng ban..."
-                        className="bg-white border border-outline-variant focus:border-[#23328c] focus:ring-1 focus:ring-[#23328c] transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                        className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
                       />
                    </div>
                 </div>
@@ -1508,12 +1511,12 @@ export default function Admin() {
                               <td className="p-md">{reg.department || 'N/A'}</td>
                               {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'breakfast') && (
                                 <td className="p-md text-center">
-                                   {reg.eatsBreakfast ? <span className="material-symbols-outlined text-[#21a366]">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
+                                   {reg.eatsBreakfast ? <span className="material-symbols-outlined text-tertiary">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
                                 </td>
                               )}
                               {(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'lunch') && (
                                 <td className="p-md text-center">
-                                   {reg.eatsLunch ? <span className="material-symbols-outlined text-[#21a366]">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
+                                   {reg.eatsLunch ? <span className="material-symbols-outlined text-tertiary">check_circle</span> : <span className="material-symbols-outlined text-outline-variant">cancel</span>}
                                 </td>
                               )}
                               <td className="p-md text-on-surface-variant">{formatTimestamp(reg.timestamp)}</td>
@@ -1531,14 +1534,14 @@ export default function Admin() {
         {activeTab === 'settings' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-md lg:gap-lg px-md md:px-0">
             {/* Monthly Config Section */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
               <div className="p-md border-b border-outline-variant bg-surface-container-low focus:outline-none">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase">Cấu hình ĐK ĂN HÀNG THÁNG</h2>
+                <h2 className="text-headline-sm text-on-surface uppercase">Cấu hình ĐK ĂN HÀNG THÁNG</h2>
                 <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Đóng / Mở form đăng ký suất ăn theo tháng (Năm 2026).</p>
               </div>
               <div className="p-md grid grid-cols-2 md:grid-cols-3 gap-md focus:outline-none">
                 {MONTHS.map(month => (
-                  <div key={month} className="flex flex-col min-w-0 bg-surface p-sm rounded-lg border border-outline-variant gap-2">
+                  <div key={month} className="flex flex-col self-start min-w-0 bg-surface p-sm rounded-lg border border-outline-variant gap-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-label-md truncate">Tháng {month}</span>
                       <button
@@ -1546,7 +1549,7 @@ export default function Admin() {
                         title={monthlyStatus[month] ? 'Đang mở đăng ký — bấm để khóa' : 'Đang khóa — bấm để mở đăng ký'}
                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${monthlyStatus[month] ? 'bg-primary' : 'bg-surface-container-high'}`}
                       >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-surface-container-lowest shadow-sm transition-transform ${monthlyStatus[month] ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                     </div>
                     {monthlyStatus[month] && (
@@ -1578,9 +1581,9 @@ export default function Admin() {
             </div>
 
             {/* Cancel Config Section */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col md:col-span-2 lg:col-span-1">
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col md:col-span-2 lg:col-span-1">
               <div className="p-md border-b border-outline-variant bg-surface-container-low">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase">Cấu hình ĐK HỦY ĂN</h2>
+                <h2 className="text-headline-sm text-on-surface uppercase">Cấu hình ĐK HỦY ĂN</h2>
                 <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Gia hạn thời gian khóa hủy ăn (Mặc định tự động khóa lúc 16:00 ngày hôm trước).</p>
               </div>
               <div className="p-md flex flex-col gap-sm">
@@ -1608,9 +1611,9 @@ export default function Admin() {
             </div>
 
             {/* Events Config Section */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden flex flex-col">
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
               <div className="p-md border-b border-outline-variant bg-surface-container-low focus:outline-none">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase">Cấu hình ĐĂNG KÝ ĂN SỰ KIỆN</h2>
+                <h2 className="text-headline-sm text-on-surface uppercase">Cấu hình ĐĂNG KÝ ĂN SỰ KIỆN</h2>
                 <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Tạo và quản lý các form đăng ký sự kiện.</p>
               </div>
               <div className="p-md flex flex-col gap-md focus:outline-none">
@@ -1710,7 +1713,7 @@ export default function Admin() {
                               onClick={() => handleToggleEvent(event.id, event.isOpen)}
                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${event.isOpen ? 'bg-primary' : 'bg-surface-variant'}`}
                             >
-                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event.isOpen ? 'translate-x-6' : 'translate-x-1'}`} />
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-surface-container-lowest transition-transform ${event.isOpen ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                           </div>
                         </div>
@@ -1737,10 +1740,10 @@ export default function Admin() {
         {activeTab === 'blocked' && (
           <div className="px-md md:px-0 grid grid-cols-1 gap-md">
             {/* Blocked Users Management */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden">
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
                 <div className="p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-1">
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase focus:outline-none">Quản Lý Vi Phạm</h2>
+                    <h2 className="text-headline-sm text-on-surface uppercase focus:outline-none">Quản Lý Vi Phạm</h2>
                     <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Danh sách người dùng không được đăng ký ăn trong thời gian đã chọn.</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1759,7 +1762,7 @@ export default function Admin() {
                 
                 <div className="p-md grid grid-cols-1 md:grid-cols-2 gap-lg items-start">
                   <div className="flex flex-col gap-md">
-                    <h3 className="font-label-md text-label-md text-on-surface">Thêm Email Vi Phạm</h3>
+                    <h3 className="text-label-md text-on-surface">Thêm Email Vi Phạm</h3>
                     <p className="text-sm text-on-surface-variant">Nhập danh sách email cần chặn, mỗi email trên 1 dòng.</p>
                     <textarea 
                       value={blockedEmailsInput}
@@ -1779,7 +1782,7 @@ export default function Admin() {
 
                   <div className="flex flex-col gap-md">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-label-md text-label-md text-on-surface">Danh sách đang chặn</h3>
+                      <h3 className="text-label-md text-on-surface">Danh sách đang chặn</h3>
                       <span className="bg-error-container text-on-error-container text-xs px-2 py-0.5 rounded-full font-bold">{blockedEmails.length}</span>
                     </div>
                     
@@ -1812,9 +1815,9 @@ export default function Admin() {
         {activeTab === 'admins' && (
           <div className="px-md md:px-0 grid grid-cols-1 gap-md">
             {/* Admin Management */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05)] border border-outline-variant overflow-hidden">
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
                 <div className="p-md border-b border-outline-variant bg-surface-container-low focus:outline-none">
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface uppercase">Tài Khoản Quản Trị Hệ Thống</h2>
+                  <h2 className="text-headline-sm text-on-surface uppercase">Tài Khoản Quản Trị Hệ Thống</h2>
                   <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Danh sách người dùng có quyền truy cập trang quản trị.</p>
                 </div>
                 
@@ -1824,7 +1827,7 @@ export default function Admin() {
                       <div key={sa} className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant">
                         <div className="flex items-center gap-sm">
                           <span className="material-symbols-outlined text-[18px] text-primary">admin_panel_settings</span>
-                          <span className="font-body-md text-body-md text-[14px]">{sa}</span>
+                          <span className="text-body-md text-[14px]">{sa}</span>
                         </div>
                         <span className="font-label-sm px-2 py-0.5 bg-primary-container text-on-primary-container rounded">Super Admin</span>
                       </div>
@@ -1833,7 +1836,7 @@ export default function Admin() {
                       <div key={index} className="flex items-center justify-between bg-surface-bright p-sm rounded border border-outline-variant">
                         <div className="flex items-center gap-sm">
                           <span className="material-symbols-outlined text-[18px] text-secondary">shield_person</span>
-                          <span className="font-body-md text-body-md text-[14px] truncate">{admin.email}</span>
+                          <span className="text-body-md text-[14px] truncate">{admin.email}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
@@ -1869,7 +1872,7 @@ export default function Admin() {
                   </div>
 
                   <div className="border-t border-outline-variant pt-md mt-md">
-                    <h3 className="font-label-md text-label-md text-on-surface mb-sm">Thêm quản trị viên mới</h3>
+                    <h3 className="text-label-md text-on-surface mb-sm">Thêm quản trị viên mới</h3>
                     <div className="flex flex-col sm:flex-row gap-3 max-w-md">
                       <input 
                         type="email" 

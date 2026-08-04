@@ -65,22 +65,22 @@ export default function RegisterStaff() {
           
           {/* Form Header */}
           <div className="p-md md:p-lg border-b border-surface-variant bg-surface-bright">
-            <h2 className="font-headline-md text-headline-md text-on-surface mb-xs">Đăng ký thông tin</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant italic">Trường Họ tên được mặc định theo Tên hiển thị của Email và không thể chỉnh sửa.</p>
+            <h2 className="text-headline-md text-on-surface mb-xs">Đăng ký thông tin</h2>
+            <p className="text-body-md text-on-surface-variant italic">Trường Họ tên được mặc định theo Tên hiển thị của Email và không thể chỉnh sửa.</p>
           </div>
 
           {/* Form Body */}
           <div className="p-md md:p-lg flex flex-col gap-md md:gap-lg">
             
             {error && (
-              <div className="bg-error-container text-on-error-container p-sm rounded-lg font-body-md text-body-md">
+              <div className="bg-error-container text-on-error-container p-sm rounded-lg text-body-md">
                 {error}
               </div>
             )}
 
             {/* Full Name Field */}
             <div className="flex flex-col gap-sm">
-              <label htmlFor="fullName" className="font-label-md text-label-md text-on-surface">Họ tên</label>
+              <label htmlFor="fullName" className="text-label-md text-on-surface">Họ tên</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">badge</span>
@@ -93,14 +93,14 @@ export default function RegisterStaff() {
                   readOnly
                   placeholder="Họ và tên của bạn" 
                   required 
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container border border-outline-variant rounded focus:ring-0 cursor-not-allowed font-body-md text-body-md text-on-surface-variant transition-shadow" 
+                  className="block w-full pl-xl pr-md py-sm bg-surface-container border border-outline-variant rounded focus:ring-0 cursor-not-allowed text-body-md text-on-surface-variant transition-shadow" 
                 />
               </div>
             </div>
 
             {/* Employee ID Field */}
             <div className="flex flex-col gap-sm">
-              <label htmlFor="employeeId" className="font-label-md text-label-md text-on-surface">Mã nhân viên</label>
+              <label htmlFor="employeeId" className="text-label-md text-on-surface">Mã nhân viên</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">badge</span>
@@ -113,14 +113,14 @@ export default function RegisterStaff() {
                   onChange={(e) => setEmployeeId(e.target.value)}
                   placeholder="Nhập mã nhân viên của bạn" 
                   required 
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface placeholder-outline transition-shadow" 
+                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary text-body-md text-on-surface placeholder-outline transition-shadow" 
                 />
               </div>
             </div>
             
             {/* Department/Group Field */}
             <div className="flex flex-col gap-sm">
-              <label htmlFor="department" className="font-label-md text-label-md text-on-surface">Phòng ban / Tổ khối</label>
+              <label htmlFor="department" className="text-label-md text-on-surface">Phòng ban / Tổ khối</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">domain</span>
@@ -131,7 +131,7 @@ export default function RegisterStaff() {
                   required 
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md text-on-surface appearance-none transition-shadow"
+                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary text-body-md text-on-surface appearance-none transition-shadow"
                 >
                   <option value="" disabled>Chọn phòng ban / tổ / khối</option>
                   <option value="BAN LÃNH ĐẠO">BAN LÃNH ĐẠO</option>
@@ -184,7 +184,7 @@ export default function RegisterStaff() {
               type="button" 
               onClick={() => navigate('/login')}
               disabled={loading}
-              className="w-full md:w-auto px-md py-sm bg-surface-container-lowest border border-outline font-label-md text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
+              className="w-full md:w-auto px-md py-sm bg-surface-container-lowest border border-outline text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
             >
               Hủy
             </button>
@@ -192,7 +192,7 @@ export default function RegisterStaff() {
               type="button" 
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full md:w-auto justify-center px-md py-sm bg-primary border border-transparent font-label-md text-label-md text-on-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center gap-xs disabled:opacity-50"
+              className="w-full md:w-auto justify-center px-md py-sm bg-primary border border-transparent text-label-md text-on-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center gap-xs disabled:opacity-50"
             >
               {loading ? 'Đang lưu...' : 'Tiếp tục'}
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
