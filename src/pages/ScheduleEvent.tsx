@@ -217,7 +217,7 @@ export default function ScheduleEvent() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="text-headline-md md:text-headline-lg text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
+              <h2 className="text-headline-md md:text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
               <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
             </div>
           </div>

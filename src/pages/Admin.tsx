@@ -810,11 +810,13 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Tabs navigation */}
+        {/* Tabs navigation. max-w-full là bắt buộc: thiếu nó thì lg:w-fit cho
+            phép thanh tab rộng hơn khung, đẩy cả trang cuộn ngang ở bề ngang
+            khoảng 1024-1100px. */}
         <div
           role="tablist"
           aria-label="Khu vực quản trị"
-          className="flex gap-1 px-1 py-1 mt-xs bg-surface-container-lowest border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit shadow-xs"
+          className="flex gap-1 px-1 py-1 mt-xs bg-surface-container-lowest border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit max-w-full shadow-xs"
         >
           {ADMIN_TABS.map(tab => {
             const isActive = activeTab === tab.key;

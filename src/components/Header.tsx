@@ -37,7 +37,9 @@ export function Header() {
         <span className="flex-1 bg-warning" />
         <span className="flex-1 bg-tertiary" />
       </div>
-      <div className="max-w-[1440px] w-full mx-auto h-full flex justify-between items-center px-4 md:px-8 lg:px-12">
+      {/* Header trải hết bề ngang: bọc max-w-1440 + mx-auto sẽ thụt logo vào
+          giữa, để lại mảng trắng trống phía trên sidebar ở màn hình rộng. */}
+      <div className="w-full h-full flex justify-between items-center gap-4 pl-4 md:pl-8 pr-4 md:pr-6 lg:pr-8">
         <Link to="/schedule" className="flex items-center gap-sm shrink-0 group">
           <img
             src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png"

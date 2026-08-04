@@ -41,13 +41,64 @@ export default function Login() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased">
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary-container/50 via-surface-container to-brand-cream/60 overflow-hidden">
+      {/* Panel thương hiệu: dựng bằng CSS nên luôn kín khung, không bị hở viền
+          như ảnh poster đặt bg-contain trước đây. */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary via-primary-dark to-primary-darker overflow-hidden">
+        {/* Khối sáng trang trí */}
+        <div className="absolute -top-32 -left-24 w-[420px] h-[420px] rounded-full bg-brand-sky/20 blur-3xl" aria-hidden="true" />
+        <div className="absolute -bottom-40 -right-16 w-[460px] h-[460px] rounded-full bg-secondary/25 blur-3xl" aria-hidden="true" />
         <div
-          className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-transform duration-1000"
-          style={{ backgroundImage: "url('https://hoangmaistarschool.edu.vn/thongtin/dka.png')" }}
+          className="absolute inset-0 opacity-[0.07]"
+          aria-hidden="true"
+          style={{
+            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+            backgroundSize: '22px 22px',
+          }}
         />
+
+        <div className="relative z-10 flex flex-col justify-center gap-7 xl:gap-8 px-10 xl:px-16 py-12 w-full">
+          <div className="inline-flex items-center gap-3 bg-surface-container-lowest rounded-xl px-4 py-3 shadow-lg w-fit">
+            <img
+              src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png"
+              alt="Trường Ngôi Sao Hoàng Mai"
+              className="h-11 w-auto object-contain"
+            />
+          </div>
+
+          <div>
+            <p className="text-label-sm text-brand-sky uppercase tracking-[0.2em] mb-3">Phần mềm đăng ký ăn</p>
+            <h2 className="text-[32px] xl:text-[44px] font-extrabold text-on-primary leading-[1.12] tracking-tight">
+              Đăng ký suất ăn
+              <br />
+              <span className="text-warning">nhanh chóng, chính xác</span>
+            </h2>
+            <span className="inline-block w-16 h-1 rounded-full bg-secondary mt-5" aria-hidden="true" />
+          </div>
+
+          <ul className="flex flex-col gap-4 max-w-[440px]">
+            {[
+              { icon: 'restaurant_menu', title: 'Đăng ký suất ăn hàng tháng', desc: 'Chọn bữa sáng, bữa trưa cho cả tháng chỉ trong một lần thao tác.' },
+              { icon: 'event_available', title: 'Mở đăng ký từ ngày 25 đến 28', desc: 'Hệ thống tự khóa đúng hạn, không cần nhắc thủ công.' },
+              { icon: 'event_busy', title: 'Hủy ăn trước 16:00 hôm trước', desc: 'Báo hủy theo ngày, gửi thẳng tới Bộ phận Dinh dưỡng.' },
+              { icon: 'verified', title: 'Số liệu minh bạch', desc: 'Thầy/cô và bộ phận quản lý xem cùng một nguồn dữ liệu.' },
+            ].map(item => (
+              <li key={item.icon} className="flex items-start gap-3.5">
+                <span className="shrink-0 w-10 h-10 rounded-lg bg-on-primary/10 border border-on-primary/15 flex items-center justify-center text-brand-sky">
+                  <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {item.icon}
+                  </span>
+                </span>
+                <div>
+                  <p className="text-label-lg text-on-primary">{item.title}</p>
+                  <p className="text-body-sm text-on-primary/65 mt-0.5">{item.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Dải màu nhận diện chạy dọc mép phải */}
-        <div className="absolute inset-y-0 right-0 w-[6px] flex flex-col" aria-hidden="true">
+        <div className="absolute inset-y-0 right-0 w-[6px] flex flex-col z-20" aria-hidden="true">
           <span className="flex-[4] bg-primary" />
           <span className="flex-[2] bg-secondary" />
           <span className="flex-1 bg-warning" />
