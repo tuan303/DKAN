@@ -299,8 +299,10 @@ export default function Admin() {
     try {
       await setDoc(doc(db, 'blocked_users', selectedMonth), { emails });
       setBlockedEmails(emails);
+      showToast('Lưu danh sách thành công!', 'success');
     } catch (err) {
       console.error('Error saving blocked emails:', err);
+      showToast('Lỗi khi lưu danh sách vi phạm!', 'error');
     }
   };
 
@@ -504,7 +506,7 @@ export default function Admin() {
       setAdminToDelete(null);
     } catch (err) {
       console.error('Error removing admin:', err);
-      alert('Có lỗi xảy ra khi xóa quyền quản trị. Vui lòng thử lại.');
+      showToast('Có lỗi xảy ra khi xóa quyền quản trị. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -614,15 +616,22 @@ export default function Admin() {
     setMonthlyExpiry(prev => ({ ...prev, [month]: dateStr }));
   };
 
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleSaveMonthExpiry = async (month: string) => {
     setSavingMonths(prev => ({ ...prev, [month]: true }));
     try {
       const newExpiry = { ...monthlyExpiry };
       await setDoc(doc(db, 'settings', 'monthlyExpiry'), newExpiry, { merge: true });
-      alert('Đã lưu cấu hình thời gian thành công!');
+      showToast('Đã lưu cấu hình thời gian thành công!', 'success');
     } catch (err) {
       console.error('Lỗi khi lưu cấu hình:', err);
-      alert('Có lỗi xảy ra khi lưu cấu hình. Vui lòng thử lại!');
+      showToast('Có lỗi xảy ra khi lưu cấu hình. Vui lòng thử lại!', 'error');
     } finally {
       setSavingMonths(prev => ({ ...prev, [month]: false }));
     }
@@ -641,8 +650,10 @@ export default function Admin() {
     setIsSavingCancelExtend(true);
     try {
       await setDoc(doc(db, 'settings', 'cancelConfig'), { extendUntil: cancelExtendUntil }, { merge: true });
+      showToast('Đã lưu cấu hình hủy ăn thành công!', 'success');
     } catch (err) {
       console.error('Error saving cancel config:', err);
+      showToast('Có lỗi xảy ra khi lưu cấu hình hủy ăn. Vui lòng thử lại!', 'error');
     } finally {
       setIsSavingCancelExtend(false);
     }
@@ -658,8 +669,10 @@ export default function Admin() {
       });
       setEvents([...events, { id: docRef.id, name: newEventName.trim(), isOpen: true }]);
       setNewEventName('');
+      showToast('Đã thêm sự kiện thành công!', 'success');
     } catch (err) {
       console.error('Error adding event:', err);
+      showToast('Có lỗi xảy ra khi thêm sự kiện. Vui lòng thử lại!', 'error');
     }
   };
 
@@ -669,6 +682,7 @@ export default function Admin() {
       setEvents(events.map(e => e.id === id ? { ...e, isOpen: !currentStatus } : e));
     } catch (err) {
       console.error('Error toggling event:', err);
+      showToast('Có lỗi xảy ra khi cập nhật trạng thái sự kiện!', 'error');
     }
   };
 
@@ -676,8 +690,10 @@ export default function Admin() {
     try {
       await updateDoc(doc(db, 'events', id), { expiresAt: dateStr });
       setEvents(events.map(e => e.id === id ? { ...e, expiresAt: dateStr } : e));
+      showToast('Lưu hạn đóng thành công!', 'success');
     } catch (err) {
       console.error('Error setting event expiry:', err);
+      showToast('Có lỗi xảy ra khi lưu hạn đóng!', 'error');
     }
   };
 
@@ -688,8 +704,10 @@ export default function Admin() {
       setEvents(events.map(e => e.id === id ? { ...e, name: editingEventName.trim() } : e));
       setEditingEventId(null);
       setEditingEventName('');
+      showToast('Chỉnh sửa sự kiện thành công!', 'success');
     } catch (err) {
       console.error('Error editing event:', err);
+      showToast('Có lỗi xảy ra khi chỉnh sửa sự kiện!', 'error');
     }
   };
 
@@ -701,8 +719,10 @@ export default function Admin() {
         setSelectedEventId('');
       }
       setEventToDelete(null);
+      showToast('Xóa sự kiện thành công!', 'success');
     } catch (err) {
       console.error('Error deleting event:', err);
+      showToast('Có lỗi xảy ra khi xóa sự kiện!', 'error');
     }
   };
 
@@ -723,7 +743,21 @@ export default function Admin() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md">
+    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-lg shadow-lg border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+          toast.type === 'success' 
+            ? 'bg-tertiary-container border-tertiary text-on-tertiary-container'
+            : 'bg-error-container border-error text-on-error-container'
+        }`}>
+          <span className="material-symbols-outlined text-[20px]">
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          <p className="font-label-md">{toast.message}</p>
+        </div>
+      )}
+
       <Header />
       
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-sm md:p-lg lg:p-xl flex flex-col gap-md md:gap-lg mt-16 md:mt-2">
