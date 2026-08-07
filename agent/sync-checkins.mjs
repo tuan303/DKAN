@@ -24,6 +24,10 @@ import { dirname, join } from 'node:path';
 // sẵn sàng.
 
 
+// In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
+// vì chạy nhầm file cũ.
+const AGENT_VERSION = '2026-08-07.2';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const hasFlag = f => argv.includes(f);
@@ -271,7 +275,7 @@ function groupByDate(events) {
 // ------------------------------------------------------------------- chạy
 
 log('');
-log('  ĐỒNG BỘ LƯỢT CHẤM ĂN TỪ MÁY NHẬN DIỆN');
+log(`  ĐỒNG BỘ LƯỢT CHẤM ĂN TỪ MÁY NHẬN DIỆN   (bản ${AGENT_VERSION})`);
 log('  ' + '─'.repeat(50));
 
 const range = timeRange(DAYS);
