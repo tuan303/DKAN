@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, a
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { MealReconciliation } from '../components/MealReconciliation';
 
 function useSortableData(items: any[], initialConfig = null) {
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(initialConfig);
@@ -80,6 +81,8 @@ interface RegistrationData {
   breakfastCount: number;
   lunchCount: number;
   timestamp?: string;
+  // Ngày bắt đầu tính suất (đăng ký giữa tháng). Bản ghi cũ không có trường này.
+  firstMealDate?: string;
 }
 
 interface AdminData {
@@ -99,12 +102,13 @@ interface EventData {
 const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
-type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'settings' | 'admins';
+type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'admins';
 
 const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
   { key: 'monthly', label: 'ĐK ăn hàng tháng', icon: 'calendar_month' },
   { key: 'daily_stats', label: 'DS ĐK theo ngày', icon: 'list_alt' },
   { key: 'cancelations', label: 'ĐK hủy ăn', icon: 'event_busy' },
+  { key: 'reconcile', label: 'Đối soát chấm ăn', icon: 'fact_check' },
   { key: 'events', label: 'ĐK ăn sự kiện', icon: 'celebration' },
   { key: 'blocked', label: 'Vi phạm', icon: 'gavel' },
   { key: 'settings', label: 'Cấu hình', icon: 'settings' },
@@ -1531,6 +1535,14 @@ export default function Admin() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'reconcile' && (
+          <MealReconciliation
+            registrations={registrations}
+            cancelations={cancelations}
+            selectedMonth={selectedMonth}
+          />
         )}
 
         {activeTab === 'settings' && (
