@@ -282,6 +282,17 @@ export default function ScheduleMonth() {
       return;
     }
 
+    // Chọn Không ăn cả hai mục thì bản ghi sẽ là 0 suất, không có giá trị cho
+    // Bộ phận Dinh dưỡng mà còn làm nhiễu danh sách đăng ký. Dừng lại và hướng
+    // dẫn thay vì lưu một bản ghi rỗng.
+    if (breakfastChoice === 'no' && lunchChoice === 'no') {
+      setSubmitStatus({
+        type: 'info',
+        message: 'Thầy/Cô đã chọn Không ăn ở cả hai mục nên không cần đăng ký trên hệ thống. Nếu có nhu cầu ăn tại trường, vui lòng chọn Có ăn ở mục tương ứng rồi xác nhận lại.'
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitStatus(null);
     
@@ -946,7 +957,7 @@ export default function ScheduleMonth() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
           <div className={clsx(
-            "relative w-[min(calc(100vw-32px),384px)] bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+            "relative w-[min(calc(100vw-32px),384px)] bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
             submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
           )}>
             <div className="p-xl text-center flex flex-col items-center">
