@@ -648,17 +648,18 @@ export default function ScheduleMonth() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
             <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
-              {/* Chỉ tab đang mở mới được tô đầy. Trước đây tab không hoạt động
-                  cũng tô cùng màu ở 70% nên nhìn như cả hai đang cùng mở. */}
-              <div className="flex w-full gap-1 border-b border-outline-variant mb-6 pt-2 px-2 bg-surface-container-low rounded-t-xl -mx-4 md:-mx-6 -mt-4 md:-mt-6 flex-wrap md:flex-nowrap">
+              {/* Cả hai tab luôn giữ màu nhận diện (đăng ký = navy, hủy = đỏ) và
+                  chữ trắng. Tab đang mở phân biệt bằng độ nổi: liền mạch với thẻ
+                  bên dưới, có đổ bóng; tab còn lại thụt xuống một chút. */}
+              <div className="flex w-full gap-1 border-b border-outline-variant mb-6 pt-2 px-2 bg-surface-container-low rounded-t-xl -mx-4 md:-mx-6 -mt-4 md:-mt-6 flex-wrap md:flex-nowrap items-end">
                   <button
                     onClick={() => setActiveMainTab('register')}
                     aria-pressed={activeMainTab === 'register'}
                     className={clsx(
-                      "relative px-6 py-2.5 rounded-t-lg text-label-lg uppercase transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x",
+                      "relative px-6 rounded-t-lg text-label-lg uppercase text-white transition-all flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x bg-primary border-primary",
                       activeMainTab === 'register'
-                        ? "bg-primary border-primary !border-b-primary text-on-primary z-10 -mb-[1px] shadow-sm"
-                        : "bg-transparent border-transparent text-on-surface-variant hover:bg-primary/10 hover:text-primary"
+                        ? "py-3 !border-b-primary z-10 -mb-[1px] shadow-md"
+                        : "py-2.5 brightness-90 hover:brightness-100"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
@@ -668,10 +669,10 @@ export default function ScheduleMonth() {
                     onClick={() => setActiveMainTab('cancel')}
                     aria-pressed={activeMainTab === 'cancel'}
                     className={clsx(
-                      "relative px-6 py-2.5 rounded-t-lg text-label-lg uppercase transition-colors flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x",
+                      "relative px-6 rounded-t-lg text-label-lg uppercase text-white transition-all flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x bg-secondary border-secondary",
                       activeMainTab === 'cancel'
-                        ? "bg-secondary border-secondary !border-b-secondary text-on-secondary z-10 -mb-[1px] shadow-sm"
-                        : "bg-transparent border-transparent text-on-surface-variant hover:bg-secondary/10 hover:text-secondary"
+                        ? "py-3 !border-b-secondary z-10 -mb-[1px] shadow-md"
+                        : "py-2.5 brightness-90 hover:brightness-100"
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px]">event_busy</span>
