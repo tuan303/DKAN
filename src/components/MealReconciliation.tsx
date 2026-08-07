@@ -78,6 +78,22 @@ interface Row {
   note?: string;
 }
 
+/**
+ * Chuẩn hoá mã nhân viên trước khi so khớp.
+ *
+ * Mã nhân viên trong DKAN là ô nhập tay và không được trim khi lưu, nên thực
+ * tế có bản ghi mang khoảng trắng thừa (kể cả khoảng trắng không ngắt và
+ * khoảng trắng full-width khi gõ bằng bộ gõ tiếng Việt). Nếu so thô thì
+ * "101190 " và "101190" là hai người khác nhau — đó chính là kiểu sai làm một
+ * người vừa nằm ở "đăng ký nhưng không chấm" vừa nằm ở "chấm nhưng không
+ * đăng ký".
+ */
+const normId = (v: unknown) =>
+  String(v ?? '').replace(/[\s 　]/g, '').toUpperCase();
+
+/** Mã không dùng để đối soát được: trống, hoặc N/A do chưa khai hồ sơ nhân sự. */
+const isUsableId = (id: string) => id !== '' && id !== 'N/A' && id !== 'NA';
+
 const toMinutes = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
@@ -135,7 +151,7 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
   const excludedIds: string[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
-    const employeeId = String(row[colId] || '').trim();
+    const employeeId = normId(row[colId]);
     if (!employeeId) continue;
     const name = String(row[0] || '').trim();
     const department = colDept >= 0 ? String(row[colDept] || '').trim() : '';
@@ -200,25 +216,35 @@ export function reconcile({
   cancelations: Cancelation[];
   excludedIds?: string[];
 }) {
+  const excluded = new Set(excludedIds.map(normId));
+
+  // Chuẩn hoá mã ngay từ đầu để mọi so khớp về sau đều dùng chung một dạng.
+  const normalized = allRegistrations.map(r => ({ ...r, employeeId: normId(r.employeeId) }));
+
+  // Đăng ký không có mã dùng được thì không thể đối soát: tách riêng, nếu để
+  // lẫn thì ngày nào họ cũng bị tính là "đăng ký nhưng không chấm".
+  const invalid = normalized.filter(r => !isUsableId(r.employeeId));
+
   // Loại cả ở phía đăng ký: nếu một người bên bếp có đăng ký trên hệ thống thì
   // cũng không được rơi vào danh sách "đăng ký nhưng không chấm".
-  const excluded = new Set(excludedIds);
-  const registrations = excluded.size
-    ? allRegistrations.filter(r => !excluded.has(r.employeeId))
-    : allRegistrations;
+  const registrations = normalized.filter(
+    r => isUsableId(r.employeeId) && !excluded.has(r.employeeId)
+  );
 
   const registered: Row[] = [];    // mọi suất đã đăng ký
   const tapped: Row[] = [];        // mọi lượt chấm được ghi nhận
   const missing: Row[] = [];       // đăng ký nhưng không chấm
   const extra: Row[] = [];         // chấm nhưng không đăng ký
   const unrecognized: Row[] = [];  // chấm ngoài khung giờ, không được ghi nhận
+  const invalidRegs: Row[] = [];   // đăng ký thiếu mã NV, không đối soát được
 
   // Ngày nào bị hủy bữa nào: khóa "mã NV|ngày|bữa"
   const cancelSet = new Set<string>();
   for (const c of cancelations) {
-    if (!c.employeeId || !c.cancelDate) continue;
+    const id = normId(c.employeeId);
+    if (!id || !c.cancelDate) continue;
     const meals = c.cancelMeal === 'both' ? ['breakfast', 'lunch'] : [c.cancelMeal];
-    for (const m of meals) if (m) cancelSet.add(`${c.employeeId}|${c.cancelDate}|${m}`);
+    for (const m of meals) if (m) cancelSet.add(`${id}|${c.cancelDate}|${m}`);
   }
 
   const regByEmployee = new Map(registrations.map(r => [r.employeeId, r]));
@@ -233,8 +259,10 @@ export function reconcile({
       return `Đăng ký từ ngày ${reg.firstMealDate.slice(8, 10)}/${reg.firstMealDate.slice(5, 7)}`;
     }
     const count = meal === 'breakfast' ? reg.breakfastCount : reg.lunchCount;
-    if (!count) return meal === 'breakfast' ? 'Chỉ đăng ký bữa trưa' : 'Không đăng ký bữa này';
-    return '';
+    if (!count) return meal === 'breakfast' ? 'Chỉ đăng ký bữa trưa' : 'Chỉ đăng ký bữa sáng';
+    // Không nhánh nào khớp nghĩa là có mâu thuẫn trong dữ liệu — nói thẳng ra
+    // thay vì để ô trống rồi không ai biết vì sao người này bị xếp vào đây.
+    return 'Chưa xác định được — vui lòng báo lại để kiểm tra';
   };
 
   for (const date of dates) {
@@ -275,6 +303,22 @@ export function reconcile({
         unrecognized.push({ employeeId, fullName: rec.name, department: rec.department, date, meal: 'none', time: t });
       }
     }
+
+    for (const r of invalid) {
+      for (const meal of ['breakfast', 'lunch'] as Meal[]) {
+        const count = meal === 'breakfast' ? r.breakfastCount : r.lunchCount;
+        if (!count) continue;
+        if (r.firstMealDate && date < r.firstMealDate) continue;
+        invalidRegs.push({
+          employeeId: r.employeeId || '(trống)',
+          fullName: r.fullName,
+          department: r.department,
+          date,
+          meal,
+          note: 'Hồ sơ nhân sự chưa có mã nhân viên',
+        });
+      }
+    }
   }
 
   const byDateThenName = (a: Row, b: Row) =>
@@ -286,10 +330,11 @@ export function reconcile({
     missing: missing.sort(byDateThenName),
     extra: extra.sort(byDateThenName),
     unrecognized: unrecognized.sort(byDateThenName),
+    invalidRegs: invalidRegs.sort(byDateThenName),
   };
 }
 
-type CardKey = 'registered' | 'tapped' | 'missing' | 'extra' | 'unrecognized';
+type CardKey = 'registered' | 'tapped' | 'missing' | 'extra' | 'unrecognized' | 'invalidRegs';
 
 const PAGE_SIZES = [50, 100, 500, 1000];
 
@@ -325,6 +370,7 @@ export function MealReconciliation({
   const [openCard, setOpenCard] = useState<CardKey | null>(null);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
 
   // Đổi phạm vi xem hay đổi bảng thì quay về trang 1, nếu không người dùng sẽ
   // thấy một trang trống vì bảng mới ít dòng hơn.
@@ -358,14 +404,18 @@ export function MealReconciliation({
     [parsed]
   );
 
+  const monthMismatch = !!parsed && parsed.month !== selectedMonth;
+
   const activeDates = useMemo(() => {
-    if (!parsed) return [];
+    // Lệch tháng thì không đối soát: so lượt chấm tháng này với đăng ký tháng
+    // khác chỉ ra số rác, thà không hiện gì còn hơn hiện số sai.
+    if (!parsed || monthMismatch) return [];
     if (scope === 'month') return dates;
     if (scope === 'day') return selectedDate ? [selectedDate] : [];
     if (!rangeFrom || !rangeTo) return [];
     const [from, to] = rangeFrom <= rangeTo ? [rangeFrom, rangeTo] : [rangeTo, rangeFrom];
     return dates.filter(d => d >= from && d <= to);
-  }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo]);
+  }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo, monthMismatch]);
 
   const result = useMemo(
     () => reconcile({
@@ -378,7 +428,6 @@ export function MealReconciliation({
     [parsed, activeDates, registrations, cancelations]
   );
 
-  const monthMismatch = parsed && parsed.month !== selectedMonth;
 
   const CARDS: {
     key: CardKey;
@@ -417,6 +466,12 @@ export function MealReconciliation({
       active: 'ring-2 ring-outline', withTime: true,
       hint: `Lượt chấm nằm ngoài hai khung giờ nên không được tính là đã ăn. Kiểm tra xem có phải người đó đến muộn, hay đồng hồ máy chấm bị lệch.`,
     },
+    {
+      key: 'invalidRegs', icon: 'badge', label: 'Đăng ký thiếu mã NV', rows: result.invalidRegs,
+      tone: 'bg-surface-container border-outline-variant text-on-surface-variant',
+      active: 'ring-2 ring-outline', withTime: false, withNote: true,
+      hint: 'Những người này đăng ký ăn khi hồ sơ nhân sự chưa có mã nhân viên, nên không thể đối chiếu với máy chấm. Cần bổ sung mã cho họ, nếu không họ sẽ mãi không xuất hiện đúng ở bất kỳ danh sách nào.',
+    },
   ];
 
   const handleExport = () => {
@@ -453,11 +508,23 @@ export function MealReconciliation({
 
   const openedCard = CARDS.find(c => c.key === openCard);
 
+  // Tìm theo mã NV hoặc tên, dùng để tra một trường hợp cụ thể mà không phải
+  // lật qua hàng chục trang.
+  const visibleRows = useMemo(() => {
+    if (!openedCard) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return openedCard.rows;
+    const qId = normId(q);
+    return openedCard.rows.filter(
+      r => r.fullName.toLowerCase().includes(q) || (qId !== '' && r.employeeId.includes(qId))
+    );
+  }, [openedCard, query]);
+
   // Kẹp số trang lại phòng khi dữ liệu đổi mà trang hiện tại vượt quá số trang.
-  const totalPages = Math.max(1, Math.ceil((openedCard?.rows.length || 0) / pageSize));
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const firstRowIndex = (safePage - 1) * pageSize;
-  const pageRows = openedCard ? openedCard.rows.slice(firstRowIndex, firstRowIndex + pageSize) : [];
+  const pageRows = visibleRows.slice(firstRowIndex, firstRowIndex + pageSize);
 
   return (
     <div className="px-md md:px-0 flex flex-col gap-md lg:gap-lg">
@@ -514,8 +581,9 @@ export function MealReconciliation({
                   <span className="material-symbols-outlined text-[20px] shrink-0">warning</span>
                   <span>
                     File là tháng <strong>{parsed.month.slice(5)}/{parsed.month.slice(0, 4)}</strong> nhưng danh sách đăng ký
-                    đang xem là tháng <strong>{selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}</strong>. Đổi tháng ở tab
-                    ĐK ăn hàng tháng cho khớp, nếu không kết quả đối soát sẽ sai.
+                    đang xem là tháng <strong>{selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}</strong>.
+                    <strong> Đã tạm dừng đối soát</strong> để không đưa ra con số sai — vui lòng đổi tháng ở tab
+                    ĐK ăn hàng tháng cho khớp với file.
                   </span>
                 </div>
               )}
@@ -623,9 +691,27 @@ export function MealReconciliation({
             <p className="px-md pt-md text-body-sm text-on-surface-variant">{openedCard.hint}</p>
           )}
 
+          <div className="px-md pt-md">
+            <div className="relative max-w-[360px]">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
+              <input
+                type="search"
+                value={query}
+                onChange={e => { setQuery(e.target.value); resetPaging(); }}
+                placeholder="Tìm theo mã NV hoặc họ tên..."
+                className="w-full bg-surface border border-outline-variant rounded-lg pl-10 pr-3 py-2 text-body-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            {query.trim() !== '' && (
+              <p className="text-body-sm text-on-surface-variant mt-2">
+                Tìm thấy {visibleRows.length} dòng khớp &quot;{query.trim()}&quot;.
+              </p>
+            )}
+          </div>
+
           <div className="overflow-x-auto">
-            {openedCard.rows.length === 0 ? (
-              <p className="text-body-sm text-on-surface-variant italic p-md">Không có trường hợp nào.</p>
+            {visibleRows.length === 0 ? (
+              <p className="text-body-sm text-on-surface-variant italic p-md">{query.trim() ? "Không tìm thấy dòng nào khớp." : "Không có trường hợp nào."}</p>
             ) : (
               <table className="w-full text-left text-body-sm min-w-[600px]">
                 <thead className="bg-surface-container-low text-on-surface-variant text-label-sm uppercase">
@@ -668,7 +754,7 @@ export function MealReconciliation({
             )}
           </div>
 
-          {openedCard.rows.length > 0 && (
+          {visibleRows.length > 0 && (
             <div className="p-sm border-t border-outline-variant flex flex-wrap items-center gap-3">
               <select
                 value={pageSize}
@@ -680,7 +766,7 @@ export function MealReconciliation({
               </select>
 
               <span className="text-body-sm text-on-surface-variant">
-                {firstRowIndex + 1}–{Math.min(firstRowIndex + pageSize, openedCard.rows.length)} trong tổng số {openedCard.rows.length}
+                {firstRowIndex + 1}–{Math.min(firstRowIndex + pageSize, visibleRows.length)} trong tổng số {visibleRows.length}
               </span>
 
               {totalPages > 1 && (
