@@ -5,20 +5,27 @@ import * as xlsx from 'xlsx';
  * Đối soát đăng ký ăn (DKAN) với dữ liệu chấm ăn xuất từ phần mềm HAC.
  *
  * File HAC là "Báo cáo chấm vào&ra hàng tháng": mỗi người một dòng, mỗi ngày
- * một ô dạng "07:43-11:49" (giờ vào – giờ ra), "Không-11:49" (thiếu giờ vào)
- * hoặc "-" (không có lượt chấm nào).
+ * một ô chỉ có ba dạng "07:43-11:49", "Không-11:49", "07:43-Không", hoặc "-"
+ * khi không có lượt chấm nào.
  *
- * Không dựa vào vị trí vào/ra của HAC mà phân bữa theo GIỜ THỰC TẾ so với hai
- * khung giờ bên dưới: như vậy lượt chấm lệch khung sẽ lộ ra thay vì bị gán bừa.
+ * PHÂN BỮA THEO VỊ TRÍ TRONG Ô, KHÔNG THEO GIỜ. Vị trí 1 là bữa sáng, vị trí 2
+ * là bữa trưa, ô trống HAC luôn ghi rõ "Không" nên không bao giờ nhập nhằng.
+ *
+ * Đừng đổi sang phân loại theo khung giờ: đo trên dữ liệu thật tháng 8/2026
+ * (679 người, 828 ô) thì lượt chấm bữa sáng kéo từ 05:12 đến 11:46 còn bữa
+ * trưa từ 08:20 đến 16:10 — hai dải chồng lên nhau nên không có mốc giờ nào
+ * tách được. Bản đầu tiên phân theo khung giờ đã bỏ sót hàng loạt người.
  */
 
-// Khung giờ chấm, khớp cấu hình ca "Chấm ăn" trong HAC.
-const MEAL_WINDOWS = {
-  breakfast: { from: '06:00', to: '07:45', label: 'Bữa sáng' },
-  lunch: { from: '11:00', to: '14:30', label: 'Bữa trưa' },
-};
-
 type Meal = 'breakfast' | 'lunch';
+
+const MEAL_LABEL: Record<Meal, string> = { breakfast: 'Bữa sáng', lunch: 'Bữa trưa' };
+
+// Chỉ dùng để gắn cờ rà soát, KHÔNG dùng để phân bữa và không ảnh hưởng số liệu.
+const SANITY = {
+  breakfast: { from: '04:30', to: '10:00' },
+  lunch: { from: '09:00', to: '14:30' },
+};
 
 interface Registration {
   employeeId: string;
@@ -42,7 +49,6 @@ interface TapRecord {
   department: string;
   breakfast: string | null;
   lunch: string | null;
-  outside: string[];
 }
 
 interface ParsedFile {
@@ -58,11 +64,9 @@ const toMinutes = (hhmm: string) => {
   return h * 60 + m;
 };
 
-const classifyTime = (hhmm: string): Meal | null => {
+const isUnusual = (meal: Meal, hhmm: string) => {
   const t = toMinutes(hhmm);
-  if (t >= toMinutes(MEAL_WINDOWS.breakfast.from) && t <= toMinutes(MEAL_WINDOWS.breakfast.to)) return 'breakfast';
-  if (t >= toMinutes(MEAL_WINDOWS.lunch.from) && t <= toMinutes(MEAL_WINDOWS.lunch.to)) return 'lunch';
-  return null;
+  return t < toMinutes(SANITY[meal].from) || t > toMinutes(SANITY[meal].to);
 };
 
 const isWeekday = (iso: string) => {
@@ -118,18 +122,15 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
     for (const c of dayCols) {
       const cell = String(row[c.idx] || '').trim();
       if (!cell || cell === '-') continue;
-      const times = cell.match(/\d{1,2}:\d{2}/g);
-      if (!times) continue;
 
-      const rec: TapRecord = { employeeId, name, department, breakfast: null, lunch: null, outside: [] };
-      for (const t of times) {
-        const meal = classifyTime(t);
-        // Chấm nhiều lần trong cùng một bữa: giữ lượt sớm nhất.
-        if (meal === 'breakfast') rec.breakfast = rec.breakfast && rec.breakfast < t ? rec.breakfast : t;
-        else if (meal === 'lunch') rec.lunch = rec.lunch && rec.lunch < t ? rec.lunch : t;
-        else rec.outside.push(t);
-      }
-      byDate[c.date][employeeId] = rec;
+      // Vị trí 1 = bữa sáng, vị trí 2 = bữa trưa. Ô trống HAC ghi "Không".
+      const parts = cell.split('-').map(s => s.trim());
+      const asTime = (s?: string) => (s && /^\d{1,2}:\d{2}$/.test(s) ? s : null);
+      const breakfast = asTime(parts[0]);
+      const lunch = asTime(parts[1]);
+      if (!breakfast && !lunch) continue;
+
+      byDate[c.date][employeeId] = { employeeId, name, department, breakfast, lunch };
     }
   }
 
@@ -159,13 +160,12 @@ interface Row {
   fullName: string;
   department: string;
   date: string;
-  // 'none' = lượt chấm không rơi vào bữa nào
-  meal: Meal | 'none';
+  meal: Meal;
   time?: string;
   note?: string;
 }
 
-const mealLabel = (m: Meal | 'none') => (m === 'none' ? '—' : MEAL_WINDOWS[m].label);
+const mealLabel = (m: Meal) => MEAL_LABEL[m];
 
 /**
  * Đối chiếu đăng ký với lượt chấm. Hàm thuần, tách khỏi giao diện để kiểm thử
@@ -185,7 +185,7 @@ export function reconcile({
 }) {
   const missing: Row[] = [];   // đăng ký nhưng không chấm
   const extra: Row[] = [];     // chấm nhưng không đăng ký
-  const outside: Row[] = [];   // chấm ngoài khung giờ
+  const unusual: Row[] = [];   // giờ chấm bất thường, chỉ để rà soát
   let expectedCount = 0;
   let actualCount = 0;
 
@@ -255,8 +255,11 @@ export function reconcile({
     }
 
     for (const [employeeId, rec] of Object.entries(taps)) {
-      for (const t of rec.outside) {
-        outside.push({ employeeId, fullName: rec.name, department: rec.department, date, meal: 'none', time: t });
+      for (const meal of ['breakfast', 'lunch'] as Meal[]) {
+        const t = rec[meal];
+        if (t && isUnusual(meal, t)) {
+          unusual.push({ employeeId, fullName: rec.name, department: rec.department, date, meal, time: t });
+        }
       }
     }
   }
@@ -267,7 +270,7 @@ export function reconcile({
   return {
     missing: missing.sort(byDateThenName),
     extra: extra.sort(byDateThenName),
-    outside: outside.sort(byDateThenName),
+    unusual: unusual.sort(byDateThenName),
     expectedCount,
     actualCount,
   };
@@ -345,7 +348,7 @@ export function MealReconciliation({
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, sheet(result.missing, false), 'DK khong cham');
     xlsx.utils.book_append_sheet(wb, sheet(result.extra, true, true), 'Cham khong DK');
-    xlsx.utils.book_append_sheet(wb, sheet(result.outside, true), 'Cham ngoai gio');
+    xlsx.utils.book_append_sheet(wb, sheet(result.unusual, true), 'Gio cham bat thuong');
     const suffix = scope === 'month' ? selectedMonth : selectedDate;
     xlsx.writeFile(wb, `Doi_soat_cham_an_${suffix}.xlsx`);
   };
@@ -417,8 +420,8 @@ export function MealReconciliation({
           <h2 className="text-headline-sm text-on-surface uppercase">Đối soát chấm ăn</h2>
           <p className="text-on-surface-variant text-[13px] mt-1">
             So sánh đăng ký trên hệ thống với dữ liệu chấm ăn xuất từ phần mềm HAC.
-            Bữa sáng tính lượt chấm {MEAL_WINDOWS.breakfast.from}–{MEAL_WINDOWS.breakfast.to},
-            bữa trưa {MEAL_WINDOWS.lunch.from}–{MEAL_WINDOWS.lunch.to}.
+            Trong mỗi ô, giờ đứng trước là bữa sáng, giờ đứng sau là bữa trưa, ô ghi
+            &quot;Không&quot; là không chấm bữa đó.
           </p>
         </div>
 
@@ -535,14 +538,16 @@ export function MealReconciliation({
           <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
             <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
               <span className="material-symbols-outlined text-on-surface-variant">schedule</span>
-              <h3 className="text-headline-sm text-on-surface uppercase">Chấm ngoài khung giờ ({result.outside.length})</h3>
+              <h3 className="text-headline-sm text-on-surface uppercase">Giờ chấm bất thường ({result.unusual.length})</h3>
             </div>
             <div className="px-md pt-md">
               <p className="text-body-sm text-on-surface-variant">
-                Lượt chấm không rơi vào khung nào. Thường do đến muộn, hoặc đồng hồ máy chấm công bị lệch giờ.
+                Lượt chấm nằm ngoài khoảng thường gặp (sáng {SANITY.breakfast.from}–{SANITY.breakfast.to},
+                trưa {SANITY.lunch.from}–{SANITY.lunch.to}). Danh sách này chỉ để rà soát,
+                <strong> không ảnh hưởng tới các con số ở trên</strong> — các lượt này vẫn được tính là đã chấm.
               </p>
             </div>
-            <Table rows={result.outside} withTime empty="Không có lượt chấm nào ngoài khung giờ." />
+            <Table rows={result.unusual} withTime empty="Không có lượt chấm nào bất thường." />
           </div>
         </>
       )}
