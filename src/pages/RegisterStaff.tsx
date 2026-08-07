@@ -5,6 +5,12 @@ import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { Footer } from '../components/Footer';
 
+// Mã nhân viên của trường: 6 chữ số, bắt đầu bằng 10. Đối chiếu với hệ thống
+// chấm công tháng 8/2026 thì toàn bộ 622 CBGV-NV đều theo đúng dạng này.
+// Ràng buộc ngay từ đây là để mã trong phần mềm khớp được với máy chấm công —
+// gõ sai một ký tự là người đó không đối soát được suất ăn.
+const EMPLOYEE_ID_PATTERN = /^10\d{4}$/;
+
 export default function RegisterStaff() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
@@ -12,6 +18,8 @@ export default function RegisterStaff() {
   const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const idValid = EMPLOYEE_ID_PATTERN.test(employeeId);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -30,6 +38,11 @@ export default function RegisterStaff() {
       return;
     }
 
+    if (!EMPLOYEE_ID_PATTERN.test(employeeId)) {
+      setError('Mã nhân viên phải gồm đúng 6 chữ số và bắt đầu bằng 10 (ví dụ: 100303).');
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user) {
       setError('Bạn chưa đăng nhập');
@@ -40,7 +53,7 @@ export default function RegisterStaff() {
       setLoading(true);
       setError(null);
       await setDoc(doc(db, 'staff', user.uid), {
-        fullName,
+        fullName: fullName.trim(),
         employeeId,
         department,
         email: user.email,
@@ -105,17 +118,37 @@ export default function RegisterStaff() {
                 <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">badge</span>
                 </div>
-                <input 
-                  type="text" 
-                  id="employeeId" 
-                  name="employeeId" 
+                <input
+                  type="text"
+                  id="employeeId"
+                  name="employeeId"
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  placeholder="Nhập mã nhân viên của bạn" 
-                  required 
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary text-body-md text-on-surface placeholder-outline transition-shadow" 
+                  // Chỉ nhận chữ số và tối đa 6 ký tự: chặn luôn khoảng trắng
+                  // thừa ngay từ lúc gõ, vì mã dư một dấu cách là không khớp
+                  // được với máy chấm công.
+                  onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={6}
+                  placeholder="Ví dụ: 100303"
+                  required
+                  aria-invalid={employeeId.length > 0 && !idValid}
+                  aria-describedby="employeeId-hint"
+                  className={`block w-full pl-xl pr-md py-sm bg-surface-container-lowest border rounded focus:ring-2 text-body-md text-on-surface placeholder-outline transition-shadow tabular ${
+                    employeeId.length > 0 && !idValid
+                      ? 'border-error focus:ring-error focus:border-error'
+                      : 'border-outline-variant focus:ring-primary focus:border-primary'
+                  }`}
                 />
               </div>
+              <p
+                id="employeeId-hint"
+                className={`text-body-sm ${employeeId.length > 0 && !idValid ? 'text-error' : 'text-on-surface-variant'}`}
+              >
+                {employeeId.length > 0 && !idValid
+                  ? 'Mã phải gồm đúng 6 chữ số và bắt đầu bằng 10.'
+                  : 'Gồm 6 chữ số, bắt đầu bằng 10 — đúng mã trên hệ thống chấm công.'}
+              </p>
             </div>
             
             {/* Department/Group Field */}
