@@ -19,7 +19,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import admin from 'firebase-admin';
+// firebase-admin nạp muộn, ngay trước lúc ghi: chế độ --dry-run không cần tới
+// nó, nhờ vậy kiểm tra kết nối thiết bị được ngay cả khi phần Firebase chưa
+// sẵn sàng.
+
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -51,6 +54,10 @@ const DAYS = Number(flagValue('--days', config.daysToSync || 7));
 if (!Number.isFinite(DAYS) || DAYS < 1) fail('Số ngày đồng bộ không hợp lệ.');
 if (!Array.isArray(config.devices) || !config.devices.length) fail('config.json chưa khai máy chấm công nào.');
 
+if (config.devices.some(d => (d.protocol || 'http') === 'https')) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 // ---------------------------------------------------- xác thực digest (ISAPI)
 
 /**
@@ -78,12 +85,35 @@ function buildDigestHeader(authHeader, { username, password, method, uri, body }
     (parts.opaque ? `, opaque="${parts.opaque}"` : '');
 }
 
+/** Lỗi mạng của fetch rất chung chung; mã thật nằm trong err.cause. */
+function describeNetworkError(err) {
+  const code = err?.cause?.code || err?.code || '';
+  const map = {
+    ECONNREFUSED: 'thiết bị từ chối kết nối (cổng 80 đang đóng, hoặc thiết bị chỉ chạy HTTPS)',
+    ETIMEDOUT: 'hết thời gian chờ (không định tuyến tới được, hoặc tường lửa chặn)',
+    EHOSTUNREACH: 'không tới được địa chỉ này từ máy đang chạy script',
+    ENOTFOUND: 'không phân giải được địa chỉ',
+    ECONNRESET: 'thiết bị ngắt kết nối giữa chừng',
+    UND_ERR_CONNECT_TIMEOUT: 'hết thời gian chờ kết nối',
+  };
+  if (code) return `${code} — ${map[code] || 'lỗi kết nối'}`;
+  const detail = err?.cause?.message || err?.message || '';
+  return detail ? `${detail} (không rõ mã lỗi)` : 'lỗi kết nối không rõ nguyên nhân';
+}
+
 async function digestPost(device, uri, payload) {
-  const url = `http://${device.ip}${uri}`;
+  const protocol = device.protocol || 'http';
+  const url = `${protocol}://${device.ip}${uri}`;
   const body = JSON.stringify(payload);
   const init = { method: 'POST', body, headers: { 'Content-Type': 'application/json' } };
 
-  let res = await fetch(url, init);
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (err) {
+    throw new Error(`Không kết nối được ${url} — ${describeNetworkError(err)}`);
+  }
+
   if (res.status === 401) {
     const wwwAuth = res.headers.get('www-authenticate') || '';
     if (!/digest/i.test(wwwAuth)) throw new Error(`Thiết bị không dùng Digest: ${wwwAuth}`);
@@ -94,7 +124,13 @@ async function digestPost(device, uri, payload) {
   }
 
   if (res.status === 401) throw new Error('Sai tài khoản hoặc mật khẩu thiết bị.');
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Hikvision trả lý do cụ thể trong thân phản hồi — không in ra thì mò rất lâu.
+    const detail = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 400);
+    const err = new Error(`HTTP ${res.status} ${res.statusText}${detail ? ` | thiết bị trả về: ${detail}` : ''}`);
+    err.httpStatus = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -115,22 +151,62 @@ function timeRange(days) {
   };
 }
 
+/**
+ * Mỗi đời firmware Hikvision khó tính một kiểu với nội dung yêu cầu: có máy
+ * bắt buộc phải có cả major lẫn minor, có máy giới hạn maxResults, có máy chỉ
+ * chấp nhận searchID ngắn. Thử lần lượt tới khi máy chấp nhận, rồi dùng luôn
+ * biến thể đó cho các trang sau.
+ */
+const REQUEST_VARIANTS = [
+  { label: 'không lọc loại sự kiện, 30 dòng', cond: { maxResults: 30 } },
+  { label: 'major=5 + minor=0, 30 dòng', cond: { maxResults: 30, major: 5, minor: 0 } },
+  { label: 'major=5, 30 dòng', cond: { maxResults: 30, major: 5 } },
+  { label: 'không lọc loại sự kiện, 10 dòng', cond: { maxResults: 10 } },
+  { label: 'không lọc, không giới hạn dòng', cond: {} },
+];
+
+const buildBody = (variant, range, position, searchID) => ({
+  AcsEventCond: {
+    searchID,
+    searchResultPosition: position,
+    ...variant.cond,
+    ...range,
+  },
+});
+
+const ENDPOINT = '/ISAPI/AccessControl/AcsEvent?format=json';
+
+/** Tìm biến thể yêu cầu mà thiết bị chấp nhận, thử trên trang đầu tiên. */
+async function findVariant(device, range, searchID) {
+  const problems = [];
+  for (const variant of REQUEST_VARIANTS) {
+    try {
+      const data = await digestPost(device, ENDPOINT, buildBody(variant, range, 0, searchID));
+      return { variant, first: data };
+    } catch (err) {
+      problems.push(`      - ${variant.label}: ${err.message}`);
+      // Sai mật khẩu hay không nối được thì thử tiếp cũng vô ích.
+      if (!err.httpStatus) throw err;
+      if (err.httpStatus === 401 || err.httpStatus === 403) throw err;
+    }
+  }
+  throw new Error('Thiết bị từ chối mọi kiểu yêu cầu đã thử:\n' + problems.join('\n'));
+}
+
 async function fetchDeviceEvents(device, range) {
   const events = [];
   const seenCodes = new Map();
+  const searchID = randomBytes(8).toString('hex');
+
+  const { variant, first } = await findVariant(device, range, searchID);
+  if (DEBUG) log(`\n    [debug] ${device.name || device.ip} chấp nhận kiểu yêu cầu: ${variant.label}`);
+
   let position = 0;
-  const PAGE = 100;
+  let pending = first;
 
   for (let guard = 0; guard < 1000; guard++) {
-    const data = await digestPost(device, '/ISAPI/AccessControl/AcsEvent?format=json', {
-      AcsEventCond: {
-        searchID: `dkan-${Date.now()}-${position}`,
-        searchResultPosition: position,
-        maxResults: PAGE,
-        major: 5, // 5 = sự kiện kiểm soát ra vào
-        ...range,
-      },
-    });
+    const data = pending || await digestPost(device, ENDPOINT, buildBody(variant, range, position, searchID));
+    pending = null;
 
     const acs = data.AcsEvent || {};
     const list = acs.InfoList || [];
@@ -213,8 +289,15 @@ for (const device of config.devices) {
     log(`${evs.length} lượt chấm`);
   } catch (err) {
     log('THẤT BẠI');
-    log(`      ${err.message}`);
-    log('      Kiểm tra: IP đúng chưa, ISAPI đã bật chưa, tài khoản/mật khẩu trong config.json.');
+    for (const line of String(err.message).split('\n')) log(`      ${line}`);
+    if (/Không kết nối được/.test(err.message)) {
+      log('');
+      log(`      Thử mở http://${device.ip} bằng trình duyệt TRÊN CHÍNH MÁY NÀY.`);
+      log('      Nếu trình duyệt vào được mà script không vào được, khả năng cao thiết bị');
+      log('      chỉ mở HTTPS: thêm "protocol": "https" vào máy đó trong config.json.');
+    } else {
+      log('      Kiểm tra: ISAPI đã bật chưa, tài khoản/mật khẩu trong config.json.');
+    }
   }
 }
 
@@ -248,6 +331,7 @@ try {
   fail('Không đọc được file khóa Firebase. ' + err.message);
 }
 
+const { default: admin } = await import('firebase-admin');
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 

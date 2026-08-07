@@ -4,7 +4,8 @@
       "name": "CA_TrH",
       "ip": "10.34.32.35",
       "username": "admin",
-      "password": "DIEN_MAT_KHAU_MAY_1"
+      "password": "DIEN_MAT_KHAU_MAY_1",
+      "_ghichu": "Nếu máy chỉ mở HTTPS thì thêm dòng: \"protocol\": \"https\""
     },
     {
       "name": "CA_TIH",

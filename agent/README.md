@@ -107,7 +107,9 @@ không nhân đôi dữ liệu vì mỗi ngày ghi đè trọn một bản ghi.
 |---|---|
 | `Sai tài khoản hoặc mật khẩu thiết bị` | Kiểm tra lại `config.json` |
 | `HTTP 403` hoặc `404` | ISAPI chưa bật: vào giao diện web của máy → Cấu hình → Mạng → Nâng cao → Integration Protocol |
-| `fetch failed` / `ECONNREFUSED` | Không tới được thiết bị. Thử mở `http://10.34.32.35` bằng trình duyệt trên chính máy này |
+| `HTTP 400` | Firmware kén nội dung yêu cầu. Script tự thử 5 kiểu khác nhau; nếu vẫn hỏng, nó in ra lý do thiết bị trả về — gửi phần đó để chỉnh |
+| `ECONNREFUSED` | Cổng 80 đóng. Thiết bị có thể chỉ chạy HTTPS: thêm `"protocol": "https"` cho máy đó trong `config.json` |
+| `ETIMEDOUT` / `EHOSTUNREACH` | Không định tuyến tới được. Thử mở `http://10.34.32.35` bằng trình duyệt **trên chính máy chạy script** |
 | `Không đọc được file khóa Firebase` | Thiếu `firebase-key.json` hoặc sai tên |
 | Lấy được 0 lượt chấm | Khoảng ngày không có ai chấm, hoặc giờ trên thiết bị bị lệch. Kiểm tra NTP trên máy nhận diện |
 
