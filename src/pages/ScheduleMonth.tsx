@@ -93,10 +93,11 @@ export default function ScheduleMonth() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const getWeekdaysCount = (month: number, year: number) => {
+  // Đếm ngày làm việc (bỏ thứ 7, CN) trong tháng, tính từ ngày fromDay trở đi.
+  const getWeekdaysCount = (month: number, year: number, fromDay = 1) => {
     let count = 0;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (let i = 1; i <= daysInMonth; i++) {
+    for (let i = Math.max(1, fromDay); i <= daysInMonth; i++) {
       const day = new Date(year, month, i).getDay();
       if (day !== 0 && day !== 6) { // Not Sunday (0) or Saturday (6)
         count++;
@@ -105,7 +106,22 @@ export default function ScheduleMonth() {
     return count;
   };
 
-  const weekdaysCount = getWeekdaysCount(selectedMonthIndex, selectedYear);
+  // Suất ăn chỉ được tính từ ngày đăng ký đến hết tháng: đăng ký giữa tháng thì
+  // những ngày đã trôi qua không còn suất. Tháng sau vẫn tính trọn tháng.
+  const today = new Date();
+  const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonthIndex === today.getMonth();
+  const isPastMonth =
+    selectedYear < today.getFullYear() ||
+    (selectedYear === today.getFullYear() && selectedMonthIndex < today.getMonth());
+
+  const fullMonthWeekdays = getWeekdaysCount(selectedMonthIndex, selectedYear);
+  const firstMealDay = isCurrentMonth ? today.getDate() : 1;
+  const weekdaysCount = isPastMonth
+    ? 0
+    : getWeekdaysCount(selectedMonthIndex, selectedYear, firstMealDay);
+  // Đăng ký giữa tháng: số suất ít hơn cả tháng, cần nói rõ cho người dùng.
+  const isPartialMonth = !isPastMonth && weekdaysCount < fullMonthWeekdays;
+  const firstMealDateLabel = `${String(firstMealDay).padStart(2, '0')}/${String(selectedMonthIndex + 1).padStart(2, '0')}`;
   const monthString = (selectedMonthIndex + 1).toString().padStart(2, '0');
   let isMonthOpen = monthlyStatus[monthString] ?? false; 
   if (isMonthOpen && monthlyExpiry[monthString]) {
@@ -310,6 +326,11 @@ export default function ScheduleMonth() {
           month: `${selectedYear}-${monthString}`,
           breakfastCount,
           lunchCount,
+          // Truy vết cách tính: suất ăn chạy từ firstMealDate đến hết tháng.
+          // Cần cho khâu đối soát khi một người có số suất ít hơn cả tháng.
+          firstMealDate: `${selectedYear}-${monthString}-${String(firstMealDay).padStart(2, '0')}`,
+          weekdaysCounted: weekdaysCount,
+          fullMonthWeekdays,
           fullName: staffData.fullName,
           employeeId: staffData.employeeId,
           department: staffData.department,
@@ -333,6 +354,10 @@ export default function ScheduleMonth() {
                 <h2 style="color: #D21235; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">XÁC NHẬN ĐĂNG KÝ SUẤT ĂN</h2>
                 <p>Kính gửi Thầy/Cô: ${staffData.fullName || 'Thầy/Cô'},</p>
                 <p>Hệ thống đăng ký suất ăn Trường Ngôi Sao Hoàng Mai xin xác nhận Thầy/Cô đã thực hiện đăng ký suất ăn thành công cho <strong>Tháng ${monthString}/${selectedYear}</strong>. Chi tiết như sau:</p>
+                <p style="background-color: #FFEBD6; color: #6B4400; padding: 12px; border-radius: 8px; margin: 16px 0;">
+                  Suất ăn được tính từ <strong>ngày ${firstMealDateLabel}/${selectedYear}</strong> đến hết tháng:
+                  <strong>${weekdaysCount} ngày làm việc</strong>${isPartialMonth ? ` (cả tháng ${fullMonthWeekdays} ngày)` : ''}, đã trừ thứ 7 và Chủ nhật.
+                </p>
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                   <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                     <th style="padding: 12px; text-align: left;">Thông tin</th>
@@ -832,7 +857,7 @@ export default function ScheduleMonth() {
                         <span className="material-symbols-outlined text-on-surface-variant">free_breakfast</span>
                         <span className="text-body-md text-on-surface">Bữa sáng</span>
                       </div>
-                      <span className="text-headline-md text-primary">
+                      <span className="text-headline-md text-primary tabular">
                         {breakfastChoice === 'yes' ? weekdaysCount : 0} <span className="text-body-md text-on-surface-variant">suất</span>
                       </span>
                     </div>
@@ -841,10 +866,26 @@ export default function ScheduleMonth() {
                         <span className="material-symbols-outlined text-on-surface-variant">restaurant</span>
                         <span className="text-body-md text-on-surface">Bữa trưa</span>
                       </div>
-                      <span className="text-headline-md text-primary">
+                      <span className="text-headline-md text-primary tabular">
                         {breakfastChoice === 'yes' || lunchChoice === 'yes' ? weekdaysCount : 0} <span className="text-body-md text-on-surface-variant">suất</span>
                       </span>
                     </div>
+
+                    {/* Nói rõ vì sao số suất ít hơn cả tháng khi đăng ký giữa tháng */}
+                    {isPartialMonth ? (
+                      <div className="p-sm rounded-lg bg-warning-container text-on-warning-container text-body-sm flex items-start gap-2">
+                        <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
+                        <p>
+                          Đăng ký giữa tháng nên chỉ tính suất ăn từ <strong>ngày {firstMealDateLabel}</strong> đến hết
+                          tháng: <strong>{weekdaysCount} ngày làm việc</strong> (cả tháng {fullMonthWeekdays} ngày, đã trừ
+                          thứ 7 và Chủ nhật).
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-body-sm text-on-surface-variant px-1">
+                        Tháng {monthString}/{selectedYear} có {fullMonthWeekdays} ngày làm việc (đã trừ thứ 7 và Chủ nhật).
+                      </p>
+                    )}
                   </div>
                   
                   <button 
