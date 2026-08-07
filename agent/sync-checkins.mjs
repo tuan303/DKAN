@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ.
-const AGENT_VERSION = '2026-08-07.5';
+const AGENT_VERSION = '2026-08-07.6';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -147,6 +147,24 @@ function baseCandidates(device) {
 }
 
 const baseLabel = b => `${b.protocol}:${b.port}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Thiết bị hay rớt kết nối khi bị hỏi dồn dập — trang đầu chạy ngon rồi trang
+ * sau đứt. Thử lại vài lần với giãn cách tăng dần thay vì bỏ cuộc ngay.
+ */
+async function postWithRetry(base, device, uri, init, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await rawPost(base, device, uri, init);
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await sleep(400 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
 
 async function digestPost(device, uri, payload) {
   const body = JSON.stringify(payload);
@@ -160,22 +178,17 @@ async function digestPost(device, uri, payload) {
   let res;
   let lastErr;
   const tried = [];
-  for (const base of baseCandidates(device)) {
+  const candidates = baseCandidates(device);
+  for (const base of candidates) {
     tried.push(baseLabel(base));
     try {
-      res = await rawPost(base, device, uri, init);
+      // Lúc còn đang dò cổng thì thử ít lần cho nhanh; khi đã biết cổng chạy
+      // được thì kiên nhẫn hơn vì lỗi lúc này là do thiết bị bận.
+      res = await postWithRetry(base, device, uri, init, candidates.length === 1 ? 3 : 1);
       device._workingBase = base;
       break;
     } catch (err) {
       lastErr = err;
-      // ECONNRESET hay gặp khi thiết bị đang bận: thử lại một lần trước khi bỏ.
-      if (err?.cause?.code === 'ECONNRESET') {
-        try {
-          res = await rawPost(base, device, uri, init);
-          device._workingBase = base;
-          break;
-        } catch (retryErr) { lastErr = retryErr; }
-      }
     }
   }
 
@@ -191,10 +204,19 @@ async function digestPost(device, uri, payload) {
     const auth = buildDigestHeader(wwwAuth, {
       username: device.username, password: device.password, method: 'POST', uri, body,
     });
-    res = await rawPost(device._workingBase, device, uri, {
-      ...init,
-      headers: { ...init.headers, Authorization: auth },
-    });
+    try {
+      res = await postWithRetry(device._workingBase, device, uri, {
+        ...init,
+        headers: { ...init.headers, Authorization: auth },
+      });
+    } catch (err) {
+      // Trước đây lỗi ở bước này lọt ra ngoài dưới dạng "fetch failed" trần
+      // trụi, không kèm gợi ý gì.
+      throw new Error(
+        `Không kết nối được ${device.ip} qua ${baseLabel(device._workingBase)} ` +
+        `ở bước xác thực — ${describeNetworkError(err)}`
+      );
+    }
   }
 
   if (res.status === 401) throw new Error('Sai tài khoản hoặc mật khẩu thiết bị.');
@@ -279,8 +301,15 @@ async function fetchDeviceEvents(device, range) {
   let pending = first;
 
   for (let guard = 0; guard < 1000; guard++) {
-    const data = pending || await digestPost(device, ENDPOINT, buildBody(variant, range, position, searchID));
-    pending = null;
+    let data;
+    if (pending) {
+      data = pending;
+      pending = null;
+    } else {
+      // Nghỉ một nhịp giữa các trang: hỏi dồn dập là thiết bị rớt kết nối.
+      await sleep(config.pageDelayMs ?? 250);
+      data = await digestPost(device, ENDPOINT, buildBody(variant, range, position, searchID));
+    }
 
     const acs = data.AcsEvent || {};
     const list = acs.InfoList || [];
@@ -370,7 +399,7 @@ for (const device of config.devices) {
       log('      Nếu trình duyệt vào được mà script không vào được, khả năng cao thiết bị');
       log('      hoặc cổng web bị đổi. Xem mục "Máy báo ECONNREFUSED" trong README.');
     } else {
-      log('      Kiểm tra: ISAPI đã bật chưa, tài khoản/mật khẩu trong config.json.');
+      log('      Kiểm tra: ISAPI đã bật chưa, tài khoản mật khẩu trong config.json.');
     }
   }
 }
