@@ -108,6 +108,11 @@ export default function ScheduleMonth() {
 
   // Suất ăn chỉ được tính từ ngày đăng ký đến hết tháng: đăng ký giữa tháng thì
   // những ngày đã trôi qua không còn suất. Tháng sau vẫn tính trọn tháng.
+  //
+  // Ngày đăng ký được TÍNH VÀO, kể cả khi đăng ký trong ngày. Nhìn qua thì có vẻ
+  // ngược với quy định hủy ăn trước 16:00 hôm trước, nhưng đây là quy định nghiệp
+  // vụ của nhà trường: khi mở form cho ai đăng ký thì quản lý đã nắm trước là
+  // người đó ăn từ hôm nay. Đừng đổi thành đếm từ ngày mai.
   const today = new Date();
   const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonthIndex === today.getMonth();
   const isPastMonth =
