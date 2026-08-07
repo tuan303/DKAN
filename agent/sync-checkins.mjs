@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ.
-const AGENT_VERSION = '2026-08-07.3';
+const AGENT_VERSION = '2026-08-07.5';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -118,38 +118,61 @@ function describeNetworkError(err) {
  * tra chứng chỉ — chỉ bật trong lúc nói chuyện với thiết bị, tắt lại trước khi
  * kết nối Firebase để không làm yếu đường truyền ra Internet.
  */
-async function rawPost(protocol, device, uri, init) {
-  if (protocol === 'https') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+async function rawPost(base, device, uri, init) {
+  if (base.protocol === 'https') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   try {
-    return await fetch(`${protocol}://${device.ip}${uri}`, init);
+    return await fetch(`${base.protocol}://${device.ip}:${base.port}${uri}`, init);
   } finally {
-    if (protocol === 'https') delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    if (base.protocol === 'https') delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   }
 }
 
+/**
+ * Cổng web của Hikvision đổi được, và có máy bị tắt hẳn HTTP. HAC nói chuyện
+ * qua cổng SDK riêng (8000) nên máy "Trực tuyến" trong HAC không có nghĩa là
+ * cổng web đang mở. Thử lần lượt các tổ hợp hay gặp.
+ */
+function baseCandidates(device) {
+  if (device._workingBase) return [device._workingBase];
+  if (device.protocol || device.port) {
+    const protocol = device.protocol || (Number(device.port) === 443 ? 'https' : 'http');
+    return [{ protocol, port: Number(device.port) || (protocol === 'https' ? 443 : 80) }];
+  }
+  return [
+    { protocol: 'http', port: 80 },
+    { protocol: 'https', port: 443 },
+    { protocol: 'http', port: 8080 },
+    { protocol: 'https', port: 8443 },
+  ];
+}
+
+const baseLabel = b => `${b.protocol}:${b.port}`;
+
 async function digestPost(device, uri, payload) {
   const body = JSON.stringify(payload);
-  const init = { method: 'POST', body, headers: { 'Content-Type': 'application/json' } };
-
-  // Thứ tự thử: giao thức đã biết chạy được > khai trong config > http rồi https.
-  const candidates = device._workingProtocol
-    ? [device._workingProtocol]
-    : device.protocol ? [device.protocol] : ['http', 'https'];
+  const init = {
+    method: 'POST',
+    body,
+    // Hikvision hay ngat ngang khi giu ket noi mo; dong luon cho gon.
+    headers: { 'Content-Type': 'application/json', Connection: 'close' },
+  };
 
   let res;
   let lastErr;
-  for (const protocol of candidates) {
+  const tried = [];
+  for (const base of baseCandidates(device)) {
+    tried.push(baseLabel(base));
     try {
-      res = await rawPost(protocol, device, uri, init);
-      device._workingProtocol = protocol;
+      res = await rawPost(base, device, uri, init);
+      device._workingBase = base;
       break;
     } catch (err) {
       lastErr = err;
       // ECONNRESET hay gặp khi thiết bị đang bận: thử lại một lần trước khi bỏ.
       if (err?.cause?.code === 'ECONNRESET') {
         try {
-          res = await rawPost(protocol, device, uri, init);
-          device._workingProtocol = protocol;
+          res = await rawPost(base, device, uri, init);
+          device._workingBase = base;
           break;
         } catch (retryErr) { lastErr = retryErr; }
       }
@@ -157,9 +180,8 @@ async function digestPost(device, uri, payload) {
   }
 
   if (!res) {
-    const tried = candidates.join(' và ');
     throw new Error(
-      `Không kết nối được ${device.ip} qua ${tried} — ${describeNetworkError(lastErr)}`
+      `Không kết nối được ${device.ip} — đã thử ${tried.join(', ')} — ${describeNetworkError(lastErr)}`
     );
   }
 
@@ -169,7 +191,7 @@ async function digestPost(device, uri, payload) {
     const auth = buildDigestHeader(wwwAuth, {
       username: device.username, password: device.password, method: 'POST', uri, body,
     });
-    res = await rawPost(device._workingProtocol, device, uri, {
+    res = await rawPost(device._workingBase, device, uri, {
       ...init,
       headers: { ...init.headers, Authorization: auth },
     });
@@ -346,7 +368,7 @@ for (const device of config.devices) {
       log('');
       log(`      Thử mở http://${device.ip} bằng trình duyệt TRÊN CHÍNH MÁY NÀY.`);
       log('      Nếu trình duyệt vào được mà script không vào được, khả năng cao thiết bị');
-      log('      chỉ mở HTTPS: thêm "protocol": "https" vào máy đó trong config.json.');
+      log('      hoặc cổng web bị đổi. Xem mục "Máy báo ECONNREFUSED" trong README.');
     } else {
       log('      Kiểm tra: ISAPI đã bật chưa, tài khoản/mật khẩu trong config.json.');
     }

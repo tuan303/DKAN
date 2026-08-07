@@ -115,6 +115,42 @@ không nhân đôi dữ liệu vì mỗi ngày ghi đè trọn một bản ghi.
 
 ---
 
+## Máy báo ECONNREFUSED hoặc ECONNRESET
+
+Nghĩa là **tới được máy nhưng cổng web không mở**, không phải hỏng mạng.
+
+Điểm dễ hiểu nhầm: **HAC không nói chuyện với thiết bị qua HTTP** mà qua cổng
+SDK riêng của Hikvision (thường là 8000). Nên máy hiện **Trực tuyến** trong HAC
+vẫn có thể đang tắt cổng web — mà ISAPI thì bắt buộc phải có cổng web.
+
+Script tự thử `http:80`, `https:443`, `http:8080`, `https:8443`. Nếu vẫn hỏng:
+
+**1. Mở `http://<IP>` bằng trình duyệt trên chính máy chạy script.**
+
+- Ra trang đăng nhập Hikvision → cổng web đang mở, vấn đề nằm chỗ khác
+- Không ra gì → cổng web đóng hoặc đã đổi số
+
+**2. Xem cổng web thật của máy đó.** Trong HAC, vào phần cấu hình từ xa của
+thiết bị → Mạng → cổng HTTP. So với máy đang chạy được (`CA_TIH` dùng cổng 80)
+xem có khác không.
+
+**3. Khai cổng đúng vào `config.json`:**
+
+```json
+{
+  "name": "CA_TrH",
+  "ip": "10.34.32.35",
+  "port": 8080,
+  "username": "admin",
+  "password": "..."
+}
+```
+
+**4. Nếu cổng web bị tắt hẳn**, bật lại trong cấu hình thiết bị: Mạng → Cơ bản
+→ cho phép HTTP. Bật xong nhớ đổi mật khẩu mạnh nếu chưa làm.
+
+---
+
 ## Lưu ý vận hành
 
 - **Bật NTP trên cả hai máy nhận diện.** Giờ lệch là suất ăn rơi sai khung
