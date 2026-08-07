@@ -291,6 +291,21 @@ export function reconcile({
 
 type CardKey = 'registered' | 'tapped' | 'missing' | 'extra' | 'unrecognized';
 
+const PAGE_SIZES = [50, 100, 500, 1000];
+
+/** Dãy số trang rút gọn: 1 … 45 46 47 … 93 */
+function pageList(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: (number | '…')[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) out.push('…');
+  for (let i = start; i <= end; i++) out.push(i);
+  if (end < total - 1) out.push('…');
+  out.push(total);
+  return out;
+}
+
 export function MealReconciliation({
   registrations,
   cancelations,
@@ -308,6 +323,12 @@ export function MealReconciliation({
   const [rangeFrom, setRangeFrom] = useState('');
   const [rangeTo, setRangeTo] = useState('');
   const [openCard, setOpenCard] = useState<CardKey | null>(null);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [page, setPage] = useState(1);
+
+  // Đổi phạm vi xem hay đổi bảng thì quay về trang 1, nếu không người dùng sẽ
+  // thấy một trang trống vì bảng mới ít dòng hơn.
+  const resetPaging = () => setPage(1);
 
   const handleFile = async (file?: File | null) => {
     if (!file) return;
@@ -323,6 +344,7 @@ export function MealReconciliation({
       setRangeFrom(days[0] || '');
       setRangeTo(fallback);
       setOpenCard(null);
+      resetPaging();
     } catch (err: any) {
       setParsed(null);
       setError(err?.message || 'File không đúng định dạng báo cáo của HAC.');
@@ -431,6 +453,12 @@ export function MealReconciliation({
 
   const openedCard = CARDS.find(c => c.key === openCard);
 
+  // Kẹp số trang lại phòng khi dữ liệu đổi mà trang hiện tại vượt quá số trang.
+  const totalPages = Math.max(1, Math.ceil((openedCard?.rows.length || 0) / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const firstRowIndex = (safePage - 1) * pageSize;
+  const pageRows = openedCard ? openedCard.rows.slice(firstRowIndex, firstRowIndex + pageSize) : [];
+
   return (
     <div className="px-md md:px-0 flex flex-col gap-md lg:gap-lg">
       <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
@@ -497,7 +525,7 @@ export function MealReconciliation({
                   {([['day', 'Theo ngày'], ['range', 'Khoảng ngày'], ['month', 'Cả tháng']] as const).map(([s, label]) => (
                     <button
                       key={s}
-                      onClick={() => setScope(s)}
+                      onClick={() => { setScope(s); resetPaging(); }}
                       className={`px-4 py-2 text-label-md transition-colors ${
                         scope === s ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
                       }`}
@@ -510,7 +538,7 @@ export function MealReconciliation({
                 {scope === 'day' && (
                   <select
                     value={selectedDate}
-                    onChange={e => setSelectedDate(e.target.value)}
+                    onChange={e => { setSelectedDate(e.target.value); resetPaging(); }}
                     className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
                   >
                     {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
@@ -521,7 +549,7 @@ export function MealReconciliation({
                   <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={rangeFrom}
-                      onChange={e => setRangeFrom(e.target.value)}
+                      onChange={e => { setRangeFrom(e.target.value); resetPaging(); }}
                       className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
                     >
                       {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
@@ -529,7 +557,7 @@ export function MealReconciliation({
                     <span className="text-on-surface-variant text-body-sm">đến</span>
                     <select
                       value={rangeTo}
-                      onChange={e => setRangeTo(e.target.value)}
+                      onChange={e => { setRangeTo(e.target.value); resetPaging(); }}
                       className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
                     >
                       {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
@@ -553,7 +581,7 @@ export function MealReconciliation({
                   return (
                     <button
                       key={card.key}
-                      onClick={() => setOpenCard(isOpen ? null : card.key)}
+                      onClick={() => { setOpenCard(isOpen ? null : card.key); resetPaging(); }}
                       aria-expanded={isOpen}
                       title={isOpen ? 'Bấm để thu gọn' : 'Bấm để xem danh sách'}
                       className={`p-md rounded-lg border text-left flex items-center gap-3 transition-all hover:brightness-[0.97] ${card.tone} ${isOpen ? card.active : ''}`}
@@ -613,9 +641,9 @@ export function MealReconciliation({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
-                  {openedCard.rows.slice(0, 300).map((r, i) => (
+                  {pageRows.map((r, i) => (
                     <tr key={`${r.date}-${r.employeeId}-${r.meal}-${i}`} className="hover:bg-surface-container-low">
-                      <td className="p-sm tabular text-on-surface-variant">{i + 1}</td>
+                      <td className="p-sm tabular text-on-surface-variant">{firstRowIndex + i + 1}</td>
                       <td className="p-sm tabular whitespace-nowrap">{formatDayLabel(r.date)}</td>
                       <td className="p-sm tabular">{r.employeeId}</td>
                       <td className="p-sm text-on-surface">
@@ -640,10 +668,62 @@ export function MealReconciliation({
             )}
           </div>
 
-          {openedCard.rows.length > 300 && (
-            <p className="text-body-sm text-on-surface-variant p-sm border-t border-outline-variant">
-              Đang hiển thị 300 dòng đầu trong tổng số {openedCard.rows.length}. Xuất Excel để xem đầy đủ.
-            </p>
+          {openedCard.rows.length > 0 && (
+            <div className="p-sm border-t border-outline-variant flex flex-wrap items-center gap-3">
+              <select
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); resetPaging(); }}
+                aria-label="Số dòng mỗi trang"
+                className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm outline-none cursor-pointer"
+              >
+                {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+
+              <span className="text-body-sm text-on-surface-variant">
+                {firstRowIndex + 1}–{Math.min(firstRowIndex + pageSize, openedCard.rows.length)} trong tổng số {openedCard.rows.length}
+              </span>
+
+              {totalPages > 1 && (
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                    aria-label="Trang trước"
+                    className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  </button>
+
+                  {pageList(safePage, totalPages).map((p, i) =>
+                    p === '…' ? (
+                      <span key={`gap-${i}`} className="w-8 h-8 inline-flex items-center justify-center text-on-surface-variant">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        aria-current={p === safePage ? 'page' : undefined}
+                        className={`min-w-8 h-8 px-2 inline-flex items-center justify-center rounded-lg text-label-md tabular transition-colors ${
+                          p === safePage
+                            ? 'bg-primary text-on-primary'
+                            : 'text-on-surface-variant hover:bg-surface-container'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={safePage === totalPages}
+                    aria-label="Trang sau"
+                    className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
