@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Bí mật của agent đồng bộ chấm ăn: mật khẩu 2 máy nhận diện và khóa Firebase.
+# Tuyệt đối không đưa lên GitHub.
+agent/config.json
+agent/firebase-key.json
+agent/*-firebase-adminsdk-*.json

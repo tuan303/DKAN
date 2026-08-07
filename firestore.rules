@@ -53,6 +53,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Lượt chấm ăn đồng bộ từ máy nhận diện. Đây là dữ liệu cá nhân (ai ăn
+    // bữa nào, lúc mấy giờ) nên chỉ quản trị mới được đọc. Không ai ghi từ
+    // trình duyệt: agent dùng Admin SDK nên đi thẳng, không qua rules.
+    match /checkins/{date} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();

@@ -1,0 +1,19 @@
+{
+  "devices": [
+    {
+      "name": "CA_TrH",
+      "ip": "10.34.32.35",
+      "username": "admin",
+      "password": "DIEN_MAT_KHAU_MAY_1"
+    },
+    {
+      "name": "CA_TIH",
+      "ip": "10.34.32.38",
+      "username": "admin",
+      "password": "DIEN_MAT_KHAU_MAY_2"
+    }
+  ],
+  "daysToSync": 7,
+  "timezoneOffset": "+07:00",
+  "firebaseKeyFile": "firebase-key.json"
+}

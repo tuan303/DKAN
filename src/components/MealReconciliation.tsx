@@ -1,5 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as xlsx from 'xlsx';
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+// Dữ liệu từ máy nhận diện không có cột bộ phận nên không tự lọc được Bếp
+// Vina. Khi đọc file Excel của HAC (có bộ phận), app ghi lại danh sách mã cần
+// loại vào đây để chế độ tự động dùng lại.
+const EXCLUDES_DOC = 'reconcileExcludes';
 
 /**
  * Đối soát đăng ký ăn (DKAN) với dữ liệu chấm ăn xuất từ phần mềm HAC.
@@ -181,6 +188,48 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
   return { month, rowCount, byDate, excludedIds };
 }
 
+/**
+ * Dựng dữ liệu từ collection `checkins` mà agent đồng bộ từ máy nhận diện.
+ *
+ * Agent chỉ lưu giờ chấm thô; việc phân bữa làm ở đây theo đúng khung giờ
+ * trong MEAL_WINDOWS, giống hệt đường đọc file Excel. Nhờ vậy đổi khung giờ là
+ * dữ liệu cũ tự tính lại đúng, không phải đồng bộ lại từ thiết bị.
+ */
+function buildFromCheckins(
+  docs: { date: string; people: Record<string, { name?: string; department?: string; times?: string[] }> }[]
+): Omit<ParsedFile, 'fileName'> & { syncedAt?: string } {
+  const byDate: ParsedFile['byDate'] = {};
+  const everyone = new Set<string>();
+
+  for (const d of docs) {
+    const day: Record<string, TapRecord> = {};
+    for (const [rawId, info] of Object.entries(d.people || {})) {
+      const employeeId = normId(rawId);
+      if (!employeeId) continue;
+      everyone.add(employeeId);
+
+      const rec: TapRecord = {
+        employeeId,
+        name: (info.name || '').trim(),
+        department: (info.department || '').trim(),
+        breakfast: null,
+        lunch: null,
+        unrecognized: [],
+      };
+      for (const t of info.times || []) {
+        const meal = classifyTime(t);
+        // Chấm nhiều lần trong cùng một bữa: giữ lượt sớm nhất.
+        if (meal) rec[meal] = rec[meal] && (rec[meal] as string) < t ? rec[meal] : t;
+        else rec.unrecognized.push(t);
+      }
+      day[employeeId] = rec;
+    }
+    byDate[d.date] = day;
+  }
+
+  return { month: docs[0]?.date.slice(0, 7) || '', rowCount: everyone.size, byDate, excludedIds: [] };
+}
+
 function parseHacWorkbook(file: File): Promise<ParsedFile> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -360,9 +409,63 @@ export function MealReconciliation({
   cancelations: Cancelation[];
   selectedMonth: string;
 }) {
-  const [parsed, setParsed] = useState<ParsedFile | null>(null);
+  const [source, setSource] = useState<'auto' | 'file'>('auto');
+  const [fileData, setFileData] = useState<ParsedFile | null>(null);
+  const [autoData, setAutoData] = useState<ParsedFile | null>(null);
+  const [autoState, setAutoState] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
+  const [savedExcludes, setSavedExcludes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
+
+  const parsed = source === 'auto' ? autoData : fileData;
+  const excludedIds = source === 'auto' ? savedExcludes : (fileData?.excludedIds || []);
+
+  const pickDefaultDates = (data: Omit<ParsedFile, 'fileName'>) => {
+    const days = Object.keys(data.byDate).filter(isWeekday).sort();
+    const today = new Date().toISOString().slice(0, 10);
+    const fallback = days.includes(today) ? today : (days[days.length - 1] || '');
+    setSelectedDate(fallback);
+    setRangeFrom(days[0] || '');
+    setRangeTo(fallback);
+    setOpenCard(null);
+    setPage(1);
+  };
+
+  // Lấy lượt chấm đã được agent đồng bộ từ máy nhận diện.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setAutoState('loading');
+      try {
+        const [snap, excludeSnap] = await Promise.all([
+          getDocs(query(collection(db, 'checkins'), where('month', '==', selectedMonth))),
+          getDoc(doc(db, 'settings', EXCLUDES_DOC)),
+        ]);
+        if (cancelled) return;
+
+        setSavedExcludes(excludeSnap.exists() ? (excludeSnap.data().employeeIds || []) : []);
+
+        if (snap.empty) {
+          setAutoData(null);
+          setAutoState('empty');
+          return;
+        }
+        const docs = snap.docs
+          .map(d => d.data() as { date: string; people: Record<string, any>; syncedAt?: string })
+          .sort((a, b) => a.date.localeCompare(b.date));
+        const latestSync = docs.map(d => d.syncedAt || '').sort().pop() || '';
+        const built = buildFromCheckins(docs);
+        setAutoData({ ...built, fileName: `Đồng bộ tự động · ${latestSync.slice(0, 16).replace('T', ' ')}` });
+        setAutoState('ready');
+        pickDefaultDates(built);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Không đọc được dữ liệu chấm ăn đã đồng bộ:', err);
+        setAutoState('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
   const [scope, setScope] = useState<'day' | 'range' | 'month'>('day');
   const [selectedDate, setSelectedDate] = useState('');
   const [rangeFrom, setRangeFrom] = useState('');
@@ -370,7 +473,7 @@ export function MealReconciliation({
   const [openCard, setOpenCard] = useState<CardKey | null>(null);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
-  const [query, setQuery] = useState('');
+  const [searchText, setSearchText] = useState('');
 
   // Đổi phạm vi xem hay đổi bảng thì quay về trang 1, nếu không người dùng sẽ
   // thấy một trang trống vì bảng mới ít dòng hơn.
@@ -382,17 +485,26 @@ export function MealReconciliation({
     setError(null);
     try {
       const result = await parseHacWorkbook(file);
-      setParsed(result);
-      const days = Object.keys(result.byDate).filter(isWeekday).sort();
-      const today = new Date().toISOString().slice(0, 10);
-      const fallback = days.includes(today) ? today : (days[days.length - 1] || '');
-      setSelectedDate(fallback);
-      setRangeFrom(days[0] || '');
-      setRangeTo(fallback);
-      setOpenCard(null);
-      resetPaging();
+      setFileData(result);
+      setSource('file');
+      pickDefaultDates(result);
+
+      // File Excel là nguồn duy nhất biết ai thuộc bộ phận nào, nên nhân dịp
+      // này ghi lại danh sách cần loại để chế độ tự động dùng được.
+      if (result.excludedIds.length) {
+        try {
+          await setDoc(doc(db, 'settings', EXCLUDES_DOC), {
+            employeeIds: result.excludedIds,
+            departments: EXCLUDED_DEPARTMENTS,
+            updatedAt: new Date().toISOString(),
+          });
+          setSavedExcludes(result.excludedIds);
+        } catch (err) {
+          console.error('Không lưu được danh sách bộ phận loại trừ:', err);
+        }
+      }
     } catch (err: any) {
-      setParsed(null);
+      setFileData(null);
       setError(err?.message || 'File không đúng định dạng báo cáo của HAC.');
     } finally {
       setIsParsing(false);
@@ -423,9 +535,9 @@ export function MealReconciliation({
       dates: activeDates,
       registrations,
       cancelations,
-      excludedIds: parsed?.excludedIds,
+      excludedIds,
     }),
-    [parsed, activeDates, registrations, cancelations]
+    [parsed, activeDates, registrations, cancelations, excludedIds]
   );
 
 
@@ -512,13 +624,13 @@ export function MealReconciliation({
   // lật qua hàng chục trang.
   const visibleRows = useMemo(() => {
     if (!openedCard) return [];
-    const q = query.trim().toLowerCase();
+    const q = searchText.trim().toLowerCase();
     if (!q) return openedCard.rows;
     const qId = normId(q);
     return openedCard.rows.filter(
       r => r.fullName.toLowerCase().includes(q) || (qId !== '' && r.employeeId.includes(qId))
     );
-  }, [openedCard, query]);
+  }, [openedCard, searchText]);
 
   // Kẹp số trang lại phòng khi dữ liệu đổi mà trang hiện tại vượt quá số trang.
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
@@ -539,16 +651,68 @@ export function MealReconciliation({
         </div>
 
         <div className="p-md flex flex-col gap-md">
-          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl p-lg cursor-pointer hover:border-primary hover:bg-primary-container/20 transition-colors text-center">
-            <span className="material-symbols-outlined text-[32px] text-primary">upload_file</span>
-            <span className="text-label-lg text-on-surface">
-              {isParsing ? 'Đang đọc file...' : 'Chọn file Excel xuất từ HAC'}
-            </span>
-            <span className="text-body-sm text-on-surface-variant">
-              Dùng báo cáo <strong>Chấm vào &amp; ra hàng tháng</strong>, không dùng bảng tổng hợp chấm công.
-            </span>
-            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
-          </label>
+          <div className="flex rounded-lg border border-outline-variant overflow-hidden w-fit">
+            {([['auto', 'Tự động từ máy chấm công', 'sync'], ['file', 'Tải file Excel', 'upload_file']] as const).map(([s, label, icon]) => (
+              <button
+                key={s}
+                onClick={() => { setSource(s); setOpenCard(null); resetPaging(); }}
+                className={`px-4 py-2 text-label-md inline-flex items-center gap-2 transition-colors ${
+                  source === s ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {source === 'auto' && autoState === 'loading' && (
+            <div className="p-md rounded-lg bg-surface-container text-on-surface-variant text-body-md flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+              Đang lấy dữ liệu chấm ăn đã đồng bộ...
+            </div>
+          )}
+
+          {source === 'auto' && autoState === 'empty' && (
+            <div className="p-md rounded-lg bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
+              <span className="material-symbols-outlined text-[20px] shrink-0">info</span>
+              <span>
+                Chưa có dữ liệu đồng bộ cho tháng {selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}.
+                Kiểm tra xem chương trình đồng bộ trên máy cài HAC đã chạy chưa — bình thường nó chạy lúc 22h mỗi đêm.
+                Trong lúc chờ, bạn có thể chuyển sang <strong>Tải file Excel</strong> để đối soát ngay.
+              </span>
+            </div>
+          )}
+
+          {source === 'auto' && autoState === 'error' && (
+            <div className="p-md rounded-lg bg-error-container text-on-error-container text-body-md flex items-start gap-2">
+              <span className="material-symbols-outlined text-[20px] shrink-0">error</span>
+              <span>Không đọc được dữ liệu đã đồng bộ. Nếu vừa cập nhật Firestore Rules, hãy tải lại trang.</span>
+            </div>
+          )}
+
+          {source === 'auto' && autoState === 'ready' && savedExcludes.length === 0 && (
+            <div className="p-sm rounded-lg bg-surface-container text-on-surface-variant text-body-sm flex items-start gap-2">
+              <span className="material-symbols-outlined text-[18px] shrink-0">filter_alt_off</span>
+              <span>
+                Dữ liệu từ máy chấm công không có cột bộ phận nên chưa loại được nhân sự bếp.
+                Tải một lần file Excel của HAC ở tab bên cạnh, hệ thống sẽ ghi nhớ danh sách này cho các lần sau.
+              </span>
+            </div>
+          )}
+
+          {source === 'file' && (
+            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl p-lg cursor-pointer hover:border-primary hover:bg-primary-container/20 transition-colors text-center">
+              <span className="material-symbols-outlined text-[32px] text-primary">upload_file</span>
+              <span className="text-label-lg text-on-surface">
+                {isParsing ? 'Đang đọc file...' : 'Chọn file Excel xuất từ HAC'}
+              </span>
+              <span className="text-body-sm text-on-surface-variant">
+                Dùng báo cáo <strong>Chấm vào &amp; ra hàng tháng</strong>, không dùng bảng tổng hợp chấm công.
+              </span>
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
+            </label>
+          )}
 
           {error && (
             <div className="p-sm rounded-lg bg-error-container text-on-error-container text-body-md flex items-start gap-2">
@@ -565,13 +729,13 @@ export function MealReconciliation({
                   {parsed.fileName}
                 </span>
                 <span>Tháng {parsed.month.slice(5)}/{parsed.month.slice(0, 4)} · {parsed.rowCount} người</span>
-                {parsed.excludedIds.length > 0 && (
+                {excludedIds.length > 0 && (
                   <span
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant"
                     title={`Bộ phận không đưa vào đối soát: ${EXCLUDED_DEPARTMENTS.join(', ')}`}
                   >
                     <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-                    Đã loại {parsed.excludedIds.length} người thuộc {EXCLUDED_DEPARTMENTS.join(', ')}
+                    Đã loại {excludedIds.length} người thuộc {EXCLUDED_DEPARTMENTS.join(', ')}
                   </span>
                 )}
               </div>
@@ -580,10 +744,10 @@ export function MealReconciliation({
                 <div className="p-sm rounded-lg bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
                   <span className="material-symbols-outlined text-[20px] shrink-0">warning</span>
                   <span>
-                    File là tháng <strong>{parsed.month.slice(5)}/{parsed.month.slice(0, 4)}</strong> nhưng danh sách đăng ký
+                    Dữ liệu là tháng <strong>{parsed.month.slice(5)}/{parsed.month.slice(0, 4)}</strong> nhưng danh sách đăng ký
                     đang xem là tháng <strong>{selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}</strong>.
                     <strong> Đã tạm dừng đối soát</strong> để không đưa ra con số sai — vui lòng đổi tháng ở tab
-                    ĐK ăn hàng tháng cho khớp với file.
+                    ĐK ăn hàng tháng cho khớp.
                   </span>
                 </div>
               )}
@@ -696,22 +860,22 @@ export function MealReconciliation({
               <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
               <input
                 type="search"
-                value={query}
-                onChange={e => { setQuery(e.target.value); resetPaging(); }}
+                value={searchText}
+                onChange={e => { setSearchText(e.target.value); resetPaging(); }}
                 placeholder="Tìm theo mã NV hoặc họ tên..."
                 className="w-full bg-surface border border-outline-variant rounded-lg pl-10 pr-3 py-2 text-body-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
-            {query.trim() !== '' && (
+            {searchText.trim() !== "" && (
               <p className="text-body-sm text-on-surface-variant mt-2">
-                Tìm thấy {visibleRows.length} dòng khớp &quot;{query.trim()}&quot;.
+                Tìm thấy {visibleRows.length} dòng khớp &quot;{searchText.trim()}&quot;.
               </p>
             )}
           </div>
 
           <div className="overflow-x-auto">
             {visibleRows.length === 0 ? (
-              <p className="text-body-sm text-on-surface-variant italic p-md">{query.trim() ? "Không tìm thấy dòng nào khớp." : "Không có trường hợp nào."}</p>
+              <p className="text-body-sm text-on-surface-variant italic p-md">{searchText.trim() ? "Không tìm thấy dòng nào khớp." : "Không có trường hợp nào."}</p>
             ) : (
               <table className="w-full text-left text-body-sm min-w-[600px]">
                 <thead className="bg-surface-container-low text-on-surface-variant text-label-sm uppercase">

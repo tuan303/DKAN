@@ -1,0 +1,14 @@
+{
+  "name": "dkan-checkin-agent",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Đồng bộ lượt chấm ăn từ máy nhận diện Hikvision về Firestore",
+  "scripts": {
+    "sync": "node sync-checkins.mjs",
+    "test": "node sync-checkins.mjs --dry-run --debug"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
