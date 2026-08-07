@@ -5,26 +5,23 @@ import * as xlsx from 'xlsx';
  * Đối soát đăng ký ăn (DKAN) với dữ liệu chấm ăn xuất từ phần mềm HAC.
  *
  * File HAC là "Báo cáo chấm vào&ra hàng tháng": mỗi người một dòng, mỗi ngày
- * một ô chỉ có ba dạng "07:43-11:49", "Không-11:49", "07:43-Không", hoặc "-"
- * khi không có lượt chấm nào.
+ * một ô dạng "07:43-11:49", "Không-11:49", "07:43-Không", hoặc "-" khi không
+ * có lượt chấm nào.
  *
- * PHÂN BỮA THEO VỊ TRÍ TRONG Ô, KHÔNG THEO GIỜ. Vị trí 1 là bữa sáng, vị trí 2
- * là bữa trưa, ô trống HAC luôn ghi rõ "Không" nên không bao giờ nhập nhằng.
- *
- * Đừng đổi sang phân loại theo khung giờ: đo trên dữ liệu thật tháng 8/2026
- * (679 người, 828 ô) thì lượt chấm bữa sáng kéo từ 05:12 đến 11:46 còn bữa
- * trưa từ 08:20 đến 16:10 — hai dải chồng lên nhau nên không có mốc giờ nào
- * tách được. Bản đầu tiên phân theo khung giờ đã bỏ sót hàng loạt người.
+ * Phân bữa theo GIỜ CHẤM so với hai khung dưới đây, không theo vị trí trong ô:
+ * HAC xếp lượt chấm đầu tiên trong ngày vào vị trí 1 dù người đó chỉ ăn trưa,
+ * nên vị trí không phản ánh đúng bữa. Lượt chấm rơi ngoài cả hai khung thì
+ * không được ghi nhận, nhưng vẫn liệt kê riêng để nhà trường rà soát.
  */
 
 type Meal = 'breakfast' | 'lunch';
 
 const MEAL_LABEL: Record<Meal, string> = { breakfast: 'Bữa sáng', lunch: 'Bữa trưa' };
 
-// Chỉ dùng để gắn cờ rà soát, KHÔNG dùng để phân bữa và không ảnh hưởng số liệu.
-const SANITY = {
-  breakfast: { from: '04:30', to: '10:00' },
-  lunch: { from: '09:00', to: '14:30' },
+// Quy định của nhà trường: chỉ lượt chấm trong khung mới được tính suất ăn.
+const MEAL_WINDOWS: Record<Meal, { from: string; to: string }> = {
+  breakfast: { from: '05:00', to: '08:00' },
+  lunch: { from: '10:00', to: '13:30' },
 };
 
 interface Registration {
@@ -38,7 +35,6 @@ interface Registration {
 
 interface Cancelation {
   employeeId?: string;
-  fullName?: string;
   cancelDate?: string;
   cancelMeal?: string;
 }
@@ -49,6 +45,7 @@ interface TapRecord {
   department: string;
   breakfast: string | null;
   lunch: string | null;
+  unrecognized: string[];
 }
 
 interface ParsedFile {
@@ -59,36 +56,49 @@ interface ParsedFile {
   byDate: Record<string, Record<string, TapRecord>>;
 }
 
+interface Row {
+  employeeId: string;
+  fullName: string;
+  department: string;
+  date: string;
+  meal: Meal | 'none';
+  time?: string;
+  note?: string;
+}
+
 const toMinutes = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 };
 
-const isUnusual = (meal: Meal, hhmm: string) => {
+const classifyTime = (hhmm: string): Meal | null => {
   const t = toMinutes(hhmm);
-  return t < toMinutes(SANITY[meal].from) || t > toMinutes(SANITY[meal].to);
+  for (const meal of ['breakfast', 'lunch'] as Meal[]) {
+    if (t >= toMinutes(MEAL_WINDOWS[meal].from) && t <= toMinutes(MEAL_WINDOWS[meal].to)) return meal;
+  }
+  return null;
 };
+
+const mealLabel = (m: Meal | 'none') => (m === 'none' ? '—' : MEAL_LABEL[m]);
 
 const isWeekday = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`).getDay();
   return d !== 0 && d !== 6;
 };
 
-const formatDayLabel = (iso: string) => {
-  const d = new Date(`${iso}T00:00:00`);
-  const names = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-  return `${names[d.getDay()]}, ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-};
+const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+const formatDayLabel = (iso: string) =>
+  `${DAY_NAMES[new Date(`${iso}T00:00:00`).getDay()]}, ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const formatDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-/** Bóc tách các dòng đã đọc từ sheet. Tách riêng khỏi phần đọc file để chạy
- *  kiểm thử được bằng Node với file Excel thật. */
+/** Bóc tách các dòng đã đọc từ sheet. Tách riêng khỏi phần đọc file để kiểm
+ *  thử được bằng Node với file Excel thật. */
 export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
-  // Năm nằm ở dòng "Khoảng thời gian: 2026-07-01 - 2026-07-31", cột ngày
-  // chỉ ghi MM-DD nên bắt buộc phải lấy năm từ đây, không được đoán.
+  // Năm nằm ở dòng "Khoảng thời gian: 2026-07-01 - 2026-07-31", cột ngày chỉ
+  // ghi MM-DD nên bắt buộc phải lấy năm từ đây, không được đoán.
   const rangeRow = rows.find(r => String(r[0] || '').startsWith('Khoảng thời gian'));
   const yearMatch = String(rangeRow?.[0] || '').match(/(\d{4})-(\d{2})-\d{2}/);
   if (!yearMatch) throw new Error('Không tìm thấy dòng "Khoảng thời gian" để xác định tháng của báo cáo.');
-  const year = yearMatch[1];
   const month = `${yearMatch[1]}-${yearMatch[2]}`;
 
   const headerIdx = rows.findIndex(r => String(r[0] || '').trim() === 'Tên');
@@ -99,11 +109,10 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
   const colDept = header.indexOf('Bộ phận');
   if (colId === -1) throw new Error('Không tìm thấy cột "ID" (mã nhân viên).');
 
-  // Cột ngày có dạng MM-DD
   const dayCols: { idx: number; date: string }[] = [];
   header.forEach((h, idx) => {
     const m = h.match(/^(\d{2})-(\d{2})$/);
-    if (m) dayCols.push({ idx, date: `${year}-${m[1]}-${m[2]}` });
+    if (m) dayCols.push({ idx, date: `${yearMatch[1]}-${m[1]}-${m[2]}` });
   });
   if (!dayCols.length) throw new Error('Không tìm thấy cột ngày nào (dạng MM-DD).');
 
@@ -122,15 +131,17 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
     for (const c of dayCols) {
       const cell = String(row[c.idx] || '').trim();
       if (!cell || cell === '-') continue;
+      const times = cell.match(/\d{1,2}:\d{2}/g);
+      if (!times) continue;
 
-      // Vị trí 1 = bữa sáng, vị trí 2 = bữa trưa. Ô trống HAC ghi "Không".
-      const parts = cell.split('-').map(s => s.trim());
-      const asTime = (s?: string) => (s && /^\d{1,2}:\d{2}$/.test(s) ? s : null);
-      const breakfast = asTime(parts[0]);
-      const lunch = asTime(parts[1]);
-      if (!breakfast && !lunch) continue;
-
-      byDate[c.date][employeeId] = { employeeId, name, department, breakfast, lunch };
+      const rec: TapRecord = { employeeId, name, department, breakfast: null, lunch: null, unrecognized: [] };
+      for (const t of times) {
+        const meal = classifyTime(t);
+        // Chấm nhiều lần trong cùng một bữa: giữ lượt sớm nhất.
+        if (meal) rec[meal] = rec[meal] && (rec[meal] as string) < t ? rec[meal] : t;
+        else rec.unrecognized.push(t);
+      }
+      byDate[c.date][employeeId] = rec;
     }
   }
 
@@ -155,22 +166,9 @@ function parseHacWorkbook(file: File): Promise<ParsedFile> {
   });
 }
 
-interface Row {
-  employeeId: string;
-  fullName: string;
-  department: string;
-  date: string;
-  meal: Meal;
-  time?: string;
-  note?: string;
-}
-
-const mealLabel = (m: Meal) => MEAL_LABEL[m];
-
 /**
  * Đối chiếu đăng ký với lượt chấm. Hàm thuần, tách khỏi giao diện để kiểm thử
- * được bằng Node — đây là chỗ ra con số nên Bộ phận Dinh dưỡng sẽ hành động,
- * không nên để nó nằm lẫn trong component.
+ * được bằng Node — đây là chỗ ra con số nên Bộ phận Dinh dưỡng sẽ hành động.
  */
 export function reconcile({
   byDate,
@@ -183,11 +181,11 @@ export function reconcile({
   registrations: Registration[];
   cancelations: Cancelation[];
 }) {
-  const missing: Row[] = [];   // đăng ký nhưng không chấm
-  const extra: Row[] = [];     // chấm nhưng không đăng ký
-  const unusual: Row[] = [];   // giờ chấm bất thường, chỉ để rà soát
-  let expectedCount = 0;
-  let actualCount = 0;
+  const registered: Row[] = [];    // mọi suất đã đăng ký
+  const tapped: Row[] = [];        // mọi lượt chấm được ghi nhận
+  const missing: Row[] = [];       // đăng ký nhưng không chấm
+  const extra: Row[] = [];         // chấm nhưng không đăng ký
+  const unrecognized: Row[] = [];  // chấm ngoài khung giờ, không được ghi nhận
 
   // Ngày nào bị hủy bữa nào: khóa "mã NV|ngày|bữa"
   const cancelSet = new Set<string>();
@@ -199,9 +197,8 @@ export function reconcile({
 
   const regByEmployee = new Map(registrations.map(r => [r.employeeId, r]));
 
-  // Vì sao người này chấm ăn mà không nằm trong danh sách đáng lẽ ăn?
-  // Phân biệt "người ngoài" với "đã báo hủy nhưng vẫn ăn" — hai chuyện rất
-  // khác nhau khi Bộ phận Dinh dưỡng xử lý.
+  // Vì sao người này chấm ăn mà không nằm trong danh sách đáng lẽ ăn? Phân biệt
+  // "người ngoài" với "đã báo hủy nhưng vẫn ăn" — hai chuyện rất khác nhau.
   const explainExtra = (employeeId: string, date: string, meal: Meal) => {
     const reg = regByEmployee.get(employeeId);
     if (!reg) return 'Không có đăng ký trong tháng';
@@ -227,39 +224,29 @@ export function reconcile({
         if (cancelSet.has(`${r.employeeId}|${date}|${meal}`)) return false;
         return true;
       });
-      expectedCount += expected.length;
 
       const expectedIds = new Set(expected.map(r => r.employeeId));
 
       for (const r of expected) {
-        if (!taps[r.employeeId]?.[meal]) {
-          missing.push({ employeeId: r.employeeId, fullName: r.fullName, department: r.department, date, meal });
-        }
+        const row = { employeeId: r.employeeId, fullName: r.fullName, department: r.department, date, meal };
+        registered.push(row);
+        if (!taps[r.employeeId]?.[meal]) missing.push(row);
       }
 
       for (const [employeeId, rec] of Object.entries(taps)) {
-        if (!rec[meal]) continue;
-        actualCount++;
+        const time = rec[meal];
+        if (!time) continue;
+        const row = { employeeId, fullName: rec.name, department: rec.department, date, meal, time };
+        tapped.push(row);
         if (!expectedIds.has(employeeId)) {
-          extra.push({
-            employeeId,
-            fullName: rec.name,
-            department: rec.department,
-            date,
-            meal,
-            time: rec[meal] as string,
-            note: explainExtra(employeeId, date, meal),
-          });
+          extra.push({ ...row, note: explainExtra(employeeId, date, meal) });
         }
       }
     }
 
     for (const [employeeId, rec] of Object.entries(taps)) {
-      for (const meal of ['breakfast', 'lunch'] as Meal[]) {
-        const t = rec[meal];
-        if (t && isUnusual(meal, t)) {
-          unusual.push({ employeeId, fullName: rec.name, department: rec.department, date, meal, time: t });
-        }
+      for (const t of rec.unrecognized) {
+        unrecognized.push({ employeeId, fullName: rec.name, department: rec.department, date, meal: 'none', time: t });
       }
     }
   }
@@ -268,13 +255,15 @@ export function reconcile({
     a.date === b.date ? a.fullName.localeCompare(b.fullName, 'vi') : a.date.localeCompare(b.date);
 
   return {
+    registered: registered.sort(byDateThenName),
+    tapped: tapped.sort(byDateThenName),
     missing: missing.sort(byDateThenName),
     extra: extra.sort(byDateThenName),
-    unusual: unusual.sort(byDateThenName),
-    expectedCount,
-    actualCount,
+    unrecognized: unrecognized.sort(byDateThenName),
   };
 }
+
+type CardKey = 'registered' | 'tapped' | 'missing' | 'extra' | 'unrecognized';
 
 export function MealReconciliation({
   registrations,
@@ -288,8 +277,11 @@ export function MealReconciliation({
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
-  const [scope, setScope] = useState<'day' | 'month'>('day');
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [scope, setScope] = useState<'day' | 'range' | 'month'>('day');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [openCard, setOpenCard] = useState<CardKey | null>(null);
 
   const handleFile = async (file?: File | null) => {
     if (!file) return;
@@ -298,9 +290,13 @@ export function MealReconciliation({
     try {
       const result = await parseHacWorkbook(file);
       setParsed(result);
-      const dates = Object.keys(result.byDate).filter(isWeekday).sort();
+      const days = Object.keys(result.byDate).filter(isWeekday).sort();
       const today = new Date().toISOString().slice(0, 10);
-      setSelectedDate(dates.includes(today) ? today : (dates[dates.length - 1] || ''));
+      const fallback = days.includes(today) ? today : (days[days.length - 1] || '');
+      setSelectedDate(fallback);
+      setRangeFrom(days[0] || '');
+      setRangeTo(fallback);
+      setOpenCard(null);
     } catch (err: any) {
       setParsed(null);
       setError(err?.message || 'File không đúng định dạng báo cáo của HAC.');
@@ -309,23 +305,65 @@ export function MealReconciliation({
     }
   };
 
-  const dates = useMemo(() => {
-    if (!parsed) return [];
-    return Object.keys(parsed.byDate).filter(isWeekday).sort();
-  }, [parsed]);
+  const dates = useMemo(
+    () => (parsed ? Object.keys(parsed.byDate).filter(isWeekday).sort() : []),
+    [parsed]
+  );
 
   const activeDates = useMemo(() => {
     if (!parsed) return [];
-    return scope === 'month' ? dates : (selectedDate ? [selectedDate] : []);
-  }, [parsed, scope, dates, selectedDate]);
+    if (scope === 'month') return dates;
+    if (scope === 'day') return selectedDate ? [selectedDate] : [];
+    if (!rangeFrom || !rangeTo) return [];
+    const [from, to] = rangeFrom <= rangeTo ? [rangeFrom, rangeTo] : [rangeTo, rangeFrom];
+    return dates.filter(d => d >= from && d <= to);
+  }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo]);
 
   const result = useMemo(
     () => reconcile({ byDate: parsed?.byDate || {}, dates: activeDates, registrations, cancelations }),
     [parsed, activeDates, registrations, cancelations]
   );
 
-
   const monthMismatch = parsed && parsed.month !== selectedMonth;
+
+  const CARDS: {
+    key: CardKey;
+    icon: string;
+    label: string;
+    rows: Row[];
+    tone: string;
+    active: string;
+    withTime: boolean;
+    withNote?: boolean;
+    hint?: string;
+  }[] = [
+    {
+      key: 'registered', icon: 'assignment_turned_in', label: 'Suất đã đăng ký', rows: result.registered,
+      tone: 'bg-primary-container/40 border-primary/20 text-on-primary-container',
+      active: 'ring-2 ring-primary', withTime: false,
+    },
+    {
+      key: 'tapped', icon: 'how_to_reg', label: 'Lượt chấm hợp lệ', rows: result.tapped,
+      tone: 'bg-tertiary-container/50 border-tertiary/25 text-on-tertiary-container',
+      active: 'ring-2 ring-tertiary', withTime: true,
+    },
+    {
+      key: 'missing', icon: 'no_meals', label: 'Đăng ký nhưng không chấm', rows: result.missing,
+      tone: 'bg-warning-container border-warning/30 text-on-warning-container',
+      active: 'ring-2 ring-warning', withTime: false,
+    },
+    {
+      key: 'extra', icon: 'person_alert', label: 'Chấm nhưng không đăng ký', rows: result.extra,
+      tone: 'bg-error-container border-error/25 text-on-error-container',
+      active: 'ring-2 ring-error', withTime: true, withNote: true,
+    },
+    {
+      key: 'unrecognized', icon: 'schedule', label: 'Chấm ngoài giờ, không tính', rows: result.unrecognized,
+      tone: 'bg-surface-container border-outline-variant text-on-surface-variant',
+      active: 'ring-2 ring-outline', withTime: true,
+      hint: `Lượt chấm nằm ngoài hai khung giờ nên không được tính là đã ăn. Kiểm tra xem có phải người đó đến muộn, hay đồng hồ máy chấm bị lệch.`,
+    },
+  ];
 
   const handleExport = () => {
     const sheet = (rows: Row[], withTime: boolean, withNote = false) =>
@@ -333,7 +371,7 @@ export function MealReconciliation({
         rows.map((r, i) => {
           const base: Record<string, string | number> = {
             'STT': i + 1,
-            'Ngày': `${r.date.slice(8, 10)}/${r.date.slice(5, 7)}/${r.date.slice(0, 4)}`,
+            'Ngày': formatDate(r.date),
             'Mã NV': r.employeeId,
             'Họ và tên': r.fullName || '(không có trong file)',
             'Bộ phận': r.department || '',
@@ -348,70 +386,18 @@ export function MealReconciliation({
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, sheet(result.missing, false), 'DK khong cham');
     xlsx.utils.book_append_sheet(wb, sheet(result.extra, true, true), 'Cham khong DK');
-    xlsx.utils.book_append_sheet(wb, sheet(result.unusual, true), 'Gio cham bat thuong');
-    const suffix = scope === 'month' ? selectedMonth : selectedDate;
+    xlsx.utils.book_append_sheet(wb, sheet(result.unrecognized, true), 'Cham ngoai gio');
+    xlsx.utils.book_append_sheet(wb, sheet(result.registered, false), 'Suat da dang ky');
+    xlsx.utils.book_append_sheet(wb, sheet(result.tapped, true), 'Luot cham hop le');
+
+    const suffix =
+      scope === 'month' ? selectedMonth
+        : scope === 'day' ? selectedDate
+          : `${rangeFrom}_den_${rangeTo}`;
     xlsx.writeFile(wb, `Doi_soat_cham_an_${suffix}.xlsx`);
   };
 
-  const Table = ({ rows, withTime, empty, withNote = false }: { rows: Row[]; withTime: boolean; empty: string; withNote?: boolean }) => (
-    <div className="overflow-x-auto">
-      {rows.length === 0 ? (
-        <p className="text-body-sm text-on-surface-variant italic p-md">{empty}</p>
-      ) : (
-        <table className="w-full text-left text-body-sm min-w-[560px]">
-          <thead className="bg-surface-container-low text-on-surface-variant text-label-sm uppercase">
-            <tr>
-              <th className="p-sm w-12">STT</th>
-              <th className="p-sm">Ngày</th>
-              <th className="p-sm">Mã NV</th>
-              <th className="p-sm">Họ và tên</th>
-              <th className="p-sm">Bộ phận</th>
-              <th className="p-sm">Bữa</th>
-              {withTime && <th className="p-sm">Giờ chấm</th>}
-              {withNote && <th className="p-sm">Lý do</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant">
-            {rows.slice(0, 300).map((r, i) => (
-              <tr key={`${r.date}-${r.employeeId}-${r.meal}-${i}`} className="hover:bg-surface-container-low">
-                <td className="p-sm tabular text-on-surface-variant">{i + 1}</td>
-                <td className="p-sm tabular whitespace-nowrap">{formatDayLabel(r.date)}</td>
-                <td className="p-sm tabular">{r.employeeId}</td>
-                <td className="p-sm text-on-surface">{r.fullName || <span className="italic text-on-surface-variant">(không có trong file)</span>}</td>
-                <td className="p-sm text-on-surface-variant">{r.department}</td>
-                <td className="p-sm">{mealLabel(r.meal)}</td>
-                {withTime && <td className="p-sm tabular">{r.time}</td>}
-                {withNote && (
-                  <td className="p-sm">
-                    {r.note ? (
-                      <span className="inline-block px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-label-sm whitespace-nowrap">
-                        {r.note}
-                      </span>
-                    ) : ''}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {rows.length > 300 && (
-        <p className="text-body-sm text-on-surface-variant p-sm">
-          Đang hiển thị 300 dòng đầu trong tổng số {rows.length}. Xuất Excel để xem đầy đủ.
-        </p>
-      )}
-    </div>
-  );
-
-  const Card = ({ icon, label, value, tone }: { icon: string; label: string; value: number; tone: string }) => (
-    <div className={`p-md rounded-lg border flex items-center gap-3 ${tone}`}>
-      <span className="material-symbols-outlined text-[26px] shrink-0">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-[28px] font-extrabold leading-none tabular">{value}</p>
-        <p className="text-body-sm mt-1">{label}</p>
-      </div>
-    </div>
-  );
+  const openedCard = CARDS.find(c => c.key === openCard);
 
   return (
     <div className="px-md md:px-0 flex flex-col gap-md lg:gap-lg">
@@ -420,8 +406,8 @@ export function MealReconciliation({
           <h2 className="text-headline-sm text-on-surface uppercase">Đối soát chấm ăn</h2>
           <p className="text-on-surface-variant text-[13px] mt-1">
             So sánh đăng ký trên hệ thống với dữ liệu chấm ăn xuất từ phần mềm HAC.
-            Trong mỗi ô, giờ đứng trước là bữa sáng, giờ đứng sau là bữa trưa, ô ghi
-            &quot;Không&quot; là không chấm bữa đó.
+            Chỉ ghi nhận lượt chấm bữa sáng trong khoảng {MEAL_WINDOWS.breakfast.from}–{MEAL_WINDOWS.breakfast.to} và
+            bữa trưa trong khoảng {MEAL_WINDOWS.lunch.from}–{MEAL_WINDOWS.lunch.to}.
           </p>
         </div>
 
@@ -434,12 +420,7 @@ export function MealReconciliation({
             <span className="text-body-sm text-on-surface-variant">
               Dùng báo cáo <strong>Chấm vào &amp; ra hàng tháng</strong>, không dùng bảng tổng hợp chấm công.
             </span>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={e => handleFile(e.target.files?.[0])}
-            />
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
           </label>
 
           {error && (
@@ -472,7 +453,7 @@ export function MealReconciliation({
 
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex rounded-lg border border-outline-variant overflow-hidden">
-                  {(['day', 'month'] as const).map(s => (
+                  {([['day', 'Theo ngày'], ['range', 'Khoảng ngày'], ['month', 'Cả tháng']] as const).map(([s, label]) => (
                     <button
                       key={s}
                       onClick={() => setScope(s)}
@@ -480,7 +461,7 @@ export function MealReconciliation({
                         scope === s ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
                       }`}
                     >
-                      {s === 'day' ? 'Theo ngày' : 'Cả tháng'}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -491,10 +472,29 @@ export function MealReconciliation({
                     onChange={e => setSelectedDate(e.target.value)}
                     className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
                   >
-                    {dates.map(d => (
-                      <option key={d} value={d}>{formatDayLabel(d)}</option>
-                    ))}
+                    {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
                   </select>
+                )}
+
+                {scope === 'range' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={rangeFrom}
+                      onChange={e => setRangeFrom(e.target.value)}
+                      className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
+                    >
+                      {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
+                    </select>
+                    <span className="text-on-surface-variant text-body-sm">đến</span>
+                    <select
+                      value={rangeTo}
+                      onChange={e => setRangeTo(e.target.value)}
+                      className="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-bold outline-none cursor-pointer"
+                    >
+                      {dates.map(d => <option key={d} value={d}>{formatDayLabel(d)}</option>)}
+                    </select>
+                    <span className="text-body-sm text-on-surface-variant">({activeDates.length} ngày làm việc)</span>
+                  </div>
                 )}
 
                 <button
@@ -506,50 +506,105 @@ export function MealReconciliation({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-md">
-                <Card icon="assignment_turned_in" label="Suất đã đăng ký" value={result.expectedCount} tone="bg-primary-container/40 border-primary/20 text-on-primary-container" />
-                <Card icon="how_to_reg" label="Lượt chấm hợp lệ" value={result.actualCount} tone="bg-tertiary-container/50 border-tertiary/25 text-on-tertiary-container" />
-                <Card icon="no_meals" label="Đăng ký nhưng không chấm" value={result.missing.length} tone="bg-warning-container border-warning/30 text-on-warning-container" />
-                <Card icon="person_alert" label="Chấm nhưng không đăng ký" value={result.extra.length} tone="bg-error-container border-error/25 text-on-error-container" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-md">
+                {CARDS.map(card => {
+                  const isOpen = openCard === card.key;
+                  return (
+                    <button
+                      key={card.key}
+                      onClick={() => setOpenCard(isOpen ? null : card.key)}
+                      aria-expanded={isOpen}
+                      title={isOpen ? 'Bấm để thu gọn' : 'Bấm để xem danh sách'}
+                      className={`p-md rounded-lg border text-left flex items-center gap-3 transition-all hover:brightness-[0.97] ${card.tone} ${isOpen ? card.active : ''}`}
+                    >
+                      <span className="material-symbols-outlined text-[26px] shrink-0">{card.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[28px] font-extrabold leading-none tabular">{card.rows.length}</p>
+                        <p className="text-body-sm mt-1">{card.label}</p>
+                      </div>
+                      <span className={`material-symbols-outlined text-[20px] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                        expand_more
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
         </div>
       </div>
 
-      {parsed && (
-        <>
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
-            <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
-              <span className="material-symbols-outlined text-on-warning-container">no_meals</span>
-              <h3 className="text-headline-sm text-on-surface uppercase">Đăng ký nhưng không chấm ăn ({result.missing.length})</h3>
-            </div>
-            <Table rows={result.missing} withTime={false} empty="Không có trường hợp nào — mọi suất đã đăng ký đều được chấm." />
+      {parsed && openedCard && (
+        <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
+          <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
+            <span className="material-symbols-outlined text-on-surface-variant">{openedCard.icon}</span>
+            <h3 className="text-headline-sm text-on-surface uppercase flex-1">
+              {openedCard.label} ({openedCard.rows.length})
+            </h3>
+            <button
+              onClick={() => setOpenCard(null)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-label-md text-on-surface-variant hover:bg-surface-container transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+              Thu gọn
+            </button>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
-            <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
-              <span className="material-symbols-outlined text-error">person_alert</span>
-              <h3 className="text-headline-sm text-on-surface uppercase">Chấm ăn nhưng không đăng ký ({result.extra.length})</h3>
-            </div>
-            <Table rows={result.extra} withTime withNote empty="Không có trường hợp nào." />
+          {openedCard.hint && (
+            <p className="px-md pt-md text-body-sm text-on-surface-variant">{openedCard.hint}</p>
+          )}
+
+          <div className="overflow-x-auto">
+            {openedCard.rows.length === 0 ? (
+              <p className="text-body-sm text-on-surface-variant italic p-md">Không có trường hợp nào.</p>
+            ) : (
+              <table className="w-full text-left text-body-sm min-w-[600px]">
+                <thead className="bg-surface-container-low text-on-surface-variant text-label-sm uppercase">
+                  <tr>
+                    <th className="p-sm w-12">STT</th>
+                    <th className="p-sm">Ngày</th>
+                    <th className="p-sm">Mã NV</th>
+                    <th className="p-sm">Họ và tên</th>
+                    <th className="p-sm">Bộ phận</th>
+                    <th className="p-sm">Bữa</th>
+                    {openedCard.withTime && <th className="p-sm">Giờ chấm</th>}
+                    {openedCard.withNote && <th className="p-sm">Lý do</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {openedCard.rows.slice(0, 300).map((r, i) => (
+                    <tr key={`${r.date}-${r.employeeId}-${r.meal}-${i}`} className="hover:bg-surface-container-low">
+                      <td className="p-sm tabular text-on-surface-variant">{i + 1}</td>
+                      <td className="p-sm tabular whitespace-nowrap">{formatDayLabel(r.date)}</td>
+                      <td className="p-sm tabular">{r.employeeId}</td>
+                      <td className="p-sm text-on-surface">
+                        {r.fullName || <span className="italic text-on-surface-variant">(không có trong file)</span>}
+                      </td>
+                      <td className="p-sm text-on-surface-variant">{r.department}</td>
+                      <td className="p-sm whitespace-nowrap">{mealLabel(r.meal)}</td>
+                      {openedCard.withTime && <td className="p-sm tabular">{r.time}</td>}
+                      {openedCard.withNote && (
+                        <td className="p-sm">
+                          {r.note && (
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-label-sm whitespace-nowrap">
+                              {r.note}
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
-            <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
-              <span className="material-symbols-outlined text-on-surface-variant">schedule</span>
-              <h3 className="text-headline-sm text-on-surface uppercase">Giờ chấm bất thường ({result.unusual.length})</h3>
-            </div>
-            <div className="px-md pt-md">
-              <p className="text-body-sm text-on-surface-variant">
-                Lượt chấm nằm ngoài khoảng thường gặp (sáng {SANITY.breakfast.from}–{SANITY.breakfast.to},
-                trưa {SANITY.lunch.from}–{SANITY.lunch.to}). Danh sách này chỉ để rà soát,
-                <strong> không ảnh hưởng tới các con số ở trên</strong> — các lượt này vẫn được tính là đã chấm.
-              </p>
-            </div>
-            <Table rows={result.unusual} withTime empty="Không có lượt chấm nào bất thường." />
-          </div>
-        </>
+          {openedCard.rows.length > 300 && (
+            <p className="text-body-sm text-on-surface-variant p-sm border-t border-outline-variant">
+              Đang hiển thị 300 dòng đầu trong tổng số {openedCard.rows.length}. Xuất Excel để xem đầy đủ.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
