@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ.
-const AGENT_VERSION = '2026-08-07.2';
+const AGENT_VERSION = '2026-08-07.3';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -41,6 +41,16 @@ const DEBUG = hasFlag('--debug');
 
 const log = (...a) => console.log(...a);
 const fail = msg => { console.error('\n  LỖI: ' + msg + '\n'); process.exit(1); };
+
+// Khi thử HTTPS với thiết bị LAN (chứng chỉ tự ký), Node in một cảnh báo dài
+// chen ngang giữa dòng làm rối màn hình. Đây là việc cố ý và chỉ áp dụng cho
+// thiết bị trong mạng nội bộ, nên ẩn riêng cảnh báo đó, giữ lại các cảnh báo
+// khác.
+process.removeAllListeners('warning');
+process.on('warning', w => {
+  if (/NODE_TLS_REJECT_UNAUTHORIZED/.test(w.message)) return;
+  console.warn(`${w.name}: ${w.message}`);
+});
 
 // ---------------------------------------------------------------- cấu hình
 
@@ -58,9 +68,6 @@ const DAYS = Number(flagValue('--days', config.daysToSync || 7));
 if (!Number.isFinite(DAYS) || DAYS < 1) fail('Số ngày đồng bộ không hợp lệ.');
 if (!Array.isArray(config.devices) || !config.devices.length) fail('config.json chưa khai máy chấm công nào.');
 
-if (config.devices.some(d => (d.protocol || 'http') === 'https')) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
 
 // ---------------------------------------------------- xác thực digest (ISAPI)
 
@@ -105,17 +112,55 @@ function describeNetworkError(err) {
   return detail ? `${detail} (không rõ mã lỗi)` : 'lỗi kết nối không rõ nguyên nhân';
 }
 
+/**
+ * Gọi một lần theo giao thức chỉ định. Trả về Response hoặc ném lỗi mạng.
+ * Thiết bị trong LAN dùng chứng chỉ tự ký nên khi thử HTTPS phải tạm bỏ kiểm
+ * tra chứng chỉ — chỉ bật trong lúc nói chuyện với thiết bị, tắt lại trước khi
+ * kết nối Firebase để không làm yếu đường truyền ra Internet.
+ */
+async function rawPost(protocol, device, uri, init) {
+  if (protocol === 'https') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  try {
+    return await fetch(`${protocol}://${device.ip}${uri}`, init);
+  } finally {
+    if (protocol === 'https') delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  }
+}
+
 async function digestPost(device, uri, payload) {
-  const protocol = device.protocol || 'http';
-  const url = `${protocol}://${device.ip}${uri}`;
   const body = JSON.stringify(payload);
   const init = { method: 'POST', body, headers: { 'Content-Type': 'application/json' } };
 
+  // Thứ tự thử: giao thức đã biết chạy được > khai trong config > http rồi https.
+  const candidates = device._workingProtocol
+    ? [device._workingProtocol]
+    : device.protocol ? [device.protocol] : ['http', 'https'];
+
   let res;
-  try {
-    res = await fetch(url, init);
-  } catch (err) {
-    throw new Error(`Không kết nối được ${url} — ${describeNetworkError(err)}`);
+  let lastErr;
+  for (const protocol of candidates) {
+    try {
+      res = await rawPost(protocol, device, uri, init);
+      device._workingProtocol = protocol;
+      break;
+    } catch (err) {
+      lastErr = err;
+      // ECONNRESET hay gặp khi thiết bị đang bận: thử lại một lần trước khi bỏ.
+      if (err?.cause?.code === 'ECONNRESET') {
+        try {
+          res = await rawPost(protocol, device, uri, init);
+          device._workingProtocol = protocol;
+          break;
+        } catch (retryErr) { lastErr = retryErr; }
+      }
+    }
+  }
+
+  if (!res) {
+    const tried = candidates.join(' và ');
+    throw new Error(
+      `Không kết nối được ${device.ip} qua ${tried} — ${describeNetworkError(lastErr)}`
+    );
   }
 
   if (res.status === 401) {
@@ -124,7 +169,10 @@ async function digestPost(device, uri, payload) {
     const auth = buildDigestHeader(wwwAuth, {
       username: device.username, password: device.password, method: 'POST', uri, body,
     });
-    res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: auth } });
+    res = await rawPost(device._workingProtocol, device, uri, {
+      ...init,
+      headers: { ...init.headers, Authorization: auth },
+    });
   }
 
   if (res.status === 401) throw new Error('Sai tài khoản hoặc mật khẩu thiết bị.');
