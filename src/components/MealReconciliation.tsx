@@ -24,6 +24,16 @@ const MEAL_WINDOWS: Record<Meal, { from: string; to: string }> = {
   lunch: { from: '10:00', to: '13:30' },
 };
 
+// Bộ phận không đưa vào đối soát: nhân sự bếp quẹt thẻ để chấm công chứ không
+// phải để nhận suất ăn, tính vào sẽ làm phình danh sách "chấm không đăng ký".
+const EXCLUDED_DEPARTMENTS = ['NSHM>Bếp Vina'];
+
+// So theo đoạn cuối sau dấu '>' nên vẫn khớp nếu HAC đổi tiền tố hoặc thêm
+// khoảng trắng, ví dụ "Bếp Vina" hay "NSHM > Bếp Vina".
+const deptLeaf = (d: string) => (d.split('>').pop() || d).replace(/\s+/g, ' ').trim().toLowerCase();
+const EXCLUDED_LEAVES = new Set(EXCLUDED_DEPARTMENTS.map(deptLeaf));
+const isExcludedDept = (d: string) => EXCLUDED_LEAVES.has(deptLeaf(d));
+
 interface Registration {
   employeeId: string;
   fullName: string;
@@ -54,6 +64,8 @@ interface ParsedFile {
   rowCount: number;
   // date (YYYY-MM-DD) -> mã NV -> lượt chấm
   byDate: Record<string, Record<string, TapRecord>>;
+  // Mã NV thuộc bộ phận bị loại, dùng để loại luôn ở phía đăng ký
+  excludedIds: string[];
 }
 
 interface Row {
@@ -120,12 +132,17 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
   dayCols.forEach(c => { byDate[c.date] = {}; });
 
   let rowCount = 0;
+  const excludedIds: string[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     const employeeId = String(row[colId] || '').trim();
     if (!employeeId) continue;
     const name = String(row[0] || '').trim();
     const department = colDept >= 0 ? String(row[colDept] || '').trim() : '';
+    if (isExcludedDept(department)) {
+      excludedIds.push(employeeId);
+      continue;
+    }
     rowCount++;
 
     for (const c of dayCols) {
@@ -145,7 +162,7 @@ export function parseHacRows(rows: string[][]): Omit<ParsedFile, 'fileName'> {
     }
   }
 
-  return { month, rowCount, byDate };
+  return { month, rowCount, byDate, excludedIds };
 }
 
 function parseHacWorkbook(file: File): Promise<ParsedFile> {
@@ -173,14 +190,23 @@ function parseHacWorkbook(file: File): Promise<ParsedFile> {
 export function reconcile({
   byDate,
   dates,
-  registrations,
+  registrations: allRegistrations,
   cancelations,
+  excludedIds = [],
 }: {
   byDate: ParsedFile['byDate'];
   dates: string[];
   registrations: Registration[];
   cancelations: Cancelation[];
+  excludedIds?: string[];
 }) {
+  // Loại cả ở phía đăng ký: nếu một người bên bếp có đăng ký trên hệ thống thì
+  // cũng không được rơi vào danh sách "đăng ký nhưng không chấm".
+  const excluded = new Set(excludedIds);
+  const registrations = excluded.size
+    ? allRegistrations.filter(r => !excluded.has(r.employeeId))
+    : allRegistrations;
+
   const registered: Row[] = [];    // mọi suất đã đăng ký
   const tapped: Row[] = [];        // mọi lượt chấm được ghi nhận
   const missing: Row[] = [];       // đăng ký nhưng không chấm
@@ -320,7 +346,13 @@ export function MealReconciliation({
   }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo]);
 
   const result = useMemo(
-    () => reconcile({ byDate: parsed?.byDate || {}, dates: activeDates, registrations, cancelations }),
+    () => reconcile({
+      byDate: parsed?.byDate || {},
+      dates: activeDates,
+      registrations,
+      cancelations,
+      excludedIds: parsed?.excludedIds,
+    }),
     [parsed, activeDates, registrations, cancelations]
   );
 
@@ -438,6 +470,15 @@ export function MealReconciliation({
                   {parsed.fileName}
                 </span>
                 <span>Tháng {parsed.month.slice(5)}/{parsed.month.slice(0, 4)} · {parsed.rowCount} người</span>
+                {parsed.excludedIds.length > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant"
+                    title={`Bộ phận không đưa vào đối soát: ${EXCLUDED_DEPARTMENTS.join(', ')}`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                    Đã loại {parsed.excludedIds.length} người thuộc {EXCLUDED_DEPARTMENTS.join(', ')}
+                  </span>
+                )}
               </div>
 
               {monthMismatch && (
