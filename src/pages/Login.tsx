@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, microsoftProvider } from '../lib/firebase';
+import { recordLoginLog } from '../lib/loginLog';
 import { Footer } from '../components/Footer';
 
 export default function Login() {
@@ -17,11 +18,15 @@ export default function Login() {
       
       const email = result.user.email;
       if (email && !email.endsWith('@hoangmaistarschool.edu.vn')) {
+        // Ghi log trước khi signOut: sau khi đăng xuất là mất token, Firestore
+        // từ chối ghi và lần đăng nhập sai tên miền này sẽ không để lại vết.
+        await recordLoginLog(result.user, 'rejected', 'Email ngoài tên miền của trường');
         await auth.signOut();
         setError("Vui lòng sử dụng tài khoản email của trường (@hoangmaistarschool.edu.vn).");
         return;
       }
 
+      await recordLoginLog(result.user, 'success');
       navigate('/register');
     } catch (err: any) {
       console.error(err);

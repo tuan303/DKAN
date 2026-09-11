@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import type { LoginLogEntry } from '../lib/loginLog';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -102,7 +103,12 @@ interface EventData {
 const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
-type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'admins';
+type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'logs' | 'admins';
+
+// Trần số dòng nhật ký tải về một lần. ~600 CBGV-NV, mỗi người đăng nhập vài
+// lần/ngày, nên 1000 dòng phủ được quãng một tuần. Chạm trần thì giao diện báo
+// để người xem biết phải thu hẹp khoảng ngày, chứ không âm thầm cắt bớt.
+const LOGIN_LOG_LIMIT = 1000;
 
 const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
   { key: 'monthly', label: 'ĐK ăn hàng tháng', icon: 'calendar_month' },
@@ -112,8 +118,14 @@ const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
   { key: 'events', label: 'ĐK ăn sự kiện', icon: 'celebration' },
   { key: 'blocked', label: 'Vi phạm', icon: 'gavel' },
   { key: 'settings', label: 'Cấu hình', icon: 'settings' },
+  { key: 'logs', label: 'Nhật ký đăng nhập', icon: 'history' },
   { key: 'admins', label: 'Quản trị', icon: 'admin_panel_settings' },
 ];
+
+// Ngày dạng YYYY-MM-DD theo giờ máy. Không dùng toISOString() vì hàm đó đổi
+// sang UTC — quá 07:00 giờ Việt Nam là nhảy sang ngày hôm sau.
+const toDateInput = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -153,6 +165,21 @@ export default function Admin() {
   // Blocked users
   const [blockedEmails, setBlockedEmails] = useState<string[]>([]);
   const [blockedEmailsInput, setBlockedEmailsInput] = useState('');
+
+  // Nhật ký đăng nhập. Mặc định mở ra là 7 ngày gần nhất — đủ để thấy bất
+  // thường mà không kéo về cả tháng dữ liệu.
+  const [loginLogs, setLoginLogs] = useState<LoginLogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logsReloadKey, setLogsReloadKey] = useState(0);
+  const [logFrom, setLogFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return toDateInput(d);
+  });
+  const [logTo, setLogTo] = useState(() => toDateInput(new Date()));
+  const [logSearch, setLogSearch] = useState('');
+  const [logStatusFilter, setLogStatusFilter] = useState<'all' | 'success' | 'rejected'>('all');
 
   // Tabs from URL
   const activeTab = (searchParams.get('tab') || 'monthly') as AdminTabKey;
@@ -544,6 +571,99 @@ export default function Admin() {
     return `${hh}:${mm}:${ss} Ngày ${d}/${m}/${y}`;
   };
 
+  // Nhật ký đăng nhập: chỉ tải khi thực sự mở tab, và chỉ trong khoảng ngày
+  // đang chọn. Collection này lớn nhanh nhất hệ thống nên không nghe realtime,
+  // cũng không tải sẵn cùng các tab khác.
+  useEffect(() => {
+    if (!isAdmin || activeTab !== 'logs') return;
+    if (!logFrom || !logTo) return;
+
+    const fromDate = new Date(`${logFrom}T00:00:00`);
+    const toDate = new Date(`${logTo}T23:59:59.999`);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return;
+    if (fromDate > toDate) {
+      setLoginLogs([]);
+      setLogsError('Ngày bắt đầu đang sau ngày kết thúc.');
+      return;
+    }
+
+    let cancelled = false;
+    const fetchLogs = async () => {
+      setLogsLoading(true);
+      setLogsError(null);
+      try {
+        // `at` lưu theo ISO (UTC) nên mốc lọc phải quy đổi từ nửa đêm giờ Việt
+        // Nam sang UTC, nếu không sẽ hụt/dư mất 7 tiếng ở hai đầu khoảng.
+        const q = query(
+          collection(db, 'login_logs'),
+          where('at', '>=', fromDate.toISOString()),
+          where('at', '<=', toDate.toISOString()),
+          orderBy('at', 'desc'),
+          limit(LOGIN_LOG_LIMIT)
+        );
+        const snapshot = await getDocs(q);
+        if (cancelled) return;
+        setLoginLogs(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as LoginLogEntry) })));
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error('Error fetching login logs:', err);
+        setLoginLogs([]);
+        setLogsError('Không tải được nhật ký: ' + (err?.message || 'lỗi không rõ'));
+      } finally {
+        if (!cancelled) setLogsLoading(false);
+      }
+    };
+
+    fetchLogs();
+    return () => { cancelled = true; };
+  }, [isAdmin, activeTab, logFrom, logTo, logsReloadKey]);
+
+  // Lọc phía trình duyệt: dữ liệu đã giới hạn theo khoảng ngày nên gõ tới đâu
+  // lọc tới đó, không phải gọi lại Firestore.
+  const filteredLoginLogs = useMemo(() => {
+    const keyword = logSearch.trim().toLowerCase();
+    return loginLogs.filter(log => {
+      if (logStatusFilter !== 'all' && log.status !== logStatusFilter) return false;
+      if (!keyword) return true;
+      return [log.fullName, log.displayName, log.email, log.employeeId, log.department]
+        .some(field => (field || '').toLowerCase().includes(keyword));
+    });
+  }, [loginLogs, logSearch, logStatusFilter]);
+
+  const loginLogStats = useMemo(() => {
+    const todayStr = toDateInput(new Date());
+    let today = 0;
+    let rejected = 0;
+    const people = new Set<string>();
+    filteredLoginLogs.forEach(log => {
+      people.add(log.email || log.uid);
+      if (log.status === 'rejected') rejected++;
+      const at = log.at ? new Date(log.at) : null;
+      if (at && !isNaN(at.getTime()) && toDateInput(at) === todayStr) today++;
+    });
+    return { total: filteredLoginLogs.length, people: people.size, rejected, today };
+  }, [filteredLoginLogs]);
+
+  const handleExportLoginLogsExcel = () => {
+    const exportData = sortedLoginLogs.map((log: any, index: number) => ({
+      'STT': index + 1,
+      'Thời gian': formatTimestamp(log.at),
+      'Họ tên': log.fullName || log.displayName || '',
+      'Email': log.email || '',
+      'Mã NV': log.employeeId || '',
+      'Phòng ban': log.department || '',
+      'Kết quả': log.status === 'rejected' ? 'Bị từ chối' : 'Thành công',
+      'Lý do': log.reason || '',
+      'Thiết bị': [log.device, log.os].filter(Boolean).join(' · '),
+      'Trình duyệt': log.browser || '',
+    }));
+
+    const worksheet = xlsx.utils.json_to_sheet(exportData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Nhat_Ky_Dang_Nhap');
+    xlsx.writeFile(workbook, `Nhat_Ky_Dang_Nhap_${logFrom}_den_${logTo}.xlsx`);
+  };
+
   const handleExportExcel = () => {
     const exportData = registrationsWithCancelations.map((reg, index) => ({
       'STT': index + 1,
@@ -773,6 +893,7 @@ export default function Admin() {
   const { items: sortedDailyRegistrations, requestSort: requestSortDaily, sortConfig: sortConfigDaily } = useSortableData(dailyRegistrations);
   const { items: sortedCancelations, requestSort: requestSortCancelations, sortConfig: sortConfigCancelations } = useSortableData(filteredCancelations);
   const { items: sortedEventRegistrations, requestSort: requestSortEvent, sortConfig: sortConfigEvent } = useSortableData(eventRegistrations);
+  const { items: sortedLoginLogs, requestSort: requestSortLogs, sortConfig: sortConfigLogs } = useSortableData(filteredLoginLogs);
 
   if (!isAdmin || loading) {
     return (
@@ -1823,6 +1944,196 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
+          </div>
+        )}
+
+        {activeTab === 'logs' && (
+          <div className="flex flex-col gap-md lg:gap-lg px-md md:px-0">
+            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+
+              <div className="p-lg md:p-xl border-b border-outline-variant flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                <div className="flex flex-col gap-2">
+                  <h2 className="font-headline-sm text-[18px] text-primary uppercase font-black tracking-wide m-0">Nhật Ký Đăng Nhập</h2>
+                  <p className="font-body-md text-on-surface-variant text-[13px]">
+                    Mỗi lần đăng nhập bằng tài khoản Microsoft đều được ghi lại, kể cả lần bị từ chối vì sai tên miền.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-label-sm text-on-surface-variant font-medium">Từ ngày:</span>
+                      <input
+                        type="date"
+                        value={logFrom}
+                        max={logTo}
+                        onChange={(e) => setLogFrom(e.target.value)}
+                        className="bg-surface border border-primary/20 hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-label-sm text-on-surface-variant font-medium">Đến ngày:</span>
+                      <input
+                        type="date"
+                        value={logTo}
+                        min={logFrom}
+                        onChange={(e) => setLogTo(e.target.value)}
+                        className="bg-surface border border-primary/20 hover:border-primary/40 transition-colors rounded-lg px-3 py-1.5 text-sm outline-none font-bold text-primary cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <button
+                    onClick={() => setLogsReloadKey(k => k + 1)}
+                    disabled={logsLoading}
+                    className="flex items-center gap-2 bg-surface-container border border-outline-variant hover:bg-surface-container-high disabled:opacity-50 text-on-surface px-4 py-2.5 rounded-xl font-label-md transition-all justify-center"
+                  >
+                    <span className={`material-symbols-outlined text-[20px] ${logsLoading ? 'animate-spin' : ''}`}>
+                      {logsLoading ? 'progress_activity' : 'refresh'}
+                    </span>
+                    <span>Tải lại</span>
+                  </button>
+                  <button
+                    onClick={handleExportLoginLogsExcel}
+                    disabled={sortedLoginLogs.length === 0}
+                    className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all justify-center transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    <span className="font-bold tracking-wide">Xuất Excel</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-lg grid grid-cols-2 lg:grid-cols-4 gap-md border-b border-outline-variant">
+                {[
+                  { label: 'Tổng lượt đăng nhập', value: loginLogStats.total, icon: 'login', tone: 'text-primary' },
+                  { label: 'Số người', value: loginLogStats.people, icon: 'group', tone: 'text-primary' },
+                  { label: 'Hôm nay', value: loginLogStats.today, icon: 'today', tone: 'text-tertiary' },
+                  { label: 'Bị từ chối', value: loginLogStats.rejected, icon: 'block', tone: loginLogStats.rejected > 0 ? 'text-error' : 'text-on-surface-variant' },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-surface-bright rounded-xl border border-outline-variant p-md flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-on-surface-variant uppercase tracking-wide text-[11px]">{stat.label}</span>
+                      <span className={`material-symbols-outlined text-[18px] ${stat.tone}`}>{stat.icon}</span>
+                    </div>
+                    <span className={`text-headline-sm font-black ${stat.tone}`}>{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-2 gap-lg border-b border-outline-variant">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-label-sm text-primary font-bold">Tìm theo tên, email, mã NV hoặc phòng ban</label>
+                  <input
+                    type="text"
+                    value={logSearch}
+                    onChange={(e) => setLogSearch(e.target.value)}
+                    placeholder="Nhập từ khóa..."
+                    className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-label-sm text-primary font-bold">Kết quả</label>
+                  <select
+                    value={logStatusFilter}
+                    onChange={(e) => setLogStatusFilter(e.target.value as any)}
+                    className="bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-lg px-4 py-2 text-[14px] shadow-sm outline-none cursor-pointer"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="success">Thành công</option>
+                    <option value="rejected">Bị từ chối</option>
+                  </select>
+                </div>
+              </div>
+
+              {logsError && (
+                <div className="mx-lg mt-lg p-sm rounded-lg bg-error-container text-on-error-container border border-error/25 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[20px] shrink-0">error</span>
+                  <span className="text-body-md text-[13px]">{logsError}</span>
+                </div>
+              )}
+
+              {loginLogs.length >= LOGIN_LOG_LIMIT && (
+                <div className="mx-lg mt-lg p-sm rounded-lg bg-secondary-container text-on-secondary-container border border-secondary/25 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[20px] shrink-0">info</span>
+                  <span className="text-body-md text-[13px]">
+                    Khoảng ngày này có nhiều hơn {LOGIN_LOG_LIMIT} lượt đăng nhập. Bảng chỉ hiện {LOGIN_LOG_LIMIT} lượt gần nhất — thu hẹp khoảng ngày để xem đầy đủ.
+                  </span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
+                    <tr>
+                      <th className="p-md text-center">STT</th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortLogs('at')}>
+                        <div className="flex items-center gap-1">Thời gian <SortIcon sortConfig={sortConfigLogs} columnKey="at" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortLogs('fullName')}>
+                        <div className="flex items-center gap-1">Họ tên <SortIcon sortConfig={sortConfigLogs} columnKey="fullName" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortLogs('email')}>
+                        <div className="flex items-center gap-1">Email <SortIcon sortConfig={sortConfigLogs} columnKey="email" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortLogs('employeeId')}>
+                        <div className="flex items-center gap-1">Mã NV <SortIcon sortConfig={sortConfigLogs} columnKey="employeeId" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none" onClick={() => requestSortLogs('department')}>
+                        <div className="flex items-center gap-1">Phòng ban <SortIcon sortConfig={sortConfigLogs} columnKey="department" /></div>
+                      </th>
+                      <th className="p-md cursor-pointer hover:bg-surface-container select-none text-center" onClick={() => requestSortLogs('status')}>
+                        <div className="flex items-center justify-center gap-1">Kết quả <SortIcon sortConfig={sortConfigLogs} columnKey="status" /></div>
+                      </th>
+                      <th className="p-md">Thiết bị</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant text-[14px]">
+                    {logsLoading ? (
+                      <tr>
+                        <td colSpan={8} className="p-xl text-center text-on-surface-variant">
+                          <span className="material-symbols-outlined animate-spin text-[28px] text-primary align-middle">progress_activity</span>
+                          <span className="ml-2 align-middle italic">Đang tải nhật ký...</span>
+                        </td>
+                      </tr>
+                    ) : sortedLoginLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-xl text-center text-on-surface-variant italic">
+                          Không có lượt đăng nhập nào trong khoảng ngày và điều kiện lọc đã chọn.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedLoginLogs.map((log: any, index: number) => (
+                        <tr key={log.id || index} className="hover:bg-surface-container-lowest transition-colors">
+                          <td className="p-md text-center">{index + 1}</td>
+                          <td className="p-md text-on-surface-variant whitespace-nowrap">{formatTimestamp(log.at)}</td>
+                          <td className="p-md font-medium text-on-surface">{log.fullName || log.displayName || <span className="italic text-on-surface-variant font-normal">Chưa khai báo</span>}</td>
+                          <td className="p-md text-on-surface-variant">{log.email || 'N/A'}</td>
+                          <td className="p-md">{log.employeeId || 'N/A'}</td>
+                          <td className="p-md">{log.department || 'N/A'}</td>
+                          <td className="p-md text-center">
+                            {log.status === 'rejected' ? (
+                              <span
+                                title={log.reason || 'Bị từ chối'}
+                                className="font-label-sm px-2 py-0.5 rounded bg-error-container text-on-error-container whitespace-nowrap"
+                              >
+                                Bị từ chối
+                              </span>
+                            ) : (
+                              <span className="font-label-sm px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary-container whitespace-nowrap">
+                                Thành công
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-md text-on-surface-variant whitespace-nowrap" title={log.userAgent || ''}>
+                            {[log.device, log.os, log.browser].filter(Boolean).join(' · ') || 'N/A'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

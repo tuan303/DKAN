@@ -61,6 +61,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Nhật ký đăng nhập. Người dùng chỉ được TỰ ghi dòng của chính mình và
+    // không sửa/xóa được — nhật ký mà đương sự sửa được thì không còn giá trị
+    // đối chứng. Chỉ quản trị được đọc vì đây là dữ liệu cá nhân (ai đăng nhập
+    // lúc nào, bằng thiết bị gì). Cho quản trị xóa để dọn log cũ.
+    match /login_logs/{logId} {
+      allow read, delete: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status in ['success', 'rejected'];
+      allow update: if false;
+    }
+
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
