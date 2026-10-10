@@ -16,5 +16,14 @@
   ],
   "daysToSync": 7,
   "timezoneOffset": "+07:00",
-  "firebaseKeyFile": "firebase-key.json"
+  "firebaseKeyFile": "firebase-key.json",
+  "alerts": {
+    "enabled": false,
+    "endpoint": "https://dkan.nshm.vn/api/meal-alerts",
+    "secret": "DIEN_KHOA_GIONG_HET_MEAL_ALERT_SECRET_TREN_VERCEL",
+    "adminEmails": ["dinhduong@hoangmaistarschool.edu.vn", "tuantm@hoangmaistarschool.edu.vn"],
+    "notBefore": "13:40",
+    "minExpected": 20,
+    "maxMissingRatio": 0.4
+  }
 }

@@ -1,12 +1,33 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, microsoftProvider } from '../lib/firebase';
 import { recordLoginLog } from '../lib/loginLog';
 import { Footer } from '../components/Footer';
 
+/**
+ * Lọc tham số `?next=` (trang cần quay lại sau đăng nhập, vd link "Xem lịch sử
+ * chấm ăn" trong email cảnh báo). Trả null nếu không an toàn.
+ *
+ * Chỉ nhận đường dẫn nội bộ: nếu nhận bừa, ai đó gửi link
+ * /login?next=//trang-gia-mao.com là đăng nhập xong người dùng bị đẩy sang
+ * trang lừa đảo trông như vẫn ở trong hệ thống của trường.
+ *   - phải bắt đầu bằng một dấu '/';
+ *   - '//x' và '/\x' trình duyệt đều hiểu là sang tên miền x, nên chặn;
+ *   - chặn mọi khoảng trắng / ký tự điều khiển / dấu '\': trình duyệt bỏ tab,
+ *     xuống dòng trước khi phân tích, nên '/\t/x' sẽ thành '//x'.
+ */
+export function safeNextPath(raw: string | null | undefined): string | null {
+  if (!raw || raw.length > 300) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null;
+  if (/[\s\\\u0000-\u001f\u007f]/.test(raw)) return null;
+  return raw;
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const next = safeNextPath(searchParams.get('next'));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +48,8 @@ export default function Login() {
       }
 
       await recordLoginLog(result.user, 'success');
-      navigate('/register');
+      // Vẫn đi qua trang khai báo thông tin như cũ, chỉ mang theo trang đích.
+      navigate(next ? `/register?next=${encodeURIComponent(next)}` : '/register');
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/unauthorized-domain') {

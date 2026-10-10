@@ -15,3 +15,8 @@ agent/*-firebase-adminsdk-*.json
 
 # Cấu hình riêng của Claude Code trên máy từng người, không phải của dự án.
 .claude/
+
+# File sinh ra khi agent chạy trên máy HAC: log và khoá "đang chạy".
+agent/dong-bo.log
+agent/dong-bo.old.log
+agent/dong-bo.lock

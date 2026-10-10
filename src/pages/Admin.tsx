@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot, orderBy, limit, runTransaction } from 'firebase/firestore';
 import type { LoginLogEntry } from '../lib/loginLog';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
+// Dùng chung quy tắc ngày với agent và trang Chấm ăn của tôi: "cuối tuần" và
+// "hôm nay" phải hiểu giống hệt nhau ở mọi nơi.
+import { formatDate, formatDayLabel, isWeekday, vnToday } from '../../agent/lib/meal-rules.mjs';
 
 function useSortableData(items: any[], initialConfig = null) {
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(initialConfig);
@@ -127,6 +130,40 @@ const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
 const toDateInput = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Một lần thêm khoảng ngày tối đa ~3 tháng (đủ cho nghỉ hè). Lỡ tay chọn nhầm
+// năm thì chặn lại, nếu không cả năm học sẽ thành ngày nghỉ và không ai còn
+// nhận cảnh báo chấm ăn.
+const MAX_OFF_DAY_SPAN = 92;
+
+/** Danh sách ngày nghỉ đúng như hợp đồng dữ liệu: YYYY-MM-DD, không trùng, sắp xếp. */
+const cleanOffDays = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? Array.from(new Set(v.filter((d): d is string => typeof d === 'string' && ISO_DATE.test(d)))).sort()
+    : [];
+
+/** Mọi ngày từ `from` tới `to` (gồm hai đầu). Tính trên mốc UTC để không lệch theo múi giờ máy. */
+const listDates = (from: string, to: string): string[] => {
+  const out: string[] = [];
+  const end = Date.parse(`${to}T00:00:00Z`);
+  for (let t = Date.parse(`${from}T00:00:00Z`); t <= end && out.length <= MAX_OFF_DAY_SPAN; t += 86_400_000) {
+    const d = new Date(t);
+    // Đệm năm đủ 4 chữ số: năm < 1000 mà không đệm thì ra "26-10-09", sai định
+    // dạng nên bị cleanOffDays lặng lẽ bỏ khi lưu.
+    out.push(`${String(d.getUTCFullYear()).padStart(4, '0')}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`);
+  }
+  return out;
+};
+
+// Năm hợp lệ cho ngày nghỉ. Ô chọn ngày cho gõ tay năm, gõ dở "26" là thành
+// năm 0026 — chặn ở đây, đừng để lưu một ngày không ai dùng tới. Trên 2 năm
+// tới là đủ cho lịch nghỉ khai trước; xa hơn gần như chắc chắn là gõ nhầm.
+const MIN_OFF_DAY_YEAR = 2020;
+const MAX_OFF_DAY_YEARS_AHEAD = 2;
+
+const sameDates = (a: string[], b: string[]) => a.length === b.length && a.every((d, i) => d === b[i]);
+
 export default function Admin() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -194,6 +231,32 @@ export default function Admin() {
   const [newEventName, setNewEventName] = useState('');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingEventName, setEditingEventName] = useState('');
+
+  // Ngày nghỉ không tính suất ăn (settings/mealOffDays). Agent đọc danh sách này
+  // để không gửi email cảnh báo vào ngày lễ; tab Đối soát và trang Chấm ăn của
+  // tôi cũng bỏ qua các ngày này.
+  const [mealOffDays, setMealOffDays] = useState<string[]>([]);
+  const [offDayFrom, setOffDayFrom] = useState('');
+  const [offDayTo, setOffDayTo] = useState('');
+  const [offDayHint, setOffDayHint] = useState<string | null>(null);
+  const [isSavingOffDays, setIsSavingOffDays] = useState(false);
+  // Xóa ngày nghỉ phải bấm hai lần như xóa sự kiện: lỡ tay xóa một ngày sắp
+  // tới là ngày đó lại thành ngày có suất ăn và agent có thể gửi cảnh báo oan.
+  const [offDayToDelete, setOffDayToDelete] = useState<string | null>(null);
+
+  // Theo dõi trực tiếp danh sách ngày nghỉ khi đang ở tab Cấu hình: trang quản
+  // trị hay để mở cả buổi, danh sách đọc một lần lúc vào trang sẽ cũ đi khi
+  // quản trị khác thêm/xóa — Thầy/Cô nhìn thấy một ngày "đã được giữ" trong khi
+  // trên máy chủ nó đã bị xóa. Một doc nhỏ, chỉ nghe khi đang mở tab này.
+  useEffect(() => {
+    if (!isAdmin || activeTab !== 'settings') return;
+    const unsubscribe = onSnapshot(
+      doc(db, 'settings', 'mealOffDays'),
+      (snap) => setMealOffDays(cleanOffDays(snap.exists() ? snap.data().dates : [])),
+      (err) => console.error('Không theo dõi được danh sách ngày nghỉ:', err)
+    );
+    return () => unsubscribe();
+  }, [isAdmin, activeTab]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -424,6 +487,9 @@ export default function Admin() {
       if (cancelConfig) {
         setCancelExtendUntil(cancelConfig.data().extendUntil || '');
       }
+
+      const offDaysConfig = monthlyDoc.docs.find(d => d.id === 'mealOffDays');
+      setMealOffDays(cleanOffDays(offDaysConfig?.data().dates));
 
       // Fetch Events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
@@ -819,6 +885,129 @@ export default function Admin() {
       showToast(`Không lưu được cấu hình hủy ăn. ${describeFirebaseError(err)}`, 'error');
     } finally {
       setIsSavingCancelExtend(false);
+    }
+  };
+
+  // Ghi danh sách ngày nghỉ trong một transaction: đọc bản đang có trên máy
+  // chủ rồi áp thay đổi. Trang quản trị thường để mở cả buổi; đọc rồi ghi rời
+  // nhau thì hai quản trị lưu cùng lúc sẽ ghi đè mất ngày của nhau — và hôm đó
+  // cả trường nhận email cảnh báo oan. Transaction tự thử lại khi có người ghi
+  // chen giữa, nên `update` phải là hàm thuần.
+  //
+  // Trả về bản trước/sau TRÊN MÁY CHỦ để nơi gọi báo đúng điều đã thực sự xảy
+  // ra (đã thêm mấy ngày, ngày đó đã có sẵn chưa), không dựa vào danh sách
+  // trong máy có thể đã cũ.
+  const persistMealOffDays = async (update: (current: string[]) => string[]) => {
+    setIsSavingOffDays(true);
+    try {
+      const ref = doc(db, 'settings', 'mealOffDays');
+      const result = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const before = cleanOffDays(snap.exists() ? snap.data().dates : []);
+        const after = cleanOffDays(update(before));
+        // Không đổi gì thì không ghi, để updatedAt/updatedBy vẫn chỉ người sửa thật.
+        if (!sameDates(before, after)) {
+          tx.set(ref, {
+            dates: after,
+            updatedAt: new Date().toISOString(),
+            updatedBy: auth.currentUser?.email || '',
+          });
+        }
+        return { before, after };
+      });
+      setMealOffDays(result.after);
+      return result;
+    } finally {
+      setIsSavingOffDays(false);
+    }
+  };
+
+  const handleAddOffDays = async () => {
+    setOffDayHint(null);
+    const from = offDayFrom;
+    const to = offDayTo || offDayFrom;
+    if (!from) {
+      setOffDayHint('Thầy/Cô chọn ngày nghỉ trước khi bấm Thêm.');
+      return;
+    }
+    if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) {
+      setOffDayHint('Ngày chưa hợp lệ, Thầy/Cô chọn lại giúp.');
+      return;
+    }
+    const maxYear = Number(vnToday().slice(0, 4)) + MAX_OFF_DAY_YEARS_AHEAD;
+    const yearOk = (d: string) => {
+      const y = Number(d.slice(0, 4));
+      return y >= MIN_OFF_DAY_YEAR && y <= maxYear;
+    };
+    if (!yearOk(from) || !yearOk(to)) {
+      setOffDayHint(`Năm phải nằm trong khoảng ${MIN_OFF_DAY_YEAR}–${maxYear}. Thầy/Cô kiểm tra lại năm của ngày đã chọn giúp.`);
+      return;
+    }
+    if (to < from) {
+      setOffDayHint('"Đến ngày" phải trùng hoặc sau "Từ ngày".');
+      return;
+    }
+    const span = listDates(from, to);
+    if (span.length > MAX_OFF_DAY_SPAN) {
+      setOffDayHint(`Mỗi lần chỉ thêm được tối đa ${MAX_OFF_DAY_SPAN} ngày. Thầy/Cô kiểm tra lại năm của "Đến ngày", hoặc thêm làm nhiều lần.`);
+      return;
+    }
+
+    // Thứ 7, Chủ nhật vốn đã không tính suất ăn: không lưu để danh sách chỉ
+    // gồm những ngày thật sự cần khai.
+    const weekdays = span.filter(isWeekday);
+    if (!weekdays.length) {
+      setOffDayHint(
+        span.length === 1
+          ? `${formatDayLabel(from)}/${from.slice(0, 4)} là ngày cuối tuần — vốn đã không tính suất ăn, không cần thêm.`
+          : 'Khoảng ngày đã chọn chỉ gồm Thứ 7 và Chủ nhật — vốn đã không tính suất ăn, không cần thêm.'
+      );
+      return;
+    }
+    try {
+      // "Đã có sẵn" và "đã thêm" tính trên bản trên máy chủ ngay lúc ghi, không
+      // dựa vào danh sách trong máy: quản trị khác có thể vừa xóa đúng ngày
+      // này, chặn theo bản cũ thì Thầy/Cô tưởng ngày đã được giữ mà thật ra không.
+      const { before, after } = await persistMealOffDays(current => [...current, ...weekdays]);
+      const added = after.filter(d => !before.includes(d));
+      if (!added.length) {
+        setOffDayHint(
+          weekdays.length === 1
+            ? `Ngày ${formatDate(weekdays[0])} đã có trong danh sách.`
+            : 'Các ngày thứ 2–6 trong khoảng này đều đã có trong danh sách.'
+        );
+        return;
+      }
+      setOffDayFrom('');
+      setOffDayTo('');
+      const notes: string[] = [];
+      if (weekdays.length < span.length) notes.push(`bỏ qua ${span.length - weekdays.length} ngày cuối tuần`);
+      if (added.length < weekdays.length) notes.push(`${weekdays.length - added.length} ngày đã có sẵn`);
+      showToast(
+        added.length === 1
+          ? `Đã thêm ngày nghỉ ${formatDate(added[0])}.${notes.length ? ` (${notes.join(', ')})` : ''}`
+          : `Đã thêm ${added.length} ngày nghỉ.${notes.length ? ` (${notes.join(', ')})` : ''}`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Lỗi khi lưu ngày nghỉ:', err);
+      showToast(`Không lưu được ngày nghỉ. ${describeFirebaseError(err)}`, 'error');
+    }
+  };
+
+  const handleRemoveOffDay = async (date: string) => {
+    setOffDayToDelete(null);
+    try {
+      const { before } = await persistMealOffDays(current => current.filter(d => d !== date));
+      showToast(
+        before.includes(date)
+          ? `Đã xóa ngày nghỉ ${formatDate(date)} — ngày này sẽ lại được tính suất ăn.`
+          : `Ngày ${formatDate(date)} đã không còn trong danh sách (có thể quản trị khác vừa xóa).`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Lỗi khi xóa ngày nghỉ:', err);
+      showToast(`Không xóa được ngày nghỉ. ${describeFirebaseError(err)}`, 'error');
     }
   };
 
@@ -1715,8 +1904,11 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Cancel Config Section */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col md:col-span-2 lg:col-span-1">
+            {/* Cancel Config Section — không đặt md:col-span-2: ở md lưới chỉ có
+                1 cột, span 2 sinh ra một cột ngầm rộng "auto". Thẻ nào lọt vào cột
+                ngầm đó (như thẻ Ngày nghỉ bên dưới) sẽ chiếm hết bề ngang và bóp
+                các thẻ còn lại về 0px trên iPad dọc. */}
+            <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
               <div className="p-md border-b border-outline-variant bg-surface-container-low">
                 <h2 className="text-headline-sm text-on-surface uppercase">Cấu hình ĐK HỦY ĂN</h2>
                 <p className="font-body-md text-on-surface-variant text-[13px] mt-1">Gia hạn thời gian khóa hủy ăn (Mặc định tự động khóa lúc 16:00 ngày hôm trước).</p>
@@ -1869,6 +2061,144 @@ export default function Admin() {
                 </div>
               </div>
             </div>
+
+            {/* Ngày nghỉ không tính suất ăn */}
+            {(() => {
+              const today = vnToday();
+              const upcoming = mealOffDays.filter(d => d >= today);
+              // Ngày đã qua xếp mới nhất lên đầu: thứ hay cần xem lại là đợt nghỉ vừa rồi.
+              const past = mealOffDays.filter(d => d < today).reverse();
+              // Hàng được phép xuống dòng: trên điện thoại hẹp, nhãn ngày + "Hôm nay"
+              // + "Xác nhận xóa"/"Hủy" không vừa một hàng. Nhãn ngày không co và không
+              // ngắt (whitespace-nowrap, không min-w-0) nên khi thiếu chỗ thì cụm nút
+              // rơi xuống hàng dưới (ml-auto giữ nó bên phải), thay vì đè lên ngày —
+              // quản trị phải đọc được trọn ngày mình sắp xác nhận xóa.
+              const offDayRow = (d: string, isPast: boolean) => (
+                <li
+                  key={d}
+                  className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 px-sm py-2 rounded-lg border ${
+                    isPast
+                      ? 'bg-surface border-outline-variant text-on-surface-variant'
+                      : 'bg-primary-container/40 border-primary/25 text-on-surface'
+                  }`}
+                >
+                  <span className={`material-symbols-outlined text-[18px] shrink-0 ${isPast ? '' : 'text-primary'}`}>event_busy</span>
+                  <span className={`flex-1 whitespace-nowrap tabular ${isPast ? '' : 'font-bold'}`}>
+                    {formatDayLabel(d)}/{d.slice(0, 4)}
+                  </span>
+                  {d === today && (
+                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-secondary text-on-secondary text-[11px] font-bold uppercase">Hôm nay</span>
+                  )}
+                  {offDayToDelete === d ? (
+                    <span className="ml-auto flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleRemoveOffDay(d)}
+                        disabled={isSavingOffDays}
+                        title={`${formatDate(d)} sẽ lại được tính suất ăn${isPast ? '' : ' và có thể gửi email cảnh báo chưa chấm ăn'}`}
+                        className="px-2 py-1 rounded-md text-[12px] bg-error text-on-error hover:bg-error/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Xác nhận xóa
+                      </button>
+                      <button
+                        onClick={() => setOffDayToDelete(null)}
+                        className="px-2 py-1 rounded-md text-[12px] bg-surface-variant text-on-surface-variant hover:bg-surface-variant/80 transition-colors"
+                      >
+                        Hủy
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setOffDayToDelete(d)}
+                      disabled={isSavingOffDays}
+                      title={`Xóa ${formatDate(d)} khỏi danh sách ngày nghỉ`}
+                      className="ml-auto shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-error hover:bg-error-container disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      Xóa
+                    </button>
+                  )}
+                </li>
+              );
+
+              return (
+                <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
+                  <div className="p-md border-b border-outline-variant bg-surface-container-low">
+                    <h2 className="text-headline-sm text-on-surface uppercase">Ngày nghỉ không tính suất ăn</h2>
+                    <p className="font-body-md text-on-surface-variant text-[13px] mt-1">
+                      Ngày lễ, Tết, ngày nghỉ học... rơi vào thứ 2–6. Vào những ngày này không ai phải chấm ăn: hệ thống
+                      không gửi email cảnh báo chưa chấm ăn, tab Đối soát và trang Chấm ăn của tôi cũng bỏ qua ngày đó.
+                      Thứ 7, Chủ nhật vốn đã không tính suất ăn nên không cần thêm.
+                    </p>
+                  </div>
+                  <div className="p-md flex flex-col gap-sm">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                      <label className="flex-1 min-w-0 flex flex-col gap-1">
+                        <span className="text-[12px] text-on-surface-variant">Ngày nghỉ (hoặc từ ngày)</span>
+                        <input
+                          type="date"
+                          value={offDayFrom}
+                          onChange={(e) => { setOffDayFrom(e.target.value); setOffDayHint(null); }}
+                          className="w-full min-w-0 bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                        />
+                      </label>
+                      <label className="flex-1 min-w-0 flex flex-col gap-1">
+                        <span className="text-[12px] text-on-surface-variant">Đến ngày (nếu nghỉ nhiều ngày)</span>
+                        <input
+                          type="date"
+                          value={offDayTo}
+                          min={offDayFrom || undefined}
+                          onChange={(e) => { setOffDayTo(e.target.value); setOffDayHint(null); }}
+                          className="w-full min-w-0 bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                        />
+                      </label>
+                      <button
+                        onClick={handleAddOffDays}
+                        disabled={isSavingOffDays || !offDayFrom}
+                        className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md hover:bg-primary/90 active:bg-primary/80 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <span className={`material-symbols-outlined text-[18px] ${isSavingOffDays ? 'animate-spin' : ''}`}>
+                          {isSavingOffDays ? 'progress_activity' : 'add'}
+                        </span>
+                        {isSavingOffDays ? 'Đang lưu...' : 'Thêm'}
+                      </button>
+                    </div>
+                    {offDayHint && (
+                      <p className="text-[12px] px-sm py-1.5 rounded-md bg-warning-container text-on-warning-container flex items-start gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] shrink-0">info</span>
+                        {offDayHint}
+                      </p>
+                    )}
+
+                    {mealOffDays.length === 0 ? (
+                      <p className="text-on-surface-variant text-center italic text-[14px] py-4">Chưa có ngày nghỉ nào.</p>
+                    ) : (
+                      <div className="flex flex-col gap-sm">
+                        <div>
+                          <p className="text-label-md text-on-surface mb-1.5">Sắp tới ({upcoming.length})</p>
+                          {upcoming.length === 0 ? (
+                            <p className="text-on-surface-variant italic text-[13px]">Không có ngày nghỉ nào sắp tới.</p>
+                          ) : (
+                            <ul className="flex flex-col gap-1.5 max-h-[320px] overflow-y-auto">
+                              {upcoming.map(d => offDayRow(d, false))}
+                            </ul>
+                          )}
+                        </div>
+                        {past.length > 0 && (
+                          <details className="group">
+                            <summary className="cursor-pointer text-label-md text-on-surface-variant select-none">
+                              Đã qua ({past.length})
+                            </summary>
+                            <ul className="flex flex-col gap-1.5 mt-1.5 max-h-[240px] overflow-y-auto">
+                              {past.map(d => offDayRow(d, true))}
+                            </ul>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

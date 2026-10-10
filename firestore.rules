@@ -61,6 +61,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Lượt chấm của TỪNG NGƯỜI, agent tách ra từ checkins/{date} để CBNV tự xem
+    // "hôm nay mình đã chấm ăn chưa" mà không phải mở checkins (chứa giờ ăn của
+    // cả trường). Mỗi người chỉ đọc được document mang uid của chính mình. Lượt
+    // chấm nào vào document của ai là do agent quyết định theo mã NV trên ĐƠN
+    // ĐĂNG KÝ tháng đó — không theo staff/{uid} vì hồ sơ đó chính chủ sửa được
+    // bất cứ lúc nào; mã đứng trên đơn của hai tài khoản thì không gán cho ai.
+    match /meal_taps/{uid}/months/{month} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Nhật ký email cảnh báo "đăng ký mà không chấm" agent đã gửi, dùng để không
+    // gửi trùng khi agent chạy lại nhiều lần trong giờ. Dữ liệu cá nhân nên chỉ
+    // quản trị đọc; chỉ agent (Admin SDK) ghi.
+    match /meal_alerts/{alertId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Nhật ký đăng nhập. Người dùng chỉ được TỰ ghi dòng của chính mình và
     // không sửa/xóa được — nhật ký mà đương sự sửa được thì không còn giá trị
     // đối chứng. Chỉ quản trị được đọc vì đây là dữ liệu cá nhân (ai đăng nhập
@@ -78,8 +97,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Đơn đăng ký ăn chỉ được tạo cho CHÍNH MÌNH: userId là tài khoản đang đăng
+    // nhập và mã document đúng dạng {uid}_{tháng} như trang đăng ký vẫn ghi.
+    // Trước đây ai đăng nhập cũng tạo được đơn mang tài khoản người khác; từ khi
+    // có email cảnh báo "đăng ký mà không chấm", một đơn giả như vậy sẽ khiến
+    // đồng nghiệp bị gửi cảnh báo oan mỗi ngày. Đọc giữ nguyên như cũ.
     match /registrations/{registrationId} {
-      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update: if isSignedIn() && (isAdmin() || (
+        (resource == null || resource.data.userId == request.auth.uid) &&
+        request.resource.data.userId == request.auth.uid &&
+        registrationId == request.auth.uid + '_' + request.resource.data.month
+      ));
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /cancel_registrations/{cancelId} {

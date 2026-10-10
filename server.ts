@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import cors from "cors";
+import mealAlertsHandler from "./api/meal-alerts";
 
 // Load .env variables
 dotenv.config();
@@ -109,6 +110,10 @@ async function startServer() {
     }
   });
 
+
+  // Email cảnh báo chấm ăn: gọi thẳng handler của Vercel (api/meal-alerts.ts)
+  // để bản chạy thử trên máy và bản thật không bao giờ lệch nhau.
+  app.post("/api/meal-alerts", (req, res) => mealAlertsHandler(req, res));
 
   app.post("/api/gas", async (req, res) => {
     try {

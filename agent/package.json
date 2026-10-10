@@ -1,12 +1,13 @@
 {
   "name": "dkan-checkin-agent",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Đồng bộ lượt chấm ăn từ máy nhận diện Hikvision về Firestore",
+  "description": "Đồng bộ lượt chấm ăn từ máy nhận diện Hikvision về Firestore, gửi cảnh báo đăng ký mà không chấm ăn",
   "scripts": {
     "sync": "node sync-checkins.mjs",
-    "test": "node sync-checkins.mjs --dry-run --debug"
+    "dry-run": "node sync-checkins.mjs --dry-run --debug",
+    "test": "node --test"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0"

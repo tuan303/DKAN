@@ -10,6 +10,7 @@ import ScheduleMonth from './pages/ScheduleMonth';
 import ScheduleEvent from './pages/ScheduleEvent';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
+import MyMeals from './pages/MyMeals';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/events" element={<ScheduleEvent />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/quantri" element={<Admin />} />
+        <Route path="/cham-an" element={<MyMeals />} />
       </Routes>
     </BrowserRouter>
   );

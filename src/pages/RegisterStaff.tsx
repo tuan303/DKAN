@@ -1,9 +1,10 @@
 import { Header } from '../components/Header';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Footer } from '../components/Footer';
+import { safeNextPath } from './Login';
 
 // Mã nhân viên của trường: 6 chữ số, bắt đầu bằng 10. Đối chiếu với hệ thống
 // chấm công tháng 8/2026 thì toàn bộ 622 CBGV-NV đều theo đúng dạng này.
@@ -13,6 +14,11 @@ const EMPLOYEE_ID_PATTERN = /^10\d{4}$/;
 
 export default function RegisterStaff() {
   const navigate = useNavigate();
+  // Trang đích sau khi khai báo (vd /cham-an từ link trong email). Lọc lại ở
+  // đây chứ không tin Login đã lọc: ai cũng gõ thẳng /register?next=... được.
+  const [searchParams] = useSearchParams();
+  const next = safeNextPath(searchParams.get('next'));
+  const loginPath = next ? `/login?next=${encodeURIComponent(next)}` : '/login';
   const [fullName, setFullName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [department, setDepartment] = useState('');
@@ -24,13 +30,30 @@ export default function RegisterStaff() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
-        navigate('/login');
-      } else if (user.displayName) {
-        setFullName(user.displayName);
+        navigate(loginPath);
+        return;
       }
+      if (user.displayName) setFullName(user.displayName);
+      // Điền sẵn mã NV và phòng ban đã khai lần trước. Bắt gõ lại mã ở mỗi lần
+      // đăng nhập là cơ hội gõ nhầm mỗi ngày: mã hồ sơ lệch với mã trên đơn
+      // đăng ký thì trang Chấm ăn của tôi khó hiểu, mà gõ nhầm sang mã người
+      // khác còn gây trùng mã. Chỉ điền khi ô còn trống (không đè chữ đang gõ)
+      // và mã đúng dạng (mã cũ sai dạng thì để Thầy/Cô nhập lại cho đúng).
+      getDoc(doc(db, 'staff', user.uid))
+        .then((snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          const savedId = typeof data.employeeId === 'string' ? data.employeeId.trim() : '';
+          if (EMPLOYEE_ID_PATTERN.test(savedId)) setEmployeeId((prev) => prev || savedId);
+          if (typeof data.department === 'string' && data.department) {
+            setDepartment((prev) => prev || data.department);
+          }
+        })
+        // Không đọc được hồ sơ cũ thì vẫn khai báo tay như trước.
+        .catch((err) => console.warn('Không đọc được hồ sơ nhân viên đã lưu:', err));
     });
     return () => unsubscribe();
-  }, [navigate]);
+  }, [navigate, loginPath]);
 
   const handleSubmit = async () => {
     if (!fullName || !employeeId || !department) {
@@ -59,7 +82,7 @@ export default function RegisterStaff() {
         email: user.email,
         createdAt: new Date().toISOString(),
       });
-      navigate('/schedule');
+      navigate(next ?? '/schedule');
     } catch (err: any) {
       console.error(err);
       setError('Lỗi khi lưu thông tin: ' + err.message);
@@ -215,7 +238,7 @@ export default function RegisterStaff() {
           <div className="p-md md:p-lg border-t border-surface-variant bg-surface-bright flex flex-col-reverse md:flex-row justify-end gap-sm md:gap-md">
             <button 
               type="button" 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(loginPath)}
               disabled={loading}
               className="w-full md:w-auto px-md py-sm bg-surface-container-lowest border border-outline text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
             >

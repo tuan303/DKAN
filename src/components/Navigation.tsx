@@ -102,6 +102,8 @@ export function Navigation({ className }: { className?: string }) {
   const links = [
     { to: '/schedule', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
     { to: '/events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
+    // Mọi người dùng (kể cả quản trị) đều có suất ăn của riêng mình để tự kiểm tra.
+    { to: '/cham-an', icon: 'fact_check', label: 'CHẤM ĂN CỦA TÔI' },
   ];
 
   let displayLinks = links;
@@ -129,7 +131,8 @@ export function Navigation({ className }: { className?: string }) {
       );
 
       if (isMobile) {
-        const isProminent = link.to === '/schedule' || link.to === '/events';
+        // Ba mục của CBNV nổi bật như nhau; mục QUẢN TRỊ nhạt hơn để không lấn.
+        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an';
         return (
           <button 
             key={link.to}
@@ -157,8 +160,11 @@ export function Navigation({ className }: { className?: string }) {
               </span>
               {isActive && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full md:hidden"></div>}
             </div>
+            {/* leading-[12px]: nhãn dài xuống 2 dòng; giữ dòng 15px mặc định thì
+                icon + 2 dòng cao hơn thanh 72px và bị cắt chân chữ. mt-1.5 để
+                dấu mũ của chữ hoa (Ấ, Ậ) không chạm chấm báo mục đang chọn. */}
             <span className={clsx(
-              "font-label-md text-[10px] mt-1 text-center max-w-[80px] uppercase tracking-wider transition-all",
+              "font-label-md text-[10px] leading-[12px] mt-1.5 text-center max-w-[80px] uppercase tracking-wider transition-all",
               isActive || isProminent ? "font-bold text-primary scale-105" : "font-normal opacity-80"
             )}>
               {link.label}
