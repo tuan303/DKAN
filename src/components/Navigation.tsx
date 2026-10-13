@@ -104,6 +104,9 @@ export function Navigation({ className }: { className?: string }) {
     { to: '/events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
     // Mọi người dùng (kể cả quản trị) đều có suất ăn của riêng mình để tự kiểm tra.
     { to: '/cham-an', icon: 'fact_check', label: 'CHẤM ĂN CỦA TÔI' },
+    // Khảo sát chất lượng suất ăn hằng tuần: luôn có mục để Thầy/Cô tự vào, kể
+    // cả khi đã lỡ email mời hay tắt thanh nhắc; trang tự hiện tuần đang mở.
+    { to: '/khao-sat', icon: 'rate_review', label: 'KHẢO SÁT' },
   ];
 
   let displayLinks = links;
@@ -121,6 +124,11 @@ export function Navigation({ className }: { className?: string }) {
     }
   }
 
+  // Thanh dưới trên điện thoại chia đều bề ngang: 5 mục (tài khoản quản trị)
+  // ở màn 360px chỉ còn 72px mỗi mục, nhãn 2 dòng phóng 105% đè sang mục bên
+  // cạnh. Khi chật thì nhãn chừa lề, không phóng to, giãn chữ ít lại.
+  const crowded = displayLinks.length > 4;
+
   const renderLinkItems = (isMobile: boolean) => {
     return displayLinks.map(link => {
       const isAccount = link.to === '#account';
@@ -131,8 +139,8 @@ export function Navigation({ className }: { className?: string }) {
       );
 
       if (isMobile) {
-        // Ba mục của CBNV nổi bật như nhau; mục QUẢN TRỊ nhạt hơn để không lấn.
-        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an';
+        // Các mục của CBNV nổi bật như nhau; mục QUẢN TRỊ nhạt hơn để không lấn.
+        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an' || link.to === '/khao-sat';
         return (
           <button 
             key={link.to}
@@ -151,7 +159,7 @@ export function Navigation({ className }: { className?: string }) {
             )}
           >
             <div className={clsx(
-              "px-5 py-1 rounded-full transition-colors relative",
+              crowded ? "px-3 py-1 rounded-full transition-colors relative" : "px-5 py-1 rounded-full transition-colors relative",
               isActive ? "bg-primary-container/40" : "hover:bg-surface-container-high",
               isProminent && !isActive && "text-primary/70"
             )}>
@@ -164,8 +172,12 @@ export function Navigation({ className }: { className?: string }) {
                 icon + 2 dòng cao hơn thanh 72px và bị cắt chân chữ. mt-1.5 để
                 dấu mũ của chữ hoa (Ấ, Ậ) không chạm chấm báo mục đang chọn. */}
             <span className={clsx(
-              "font-label-md text-[10px] leading-[12px] mt-1.5 text-center max-w-[80px] uppercase tracking-wider transition-all",
-              isActive || isProminent ? "font-bold text-primary scale-105" : "font-normal opacity-80"
+              // Nhãn luôn chừa 3px mỗi bên trong ô, kể cả màn rất hẹp (320px) ít mục.
+              "font-label-md text-[10px] leading-[12px] mt-1.5 text-center uppercase transition-all max-w-[min(80px,calc(100%_-_6px))]",
+              // Màn dưới 340px mà 5 mục: nhãn dài phải xuống 3 dòng — thu chữ và
+              // dòng lại cho 3 dòng vẫn nằm trọn trong thanh 72px.
+              crowded ? "tracking-normal max-[340px]:text-[9px] max-[340px]:leading-[10px] max-[340px]:mt-1" : "tracking-wider",
+              isActive || isProminent ? clsx("font-bold text-primary", !crowded && "scale-105") : "font-normal opacity-80"
             )}>
               {link.label}
             </span>
