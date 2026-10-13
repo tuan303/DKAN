@@ -136,6 +136,11 @@ test('evaluatePersonDay: mọi mã trạng thái', () => {
   assert.equal(r.meals.breakfast.reason, 'registered_late');
   assert.equal(r.meals.lunch.code, 'missing');
 
+  // ăn trước rồi mới nộp đơn trong ngày (đơn tính luôn ngày nộp): có chấm thì là đã ăn bình thường
+  r = evaluatePersonDay({ date: D, registration: { ...reg, timestamp: vn(D, '15:00').toISOString() }, times: ['11:57'], ...final });
+  assert.deepEqual([r.meals.lunch.code, r.meals.lunch.time], ['ok', '11:57']);
+  assert.deepEqual([r.meals.breakfast.code, r.meals.breakfast.reason], ['not_registered', 'registered_late'], 'không chấm thì vẫn không bị tính là thiếu');
+
   // chưa tới ngày bắt đầu
   r = evaluatePersonDay({ date: D, registration: { ...reg, firstMealDate: '2026-10-12' }, ...final });
   assert.equal(r.meals.breakfast.reason, 'before_start');
@@ -262,4 +267,21 @@ test('reconcile: lượt chấm của nhân sự Bếp Vina (mã không đủ 6 
 test('isSchoolStaffId: đúng 6 chữ số sau khi chuẩn hoá', () => {
   for (const v of ['101190', ' 101190 ', '000123']) assert.equal(isSchoolStaffId(v), true, JSON.stringify(v));
   for (const v of ['12345', '1234567', 'AB1234', '', null]) assert.equal(isSchoolStaffId(v), false, JSON.stringify(v));
+});
+
+test('reconcile: ăn trước rồi mới nộp đơn trong ngày (đầu tháng) — có chấm là đã ăn, không vào "chấm nhưng không đăng ký"', () => {
+  const D = '2026-10-01';
+  const reg = { userId: 'H', employeeId: '100896', fullName: 'Hoàng Khánh Huyền', month: '2026-10', firstMealDate: D,
+    timestamp: '2026-10-01T08:00:00.000Z' /* 15:00 giờ VN, sau giờ ăn trưa */, breakfastCount: 0, lunchCount: 20 };
+  const tapped = reconcile({ byDate: buildFromCheckins([{ date: D, people: { '100896': { name: 'Huyền', times: ['11:57'] } } }]).byDate,
+    dates: [D], registrations: [reg], cancelations: [] });
+  assert.deepEqual(tapped.extra, []);
+  assert.deepEqual(tapped.missing, []);
+  assert.deepEqual(tapped.registered.map(x => x.meal), ['lunch']);
+  assert.deepEqual(tapped.tapped.map(x => x.time), ['11:57']);
+
+  // Cùng đơn, hôm đó không chấm: không bị tính "đăng ký nhưng không chấm".
+  const none = reconcile({ byDate: { [D]: {} }, dates: [D], registrations: [reg], cancelations: [] });
+  assert.deepEqual(none.missing, []);
+  assert.deepEqual(none.registered, []);
 });

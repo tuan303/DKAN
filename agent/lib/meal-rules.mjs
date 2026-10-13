@@ -409,6 +409,26 @@ export function notExpectedReason(reg, cancelSet, date, meal) {
 }
 
 /**
+ * Bữa này có tính là "đã đăng ký" không, khi đã biết người đó có chấm hay không.
+ *
+ * Giống notExpectedReason() === null, thêm một ngoại lệ: ăn TRƯỚC rồi mới nộp
+ * đơn trong cùng ngày (hay gặp đầu tháng). Form đăng ký tính luôn ngày nộp vào
+ * số suất, nên bữa đó nằm trong đơn và người đó đã ăn — coi như đã đăng ký và
+ * đã ăn, không xếp vào "chấm nhưng không đăng ký". Nếu KHÔNG chấm thì vẫn không
+ * tính là phải ăn: không ai bị cảnh báo vì bữa đã kết thúc trước khi nộp đơn.
+ *
+ * @param {Registration | null | undefined} reg đã qua normalizeRegistration
+ * @param {Set<string>} cancelSet
+ * @param {string} date
+ * @param {Meal} meal
+ * @param {boolean} tapped có lượt chấm trong khung giờ của bữa này
+ */
+export function countsAsRegistered(reg, cancelSet, date, meal, tapped) {
+  const why = notExpectedReason(reg, cancelSet, date, meal);
+  return why === null || (why === 'registered_late' && tapped);
+}
+
+/**
  * Diễn giải lý do cho người đọc.
  * @param {ReturnType<typeof notExpectedReason>} reason
  * @param {Registration | null | undefined} reg
@@ -509,7 +529,7 @@ export function reconcile({ byDate, dates, registrations: allRegistrations, canc
 
     for (const meal of MEALS) {
       // Ai đáng lẽ phải ăn bữa này hôm nay
-      const expected = active.filter(r => notExpectedReason(r, cancelSet, date, meal) === null);
+      const expected = active.filter(r => countsAsRegistered(r, cancelSet, date, meal, !!taps[r.employeeId]?.[meal]));
       const expectedIds = new Set(expected.map(r => r.employeeId));
 
       for (const r of expected) {
@@ -671,7 +691,7 @@ export function evaluatePersonDay({ date, registration, cancelations = [], times
     if (reg && isUsableId(reg.employeeId) && excluded.has(reg.employeeId)) { meals[meal] = { code: 'excluded', time }; continue; }
 
     const reason = notExpectedReason(reg, cancelSet, date, meal);
-    if (reason !== null) {
+    if (!countsAsRegistered(reg, cancelSet, date, meal, !!time)) {
       meals[meal] = { code: time ? 'extra' : 'not_registered', time, reason };
       continue;
     }
