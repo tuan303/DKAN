@@ -461,6 +461,8 @@ type CardKey = 'registered' | 'tapped' | 'missing' | 'pending' | 'extra' | 'unre
 // Dải "số liệu tạm" chỉ liệt kê vài ngày đầu; xem cả tháng file Excel giữa
 // tháng thì có thể tới hơn chục ngày chưa tới.
 const UNSETTLED_SHOWN = 4;
+// Dòng báo nhân sự Bếp Vina bị loại chỉ kể vài tên; đủ danh sách nằm ở tooltip.
+const KITCHEN_SHOWN = 5;
 
 type Unsettled = { date: string; meals: Meal[] };
 
@@ -1112,6 +1114,25 @@ export function MealReconciliation({
                         không tính vào <strong>Đăng ký nhưng không chấm</strong>.
                       </>
                     )}
+                  </span>
+                </div>
+              )}
+
+              {/* Nhân sự Bếp Vina chấm công trên cùng máy: đã bị loại khỏi các
+                  danh sách lượt chấm. Nói rõ ai bị loại để quản trị soát được
+                  khi có người của trường bị nhận nhầm (mã sai trên máy chấm). */}
+              {result.kitchenExcluded.length > 0 && (
+                <div
+                  className="p-sm rounded-lg bg-surface-container text-on-surface-variant text-body-sm flex items-start gap-2"
+                  title={result.kitchenExcluded.map(k => `${k.fullName || '(không tên)'} — ${k.employeeId}`).join('\n')}
+                >
+                  <span className="material-symbols-outlined text-[18px] shrink-0">soup_kitchen</span>
+                  <span>
+                    Đã loại <strong>{result.kitchenExcluded.length}</strong> người thuộc Bếp Vina khỏi các danh sách lượt chấm
+                    (mã trên máy chấm không đủ 6 chữ số, hoặc thuộc bộ phận Bếp Vina): {' '}
+                    {result.kitchenExcluded.slice(0, KITCHEN_SHOWN).map(k => `${k.fullName || '(không tên)'} (${k.employeeId})`).join(', ')}
+                    {result.kitchenExcluded.length > KITCHEN_SHOWN && ` và ${result.kitchenExcluded.length - KITCHEN_SHOWN} người khác`}.
+                    {' '}Người có đơn đăng ký ăn thì không bao giờ bị loại.
                   </span>
                 </div>
               )}

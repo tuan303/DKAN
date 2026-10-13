@@ -80,6 +80,14 @@ export const normId = v => String(v ?? '').replace(/[\s 　]/g, '').toUpperCase
 /** Mã không dùng để đối soát được: trống, hoặc N/A do chưa khai hồ sơ nhân sự. */
 export const isUsableId = (/** @type {string} */ id) => id !== '' && id !== 'N/A' && id !== 'NA';
 
+/**
+ * Mã nhân viên của trường luôn đúng 6 chữ số (vd. 101190). Trên máy chấm, mã
+ * ngắn hoặc dài hơn là nhân sự Bếp Vina — họ chấm để chấm công, không phải để
+ * nhận suất ăn.
+ */
+export const SCHOOL_STAFF_ID_RE = /^\d{6}$/;
+export const isSchoolStaffId = (/** @type {unknown} */ id) => SCHOOL_STAFF_ID_RE.test(normId(id));
+
 // --------------------------------------------------------------- giờ, ngày
 
 /** @param {string} hhmm */
@@ -470,9 +478,27 @@ export function reconcile({ byDate, dates, registrations: allRegistrations, canc
   const cancelSet = buildCancelSet(cancelations);
   const regByEmployee = new Map(registrations.map(r => [r.employeeId, r]));
 
+  // Lượt chấm của nhân sự Bếp Vina là chấm công, không phải suất ăn: không đưa
+  // vào "chấm nhưng không đăng ký", cũng không tính là lượt chấm hợp lệ hay
+  // chấm ngoài giờ. Nhận ra họ bằng danh sách loại trừ (lấy từ file HAC có cột
+  // bộ phận) hoặc mã không đúng 6 chữ số của trường. Mã nào có đứng trên một
+  // đơn đăng ký ăn thì KHÔNG bao giờ bị coi là bếp: loại nhầm lượt chấm của họ
+  // là họ bị tính oan "đăng ký nhưng không chấm".
+  const registeredIds = new Set(normalized.map(r => r.employeeId).filter(isUsableId));
+  const isKitchenTap = (/** @type {string} */ id) => !registeredIds.has(id) && (excluded.has(id) || !isSchoolStaffId(id));
+  /** @type {Map<string, string>} */ const kitchen = new Map();   // mã -> tên trên máy chấm
+
   for (const date of dates) {
     if (!isMealDay(date, off)) continue;
-    const taps = byDate[date] || {};
+    /** @type {Record<string, TapRecord>} */
+    const taps = {};
+    for (const [employeeId, rec] of Object.entries(byDate[date] || {})) {
+      if (isKitchenTap(employeeId)) {
+        if (!kitchen.get(employeeId)) kitchen.set(employeeId, rec.name || '');
+        continue;
+      }
+      taps[employeeId] = rec;
+    }
 
     // Mã trùng giữa nhiều tài khoản trong ngày này: không kết luận được ai ăn
     // ai không — tách riêng như đơn thiếu mã, đúng như email cảnh báo và trang
@@ -561,6 +587,10 @@ export function reconcile({ byDate, dates, registrations: allRegistrations, canc
     extra: extra.sort(byDateThenName),
     unrecognized: unrecognized.sort(byDateThenName),
     invalidRegs: invalidRegs.sort(byDateThenName),
+    /** Nhân sự Bếp Vina đã bị loại khỏi các danh sách lượt chấm (để báo cho quản trị biết). */
+    kitchenExcluded: [...kitchen]
+      .map(([employeeId, fullName]) => ({ employeeId, fullName }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi') || a.employeeId.localeCompare(b.employeeId)),
   };
 }
 

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   vnParts, isMealFinal, evaluatePersonDay, mealDaysOfMonth, classifyTime, normId, isUsableId,
-  isMealDay, formatDayLabel, formatVnDateTime, duplicateIdsOn, registrationEffectiveFrom, reconcile, buildFromCheckins,
+  isMealDay, formatDayLabel, formatVnDateTime, duplicateIdsOn, registrationEffectiveFrom, reconcile, buildFromCheckins, isSchoolStaffId,
 } from '../lib/meal-rules.mjs';
 
 // Giờ Việt Nam = UTC+7. Viết mốc UTC cho rõ ràng: vn('2026-10-09', '13:46').
@@ -231,4 +231,35 @@ test('reconcile + evaluatePersonDay: lần hủy của tài khoản khác mang m
   assert.equal(ev.meals.breakfast.code, 'missing');
   assert.equal(ev.meals.lunch.code, 'not_registered');
   assert.equal(ev.meals.lunch.reason, 'canceled');
+});
+
+test('reconcile: lượt chấm của nhân sự Bếp Vina (mã không đủ 6 số, hoặc trong danh sách loại trừ) không vào các danh sách chấm', () => {
+  const D = '2026-10-09';
+  const people = {
+    '101190': { name: 'Giáo viên có đơn', times: ['07:10', '11:40'] },
+    '101555': { name: 'Giáo viên không đơn', times: ['11:45'] },
+    '12345': { name: 'Bếp 5 số', times: ['06:00', '11:00', '15:00'] },
+    '1234567': { name: 'Bếp 7 số', times: ['10:30'] },
+    'BV01': { name: 'Bếp chữ', times: ['10:30'] },
+    '109999': { name: 'Bếp 6 số trong danh sách loại trừ', times: ['10:45'] },
+    '9876': { name: 'Mã lạ nhưng có đơn', times: ['11:50'] },
+  };
+  const byDate = buildFromCheckins([{ date: D, people }]).byDate;
+  const regs = [
+    { userId: 'A', employeeId: '101190', fullName: 'Giáo viên có đơn', breakfastCount: 1, lunchCount: 1 },
+    // Đơn cũ mang mã không đủ 6 số: lượt chấm của người này vẫn phải được tính.
+    { userId: 'B', employeeId: '9876', fullName: 'Mã lạ nhưng có đơn', breakfastCount: 0, lunchCount: 1 },
+  ];
+  const r = reconcile({ byDate, dates: [D], registrations: regs, cancelations: [], excludedIds: ['109999'] });
+
+  assert.deepEqual(r.extra.map(x => x.employeeId), ['101555'], 'chỉ giáo viên không đơn mới là "chấm nhưng không đăng ký"');
+  assert.deepEqual(r.tapped.map(x => x.employeeId).sort(), ['101190', '101190', '101555', '9876'].sort());
+  assert.deepEqual(r.unrecognized, [], 'giờ chấm công của bếp ngoài khung cũng không liệt kê');
+  assert.deepEqual(r.missing, [], 'người có đơn mang mã lạ vẫn được tính là đã chấm');
+  assert.deepEqual(r.kitchenExcluded.map(x => x.employeeId).sort(), ['109999', '12345', '1234567', 'BV01']);
+});
+
+test('isSchoolStaffId: đúng 6 chữ số sau khi chuẩn hoá', () => {
+  for (const v of ['101190', ' 101190 ', '000123']) assert.equal(isSchoolStaffId(v), true, JSON.stringify(v));
+  for (const v of ['12345', '1234567', 'AB1234', '', null]) assert.equal(isSchoolStaffId(v), false, JSON.stringify(v));
 });
