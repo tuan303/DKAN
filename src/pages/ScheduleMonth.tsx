@@ -5,6 +5,7 @@ import { Navigation } from '../components/Navigation';
 import { auth, db } from '../lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, query, where } from 'firebase/firestore';
 import { Footer } from '../components/Footer';
+import { SurveyBanner } from '../components/SurveyBanner';
 
 interface EventData {
   id: string;
@@ -631,7 +632,10 @@ export default function ScheduleMonth() {
     <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
-      
+      {/* Nhắc khảo sát suất ăn tuần (chỉ hiện khi đang mở mà Thầy/Cô chưa trả
+          lời). Lề ngang khớp phần đầu trang bên dưới. */}
+      <SurveyBanner className="max-w-[1440px] w-full mx-auto px-md md:px-margin lg:px-xl pt-md md:pt-lg" />
+
       <main className="flex-1 max-w-[1440px] w-full mx-auto py-md md:py-lg flex flex-col gap-md md:gap-lg">
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">

@@ -25,5 +25,8 @@
     "notBefore": "13:40",
     "minExpected": 20,
     "maxMissingRatio": 0.4
+  },
+  "survey": {
+    "enabled": false
   }
 }

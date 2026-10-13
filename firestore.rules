@@ -92,6 +92,56 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Khảo sát chất lượng suất ăn hằng tuần. Mã đáp án phải khớp SURVEY_QUESTIONS
+    // trong agent/lib/survey.mjs — test agent/test/survey.test.mjs đối chiếu.
+    function validSurveyAnswers(a) {
+      return a is map
+        && a.keys().hasOnly(['taste', 'variety', 'warmth', 'portion', 'hygiene', 'liked', 'disliked', 'suggestion'])
+        && a.taste in ['ngon', 'binh_thuong', 'chua_ngon']
+        && a.variety in ['da_dang', 'chua_da_dang']
+        && a.warmth in ['du_nong', 'chua_du_nong']
+        && a.portion in ['thua', 'vua_du', 'thieu']
+        && a.hygiene in ['sach', 'chua_sach']
+        && a.liked is string && a.liked.size() > 0 && a.liked.size() <= 500
+        && (!('disliked' in a) || (a.disliked is string && a.disliked.size() <= 500))
+        && (!('suggestion' in a) || (a.suggestion is string && a.suggestion.size() <= 1000));
+    }
+
+    // Khảo sát tuần {weekId} đang nhận trả lời: giờ máy chủ Firestore nằm trong
+    // [opensAt, closesAt) của document tuần. Không tin giờ máy người dùng.
+    function surveyOpen(weekId) {
+      let s = get(/databases/$(database)/documents/meal_surveys/$(weekId)).data;
+      return request.time >= s.opensAt && request.time < s.closesAt;
+    }
+
+    match /meal_surveys/{weekId} {
+      // Lịch mở/đóng và trạng thái gửi email: ai đăng nhập cũng đọc (để hiện
+      // nhắc khảo sát), chỉ quản trị và agent (Admin SDK) ghi.
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      // Mỗi người một câu trả lời mỗi tuần, khoá theo uid; sửa được tới hạn.
+      // Không ẩn danh (giống form Microsoft cũ): quản trị đọc được kèm họ tên.
+      match /responses/{uid} {
+        allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+        allow create, update: if isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'weekId', 'version', 'answers', 'fullName', 'employeeId', 'department', 'email', 'submittedAt', 'updatedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.weekId == weekId
+          && validSurveyAnswers(request.resource.data.answers)
+          && surveyOpen(weekId);
+        allow delete: if isAdmin();
+      }
+
+      // Danh sách người được mời (họ tên, email) để quản trị xem ai chưa trả
+      // lời. Chỉ agent ghi.
+      match /private/{docId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();

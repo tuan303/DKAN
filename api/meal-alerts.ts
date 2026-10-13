@@ -1,10 +1,13 @@
 /**
- * POST /api/meal-alerts — email cảnh báo chấm ăn.
+ * POST /api/meal-alerts — email cảnh báo chấm ăn và thư mời khảo sát suất ăn.
  *
- * Chỉ agent đồng bộ trên máy HAC gọi vào (sau giờ ăn trưa), có khoá bí mật
- * MEAL_ALERT_SECRET. Hai loại thư:
- *   - 'staff-missing': mỗi CBNV đã đăng ký mà không có lượt chấm nhận 1 thư riêng.
+ * Chỉ agent trên máy HAC gọi vào, có khoá bí mật MEAL_ALERT_SECRET. Ba loại thư:
+ *   - 'staff-missing': mỗi CBNV đã đăng ký mà không có lượt chấm nhận 1 thư riêng
+ *                      (agent đồng bộ, sau giờ ăn trưa).
  *   - 'admin-notice' : báo quản trị khi agent tự dừng gửi vì số liệu bất thường.
+ *   - 'survey-invite': mời CBGV-NV có đăng ký ăn làm khảo sát chất lượng suất ăn
+ *                      của tuần (agent/survey-invite.mjs, 15:00 thứ 6). MỘT thư
+ *                      cho cả lô: To là hộp thư Nhóm Dinh dưỡng, người nhận ở Bcc.
  *
  * Endpoint KHÔNG nhận HTML hay tiêu đề từ bên gọi: chỉ nhận dữ liệu đã kiểm tra
  * chặt rồi tự dựng thư bằng mẫu cố định ở đây (khác với /api/send-email hiện là
@@ -15,7 +18,11 @@
  *   - thư CBNV luôn CC MEAL_ALERT_CC (mặc định dinhduong@), dùng sai là lộ ngay;
  *   - chữ từ bên gọi chỉ là vài trường ngắn, bị escape HTML và bẻ gãy dạng link
  *     (https://, www.) nên không thành link bấm được trong thư;
- *   - mỗi lần gọi tối đa 20 thư.
+ *   - thư mời khảo sát không mang chữ nào của bên gọi: chỉ nhận mã tuần và hạn
+ *     trả lời dạng thời điểm ISO (kiểm tra chặt, phải nằm trong 40 ngày từ đầu
+ *     tuần); nhãn tuần và dòng "hạn" do máy chủ tự định dạng, luôn gửi To
+ *     MEAL_ALERT_CC;
+ *   - mỗi lần gọi tối đa 20 thư cảnh báo, hoặc 1 thư mời với tối đa 400 Bcc.
  * Nhưng endpoint không giữ trạng thái giữa các lần gọi nên KHÔNG chặn được việc
  * gọi lặp: kẻ có khoá vẫn gửi được nhiều thư mang chữ ngắn tuỳ ý trong trường và
  * có thể làm hộp thư gửi chạm hạn mức của Exchange. Nghi lộ khoá thì đổi ngay
@@ -27,7 +34,10 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { formatDate } from '../agent/lib/meal-rules.mjs';
 // Đuôi .js là bắt buộc: package.json đặt "type": "module" nên trên Vercel file
 // này chạy dạng ESM, mà ESM của Node không tự thêm đuôi cho đường dẫn tương đối.
-import { getGraphToken, readGraphConfig, sendMail, type MailMessage } from './_lib/msgraph.js';
+import {
+  getGraphToken, hideAddresses, mailCertainlyNotSent, readGraphConfig, sendMail, type GraphConfig, type MailMessage,
+} from './_lib/msgraph.js';
+import { isMondayIso, surveyDeadlineLabel, surveyWeekLabel } from './_lib/survey-week.js';
 
 // Vercel: cho function chạy tối đa 60 giây (đủ cho 20 thư kể cả khi phải chờ 429).
 export const config = { maxDuration: 60 };
@@ -55,6 +65,20 @@ const MAX_ALERTS = 20;
 const MAX_ADMIN_TO = 5;
 const MAX_OUT_OF_WINDOW = 10;
 const MAX_LINES = 30;
+// Exchange Online nhận tối đa 500 người nhận mỗi thư (To + Cc + Bcc); 400 chừa
+// chỗ cho To (MEAL_ALERT_CC). Agent chia lô đúng cỡ này.
+const MAX_SURVEY_BCC = 400;
+// Hạn trả lời (closesAt) agent gửi kèm phải nằm trong khoảng này tính từ 00:00
+// thứ 2 của tuần (giờ VN). Quản trị gia hạn được tối đa 31 ngày kể từ lúc bấm,
+// nên hạn thật của một tuần còn đáng mời hiếm khi quá 40 ngày; quá xa là dấu
+// hiệu dữ liệu sai (hay khoá bị lộ) — từ chối thay vì in một hạn vô lý vào thư.
+const MAX_CLOSE_AFTER_WEEK_START_DAYS = 40;
+// closesAt chỉ nhận đúng dạng Date.toISOString() (giờ UTC, có thể thiếu phần
+// mili giây): agent luôn gửi dạng này, chấp nhận ít dạng thì ít chỗ để lách.
+const ISO_UTC_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
+// Việt Nam dùng UTC+7 quanh năm (không đổi giờ mùa hè).
+const VN_OFFSET_MS = 7 * 3_600_000;
+const DAY_MS = 86_400_000;
 const LIMITS = { email: 254, fullName: 120, employeeId: 40, dateLabel: 60, label: 40, reason: 1000, line: 300 };
 
 // Microsoft Graph giới hạn số thư đồng thời của một hộp thư; 4 là mức an toàn.
@@ -84,9 +108,23 @@ interface StaffAlert {
   outOfWindow: string[];
 }
 
+interface SurveyInvite {
+  kind: 'survey-invite';
+  /** Ngày thứ 2 của tuần khảo sát, YYYY-MM-DD. */
+  weekId: string;
+  /**
+   * Hạn trả lời THẬT của tuần (ms), từ closesAt agent đọc ở document tuần ngay
+   * trước khi gửi — quản trị có thể đã gia hạn hay đóng sớm. null = bên gọi
+   * không gửi kèm: thư ghi hạn mặc định tính từ mã tuần (12h00 thứ 2 tuần sau).
+   */
+  closesAt: number | null;
+  bcc: string[];
+}
+
 type ParsedRequest =
   | { kind: 'staff-missing'; date: string; dateLabel: string; alerts: StaffAlert[] }
-  | { kind: 'admin-notice'; date: string; dateLabel: string; to: string[]; reason: string; lines: string[] };
+  | { kind: 'admin-notice'; date: string; dateLabel: string; to: string[]; reason: string; lines: string[] }
+  | SurveyInvite;
 
 /** Đủ dùng cho cả VercelRequest lẫn express.Request. */
 interface ApiRequest {
@@ -105,6 +143,27 @@ interface ApiResponse {
 interface SendResult {
   to: string;
   ok: boolean;
+  error?: string;
+}
+
+/**
+ * Kết quả thư mời khảo sát. `count` luôn là số địa chỉ Bcc của thư, kể cả khi
+ * lỗi: cả lô đi chung một thư nên cùng thành hoặc cùng hỏng. Không ghi địa chỉ:
+ * bên gọi tự biết lô của nó.
+ *
+ * Khi không ok, phải nói rõ thư CÓ THỂ đã đi hay chưa, vì một thư là cả trường:
+ *   - `{ ok: false, count, error }` (không có maybeSent): CHẮC CHẮN chưa đi —
+ *     chưa kịp gửi request (hết thời gian của lần gọi), hay Graph đã trả lời từ
+ *     chối (4xx, quá tải 429). Agent gửi lại ở lần chạy sau;
+ *   - `{ ok: false, count, maybeSent: true, error }`: lỗi xảy ra SAU khi đã gửi
+ *     request tới Graph (hết 10 giây chờ, đứt kết nối, Graph 5xx) — Graph có thể
+ *     đã nhận thư. Agent ghi người nhận vào nhóm "không rõ" và KHÔNG tự gửi lại
+ *     (gửi lại "cho chắc" là cả trường nhận hai thư); người vận hành quyết định.
+ */
+interface SurveyResult {
+  ok: boolean;
+  count: number;
+  maybeSent?: true;
   error?: string;
 }
 
@@ -181,6 +240,24 @@ function mealWindow(v: unknown, field: string): string {
   return v;
 }
 
+/** Thời điểm dạng Date.toISOString() (UTC, có thật) -> ms. Không đoán các dạng khác. */
+function isoInstant(v: unknown, field: string): number {
+  const m = typeof v === 'string' ? ISO_UTC_RE.exec(v) : null;
+  if (!m) fail(`${field} phải là thời điểm ISO giờ UTC, ví dụ 2026-10-12T05:00:00.000Z.`);
+  const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
+  const t = Date.UTC(y, mo - 1, d, h, mi, s, Number(m[7] ?? 0));
+  // Date.UTC tự cuộn giá trị tràn (30/02 -> 02/03, 24:00 -> hôm sau) và đổi năm
+  // 0–99 thành 19xx: đổi ngược lại để chắc đúng là thời điểm có thật.
+  const b = new Date(t);
+  if (
+    b.getUTCFullYear() !== y || b.getUTCMonth() !== mo - 1 || b.getUTCDate() !== d ||
+    b.getUTCHours() !== h || b.getUTCMinutes() !== mi || b.getUTCSeconds() !== s
+  ) {
+    fail(`${field} không phải thời điểm có thật.`);
+  }
+  return t;
+}
+
 function list(v: unknown, field: string, min: number, max: number): unknown[] {
   if (!Array.isArray(v)) fail(`${field} phải là mảng.`);
   if (v.length < min || v.length > max) fail(`${field} phải có từ ${min} đến ${max} phần tử.`);
@@ -221,6 +298,54 @@ function parseStaffAlert(v: unknown, i: number): StaffAlert {
   return { to, fullName, employeeId, meals, outOfWindow };
 }
 
+/**
+ * Thư mời khảo sát: chỉ nhận mã tuần, hạn trả lời (closesAt, không bắt buộc) và
+ * danh sách người nhận. Nhãn tuần, dòng "hạn", tiêu đề, nội dung đều do máy chủ
+ * tự dựng.
+ *
+ * closesAt là thời điểm (không phải chữ hiển thị): agent đọc ở document tuần, vì
+ * quản trị có thể đã gia hạn hay đóng sớm — tính hạn từ mã tuần thì thư gửi bù
+ * sau khi gia hạn lại ghi một hạn đã qua. Thiếu closesAt thì dùng hạn mặc định
+ * (12h00 thứ 2 tuần sau). closesAt đã qua thì từ chối (400): mời làm một khảo sát
+ * đã đóng là vô ích, và 400 nghĩa là chắc chắn chưa gửi.
+ *
+ * Trường lạ bị bỏ qua (không đọc tới), giống hai loại thư kia: bên gọi gửi thừa
+ * `subject`, `to`, `html`... cũng không đổi được gì trong thư.
+ *
+ * Thông báo lỗi chỉ nêu vị trí (bcc[3]), không chép lại địa chỉ: agent ghi lỗi
+ * vào log trên máy HAC, không cần rải địa chỉ CBGV-NV ra đó.
+ */
+function parseSurveyInvite(body: Record<string, unknown>): SurveyInvite {
+  const weekId = isoDate(body.weekId, 'weekId');
+  if (!isMondayIso(weekId)) fail('weekId phải là ngày thứ 2 (mã tuần khảo sát là ngày đầu tuần).');
+
+  let closesAt: number | null = null;
+  if (body.closesAt !== undefined) {
+    const t = isoInstant(body.closesAt, 'closesAt');
+    const weekStartMs = Date.parse(`${weekId}T00:00:00+07:00`);
+    if (t <= weekStartMs || t > weekStartMs + MAX_CLOSE_AFTER_WEEK_START_DAYS * DAY_MS) {
+      fail(`closesAt phải sau 00:00 thứ 2 của tuần và không quá ${MAX_CLOSE_AFTER_WEEK_START_DAYS} ngày sau đó.`);
+    }
+    if (t <= Date.now()) {
+      fail(`Khảo sát tuần này đã đóng lúc ${vnDeadlineLabel(t)} (closesAt đã qua) — không gửi lời mời.`);
+    }
+    closesAt = t;
+  }
+
+  const bcc = list(body.bcc, 'bcc', 1, MAX_SURVEY_BCC).map((e, i) => schoolEmail(e, `bcc[${i}]`));
+  // Trùng địa chỉ thì Exchange vẫn chỉ giao một bản, nhưng đó là dấu hiệu agent
+  // ghép danh sách sai (đếm "đã gửi" sẽ lệch) — từ chối cả lô như hai loại thư kia.
+  const firstIndex = new Map<string, number>();
+  bcc.forEach((e, i) => {
+    const k = e.toLowerCase();
+    const j = firstIndex.get(k);
+    if (j !== undefined) fail(`bcc[${i}] trùng với bcc[${j}] (không phân biệt hoa thường).`);
+    firstIndex.set(k, i);
+  });
+
+  return { kind: 'survey-invite', weekId, closesAt, bcc };
+}
+
 function parseBody(raw: unknown): unknown {
   // Vercel chỉ tự parse khi Content-Type là JSON; gọi thiếu header thì nhận chuỗi/Buffer.
   let v = raw;
@@ -238,8 +363,10 @@ function parseBody(raw: unknown): unknown {
 function parseRequest(raw: unknown): ParsedRequest {
   const body = parseBody(raw);
   if (!isObject(body)) fail('Nội dung yêu cầu phải là một JSON object.');
+  // Thư mời khảo sát không có date/dateLabel như hai loại thư cảnh báo.
+  if (body.kind === 'survey-invite') return parseSurveyInvite(body);
   if (body.kind !== 'staff-missing' && body.kind !== 'admin-notice') {
-    fail("kind phải là 'staff-missing' hoặc 'admin-notice'.");
+    fail("kind phải là 'staff-missing', 'admin-notice' hoặc 'survey-invite'.");
   }
   const date = isoDate(body.date, 'date');
   const dateLabel = text(body.dateLabel, 'dateLabel', LIMITS.dateLabel);
@@ -519,6 +646,73 @@ function renderAdminEmail(r: Extract<ParsedRequest, { kind: 'admin-notice' }>, a
   return { subject, html };
 }
 
+const VN_WEEKDAYS = ['Chủ nhật', 'thứ 2', 'thứ 3', 'thứ 4', 'thứ 5', 'thứ 6', 'thứ 7'];
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Thời điểm (ms) -> "17h30 thứ 3, ngày 13/10/2026" theo giờ Việt Nam, đúng cách
+ * viết hạn của mẫu email Nhóm Dinh dưỡng. Hạn mặc định (12:00 thứ 2 tuần sau)
+ * ra đúng chữ của surveyDeadlineLabel(weekId) — harness đối chiếu hai bên.
+ * Giây lẻ (hạn "Đóng ngay" theo giờ máy chủ) bị bỏ: ghi sớm hơn vài giây thì
+ * không ai trả lời trễ vì tin vào thư.
+ */
+function vnDeadlineLabel(ms: number): string {
+  const d = new Date(ms + VN_OFFSET_MS); // đọc các trường UTC của mốc đã cộng 7 giờ = giờ VN
+  return `${pad2(d.getUTCHours())}h${pad2(d.getUTCMinutes())} ${VN_WEEKDAYS[d.getUTCDay()]}, ngày ${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+}
+
+/**
+ * Thư mời khảo sát, theo mẫu email của Nhóm Dinh dưỡng ("đồng chí" đổi thành
+ * "Thầy Cô"). Cùng một thư cho mọi người nhận nên không có lời chào theo tên.
+ * Chữ động duy nhất là nhãn tuần (tính từ mã tuần đã kiểm tra) và hạn (định dạng
+ * từ closesAt đã kiểm tra, hoặc hạn mặc định của mã tuần) — vẫn escape cho chắc.
+ */
+function renderSurveyEmail(weekId: string, closesAt: number | null, appUrl: string): { subject: string; html: string } {
+  const weekLabel = surveyWeekLabel(weekId);
+  const deadline = closesAt === null ? surveyDeadlineLabel(weekId) : vnDeadlineLabel(closesAt);
+  const subject = `Khảo sát chất lượng phục vụ suất ăn CBGV-NV tuần ${weekLabel}`;
+  const surveyUrl = `${appUrl}/khao-sat?tuan=${encodeURIComponent(weekId)}`;
+
+  const rows = [
+    row(para('Kính gửi Quý Thầy Cô CBGV-NV,')),
+    row(
+      para(
+        `Nhằm không ngừng nâng cao chất lượng phục vụ suất ăn dành cho CBGV-NV, Nhóm Dinh dưỡng kính mong nhận được những ý kiến đóng góp khách quan, chân thực và sát với thực tế từ các Thầy Cô về bữa ăn tuần <strong style="white-space:nowrap;">${esc(weekLabel)}</strong>.`,
+      ),
+    ),
+    // Nút đặt ngay sau lời mời: trên điện thoại thấy được mà không phải cuộn.
+    row(button(surveyUrl, 'Tham gia khảo sát'), '4px 28px 10px'),
+    row(fallbackLink(surveyUrl)),
+    row(
+      para(
+        'Những ý kiến đóng góp của Thầy Cô là cơ sở quan trọng để Nhóm Dinh dưỡng đánh giá thực tế, kịp thời điều chỉnh và đề xuất các giải pháp phù hợp nhằm nâng cao chất lượng bữa ăn, đáp ứng tốt hơn nhu cầu và mong muốn của CBGV-NV trong nhà trường.',
+      ),
+    ),
+    row(
+      para(
+        '<strong>Kính đề nghị 100% CBGV-NV đang sử dụng suất ăn tại Bếp nghiêm túc tham gia khảo sát, dành thời gian chia sẻ ý kiến để cùng góp phần cải thiện chất lượng bữa ăn ngày càng tốt hơn.</strong>',
+      ),
+    ),
+    row(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="border-left:4px solid ${RED};background-color:#fdf2f4;padding:12px 16px;">${para(
+      `⏰ Thời hạn hoàn thành khảo sát: trước <strong>${esc(deadline)}</strong>.`,
+      15,
+      NAVY,
+    )}<p style="margin:6px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">Khảo sát mất khoảng 1 phút, đăng nhập bằng tài khoản Microsoft của trường.</p></td></tr></table>`),
+    row(para(`Trân trọng,<br><strong style="color:${NAVY};">Nhóm Dinh dưỡng</strong> — Trường Ngôi Sao Hoàng Mai`), '0 28px 24px'),
+  ];
+
+  const html = layout({
+    title: subject,
+    preheader: `Mời Thầy Cô dành khoảng 1 phút đánh giá bữa ăn tuần ${weekLabel}. Hạn: trước ${deadline}.`,
+    heading: 'Khảo sát chất lượng suất ăn',
+    // Hạn nhắc ngay đầu thư vì nút bấm đứng trước khối "Thời hạn" ở cuối.
+    subheading: `Tuần ${weekLabel} · Hạn: trước ${deadline}`,
+    rows,
+  });
+  return { subject, html };
+}
+
 // ------------------------------------------------------------------ gửi
 
 /** Chạy tối đa `limit` việc cùng lúc, kết quả giữ đúng thứ tự đầu vào. `fn` không được ném lỗi. */
@@ -536,6 +730,67 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
 }
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
+
+/**
+ * Lỗi của Graph có thể nêu địa chỉ người nhận ("Recipient 'x@...' is not
+ * valid"). Thư mời gửi một lúc tới cả trăm người ở Bcc: lỗi trả về agent và ghi
+ * log không được làm lộ danh sách đó. Che TRƯỚC khi cắt 300 ký tự để không sót
+ * nửa địa chỉ ở chỗ cắt (lỗi Graph thì sendMail đã che từ trước khi tự cắt).
+ */
+const safeErrorMessage = (e: unknown) => hideAddresses(e instanceof Error ? e.message : String(e)).slice(0, 300);
+
+/**
+ * Gửi thư mời khảo sát: đúng MỘT lần sendMail cho cả lô. To = MEAL_ALERT_CC
+ * (mặc định dinhduong@; 'none' → hộp thư gửi) để mỗi lần gửi luôn có người của
+ * Nhóm Dinh dưỡng thấy — dùng sai khoá là lộ ngay; CBGV-NV ở Bcc nên không ai
+ * thấy địa chỉ của nhau và "Trả lời tất cả" chỉ về Nhóm Dinh dưỡng.
+ */
+async function sendSurveyInvite(r: SurveyInvite, graph: GraphConfig, deadlineAt: number, res: ApiResponse): Promise<void> {
+  const count = r.bcc.length;
+  let mail: MailMessage;
+  try {
+    const { cc, replyTo, appUrl } = mailSettings(graph.sender);
+    const { subject, html } = renderSurveyEmail(r.weekId, r.closesAt, appUrl);
+    mail = { to: cc.length ? cc : [graph.sender], bcc: r.bcc, replyTo, subject, html, saveToSentItems: false };
+  } catch (e) {
+    if (e instanceof Misconfigured) {
+      console.error(`[meal-alerts] ${e.message}`);
+      res.status(500).json({ error: e.message });
+      return;
+    }
+    throw e;
+  }
+
+  let token: string;
+  try {
+    token = await getGraphToken(graph);
+  } catch (e) {
+    // Cùng cách báo với hai loại thư kia: 502, chưa thư nào đi.
+    const error = safeErrorMessage(e);
+    console.error(`[meal-alerts] ${error}`);
+    res.status(502).json({ error, results: [{ ok: false, count, error } satisfies SurveyResult] });
+    return;
+  }
+
+  let result: SurveyResult;
+  try {
+    // sendMail tự thử lại một lần khi gặp 429 và tự từ chối khi không còn đủ thời gian trước deadlineAt.
+    await sendMail(token, graph.sender, mail, { deadlineAt, hideAddresses: true });
+    result = { ok: true, count };
+  } catch (e) {
+    const error = safeErrorMessage(e);
+    // Phân loại xem SurveyResult: chỉ lỗi chắc chắn chưa gửi mới trả ok:false
+    // "trơn" (agent gửi lại); còn lại báo maybeSent để agent không gửi lần hai.
+    const maybeSent = !mailCertainlyNotSent(e);
+    console.error(
+      `[meal-alerts] Thư mời khảo sát tuần ${r.weekId} (${count} người nhận) ${maybeSent ? 'lỗi sau khi đã gửi yêu cầu tới Graph (thư có thể đã đi)' : 'lỗi, chưa gửi'}: ${error}`,
+    );
+    result = maybeSent ? { ok: false, count, maybeSent: true, error } : { ok: false, count, error };
+  }
+  const outcome = result.ok ? `đã gửi 1 thư tới ${count} người (Bcc)` : result.maybeSent ? 'không rõ thư đã đi hay chưa' : 'không gửi được';
+  console.log(`[meal-alerts] survey-invite ${r.weekId}: ${outcome}.`);
+  res.status(200).json({ results: [result] });
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   // Mốc ngân sách thời gian lấy ngay khi vào, trước mọi việc có thể chậm (xem SEND_DEADLINE_MS).
@@ -589,6 +844,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   if (!graph) {
     console.error('[meal-alerts] Thiếu MS_GRAPH_TENANT_ID / MS_GRAPH_CLIENT_ID / MS_GRAPH_CLIENT_SECRET / MS_GRAPH_SENDER.');
     res.status(500).json({ error: 'Máy chủ chưa cấu hình dịch vụ email (MS_GRAPH_*).' });
+    return;
+  }
+
+  // Thư mời khảo sát: một thư Bcc cho cả lô, kết quả dạng khác — xử lý riêng để
+  // luồng hai loại thư cảnh báo bên dưới giữ nguyên.
+  if (request.kind === 'survey-invite') {
+    await sendSurveyInvite(request, graph, deadlineAt, res);
     return;
   }
 

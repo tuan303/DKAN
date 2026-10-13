@@ -18,6 +18,11 @@ export interface GraphConfig {
 export interface MailMessage {
   to: string[];
   cc?: string[];
+  /**
+   * Người nhận ẩn. Thư mời khảo sát gửi MỘT thư cho cả lô CBGV-NV: để họ ở Bcc
+   * thì không ai thấy địa chỉ của nhau và "Trả lời tất cả" chỉ tới người ở To.
+   */
+  bcc?: string[];
   replyTo?: string[];
   subject: string;
   html: string;
@@ -34,6 +39,49 @@ export interface SendOptions {
    * rồi báo lỗi rõ ràng để lần sau gửi nốt.
    */
   deadlineAt?: number;
+  /**
+   * Che địa chỉ email trong thông báo lỗi của Graph TRƯỚC khi cắt ngắn. Thư mời
+   * khảo sát có hàng trăm người ở Bcc mà Graph có thể nêu lại địa chỉ trong lỗi;
+   * cắt rồi mới che thì có thể sót nửa địa chỉ ở chỗ cắt. Mặc định tắt: thư
+   * cảnh báo vốn đã báo lỗi kèm địa chỉ người nhận của chính nó.
+   */
+  hideAddresses?: boolean;
+}
+
+/**
+ * Thay mọi "từ" (dãy ký tự liền nhau không có khoảng trắng) có chứa "@" bằng
+ * "[địa chỉ]".
+ *
+ * Che CẢ TỪ chứ không đoán biên địa chỉ theo dấu câu: endpoint nhận phần trước
+ * @ là mọi ký tự ASCII in được trừ @ (nên có thể có ' ( ) " , ; : [ ] < >), đoán
+ * biên theo dấu câu sẽ để lọt nguyên địa chỉ "a(b)@…" hay nửa đầu "o'" của
+ * "o'brien@…". Địa chỉ hợp lệ không chứa khoảng trắng nên luôn nằm trọn trong
+ * một từ; dấu nháy / ngoặc dính quanh địa chỉ bị che theo, không sao với một
+ * dòng lỗi.
+ *
+ * Duyệt một lượt, thời gian tuyến tính theo độ dài chuỗi: biểu thức kiểu
+ * "[^…]+@" phải dò lại từ mọi vị trí trên một dãy dài không có "@" (bậc hai —
+ * thân lỗi 50 KB mất vài giây, ăn hết thời gian của function).
+ */
+export const hideAddresses = (s: string): string => s.replace(/\S+/g, word => (word.includes('@') ? '[địa chỉ]' : word));
+
+// Dòng lỗi cuối cùng chỉ giữ 300 ký tự; khi phải che địa chỉ thì chỉ xét chừng
+// này ký tự đầu của thân lỗi để công che không phụ thuộc độ dài thân lỗi (proxy
+// trước Graph có thể trả cả trang dài). Dư nhiều so với 300 để vẫn còn đủ chữ
+// sau khi gộp khoảng trắng và thay địa chỉ dài bằng "[địa chỉ]".
+const HIDE_SCAN_LIMIT = 2000;
+
+/**
+ * Cắt `s` còn tối đa `limit` ký tự nhưng chỉ cắt ở khoảng trắng: bỏ luôn từ dở
+ * dang ở chỗ cắt. Cắt giữa một địa chỉ có thể để lại mẩu đầu đã mất "@" — mẩu
+ * đó hideAddresses không nhận ra, mà sau khi che và gộp khoảng trắng chuỗi ngắn
+ * lại nên mẩu ấy có thể dồn lên trong 300 ký tự được giữ.
+ */
+function cutAtSpace(s: string, limit: number): string {
+  if (s.length <= limit) return s;
+  let end = limit;
+  while (end > 0 && !/\s/.test(s[end])) end--;
+  return s.slice(0, end);
 }
 
 export class GraphError extends Error {
@@ -95,7 +143,7 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 }
 
 /** Tóm tắt lỗi Graph / Entra ID thành một dòng ngắn để bên gọi ghi log. */
-async function describeFailure(res: Response, prefix: string): Promise<string> {
+async function describeFailure(res: Response, prefix: string, hide = false): Promise<string> {
   let detail = '';
   try {
     const text = await res.text();
@@ -114,6 +162,9 @@ async function describeFailure(res: Response, prefix: string): Promise<string> {
   } catch {
     // Không đọc được nội dung lỗi thì chỉ báo mã HTTP.
   }
+  // Cắt (ở khoảng trắng) rồi mới che, che rồi mới cắt 300: không mẩu địa chỉ nào lọt qua chỗ cắt.
+  // Không che thì giữ nguyên như cũ (thư cảnh báo).
+  if (hide) detail = hideAddresses(cutAtSpace(detail, HIDE_SCAN_LIMIT));
   return `${prefix} HTTP ${res.status}${detail ? ` — ${detail}` : ''}`.replace(/\s+/g, ' ').slice(0, 300);
 }
 
@@ -141,11 +192,16 @@ export async function getGraphToken(cfg: GraphConfig): Promise<string> {
 const recipients = (list: string[]) => list.map(address => ({ emailAddress: { address } }));
 
 /**
- * Gửi một thư. Thành công thì trả về, thất bại thì ném GraphError.
+ * Gửi một thư. Thành công thì trả về; thất bại thì ném lỗi — GraphError khi
+ * Graph trả mã lỗi hoặc khi không bắt đầu gửi, còn lỗi mạng / hết thời gian chờ
+ * thì là lỗi gốc của fetch (TypeError, TimeoutError...).
  *
  * Chỉ thử lại khi gặp 429: lúc đó Graph chắc chắn đã từ chối thư nên gửi lại
  * không thể thành hai thư. Lỗi mạng / hết thời gian / 5xx thì KHÔNG thử lại vì
- * thư có thể đã đi — bên gọi (agent) sẽ gửi nốt ở lần chạy sau.
+ * thư có thể đã đi. Bên gọi phân biệt hai trường hợp bằng mailCertainlyNotSent:
+ * thư cảnh báo (mỗi người một thư) thì agent gửi lại ở lần chạy sau — nhận 2
+ * thư cảnh báo vẫn hơn sót; còn thư mời khảo sát (MỘT thư Bcc cho cả trường)
+ * thì endpoint báo "có thể đã đi" để agent KHÔNG tự gửi lại.
  */
 export async function sendMail(token: string, sender: string, msg: MailMessage, opts: SendOptions = {}): Promise<void> {
   // Giữ "@" nguyên dạng như api/send-email.ts (đã chạy thật), chỉ mã hoá ký tự
@@ -157,6 +213,7 @@ export async function sendMail(token: string, sender: string, msg: MailMessage, 
       body: { contentType: 'HTML', content: msg.html },
       toRecipients: recipients(msg.to),
       ...(msg.cc && msg.cc.length ? { ccRecipients: recipients(msg.cc) } : {}),
+      ...(msg.bcc && msg.bcc.length ? { bccRecipients: recipients(msg.bcc) } : {}),
       ...(msg.replyTo && msg.replyTo.length ? { replyTo: recipients(msg.replyTo) } : {}),
     },
     saveToSentItems: msg.saveToSentItems ?? false,
@@ -187,7 +244,24 @@ export async function sendMail(token: string, sender: string, msg: MailMessage, 
     res = await post();
   }
 
-  if (!res.ok) throw new GraphError(await describeFailure(res, 'Gửi email thất bại:'), res.status);
+  if (!res.ok) throw new GraphError(await describeFailure(res, 'Gửi email thất bại:', opts.hideAddresses), res.status);
   // Graph trả 202 không có nội dung; đọc bỏ để giải phóng kết nối.
   await res.text().catch(() => '');
+}
+
+/**
+ * Lỗi do sendMail ném ra có CHẮC CHẮN là thư chưa đi không.
+ *
+ * Chắc chắn chưa đi chỉ khi:
+ *   - GraphError status 0: không đủ thời gian nên chưa gửi request nào;
+ *   - GraphError 4xx (kể cả 429 — hết thời gian để thử lại, hoặc lần thử lại
+ *     vẫn 429): Graph đã trả lời và từ chối nhận thư.
+ * Mọi lỗi khác thì thư CÓ THỂ đã đi: Graph trả 5xx (có thể đã xếp thư vào hàng
+ * đợi rồi mới lỗi), hết REQUEST_TIMEOUT_MS sau khi đã gửi request, đứt kết nối
+ * sau khi đã gửi thân thư, hay một lỗi lạ không biết xảy ra lúc nào — nghiêng về
+ * "có thể đã đi" vì với thư Bcc cho cả trường, đoán nhầm "chưa đi" là mọi người
+ * nhận hai thư.
+ */
+export function mailCertainlyNotSent(e: unknown): boolean {
+  return e instanceof GraphError && (e.status === 0 || (e.status >= 400 && e.status < 500));
 }

@@ -5,11 +5,15 @@ Lấy lượt chấm từ hai máy Hikvision trong LAN rồi ghi lên hệ thố
 - tab **Đối soát chấm ăn** của quản trị có số liệu mà không phải xuất Excel thủ công;
 - CBNV tự xem lượt chấm của mình ở trang **Chấm ăn của tôi**;
 - sau giờ ăn trưa, người **đã đăng ký mà không có lượt chấm** nhận **một email
-  cảnh báo** (gửi qua hộp thư dinhduong@, có CC dinhduong@).
+  cảnh báo** (gửi qua hộp thư dinhduong@, có CC dinhduong@);
+- **15:00 thứ 6 hằng tuần**, CBGV-NV có đăng ký ăn nhận **email mời khảo sát
+  chất lượng suất ăn** của tuần (script riêng `survey-invite.mjs`, xem mục
+  **Khảo sát bữa ăn hằng tuần**).
 
 Chạy trên **PC cài phần mềm HAC** — máy đó vốn đã kết nối tới hai thiết bị.
 
 Bản hiện tại: **2026-10-09.1** (script in số bản ở dòng đầu mỗi lần chạy).
+Script khảo sát: **2026-10-13.4**.
 
 ---
 
@@ -223,6 +227,9 @@ chờ bạn bấm phím bất kỳ để đóng.
 | `DKAN 2 - Canh bao 13h45` | Thứ 2–6, 13:45, **lặp mỗi 15 phút trong 1 giờ** | `--quiet --days 1 --send-alerts` | Đồng bộ bữa trưa rồi gửi email cảnh báo |
 | `DKAN 3 - Dong bo 22h` | Hằng ngày, 22:00 | `--quiet` | Lấy lại 7 ngày gần nhất, bù khi có trục trặc |
 
+Gửi lời mời khảo sát (15:00 thứ 6, kèm các lần gửi bù) là task thứ tư, chạy
+file `.bat` riêng — xem mục **Khảo sát bữa ăn hằng tuần**.
+
 Task 2 chạy lúc 13:45 rồi cứ 15 phút một lần tới khoảng 14:45: lần đầu gửi,
 các lần sau chỉ gửi nốt cho người lần trước gửi lỗi, hoặc thử lại nếu lần
 trước có máy lỗi. Người đã được ghi vào nhật ký `meal_alerts` không nhận lần
@@ -293,6 +300,7 @@ Cột **Last Run Result** trong Task Scheduler cho biết kết quả:
 | `node sync-checkins.mjs --send-alerts` | Đồng bộ xong thì chạy pha gửi email cảnh báo (cần `alerts.enabled: true`) |
 | `node sync-checkins.mjs --dry-run --send-alerts` | Xem thử ai sẽ nhận email hôm nay, không gửi, không ghi |
 | `node sync-checkins.mjs --dry-run --send-alerts --alerts-date 2026-10-08` | Xem thử cho một ngày đã qua, bỏ qua kiểm tra giờ |
+| `node survey-invite.mjs --dry-run` | Xem thử lời mời khảo sát tuần này: ai sẽ nhận, mấy thư — không gửi, không ghi (xem mục **Khảo sát bữa ăn hằng tuần**) |
 | `npm test` | Chạy bộ kiểm tra tự động của script (không cần máy nhận diện hay Firebase) |
 
 **Vì sao mỗi lần lấy nhiều ngày chứ không chỉ hôm nay:** bộ nhớ sự kiện của
@@ -333,6 +341,9 @@ cũ.
 | `meal_taps/{tài khoản}/months/{tháng}` | Lượt chấm của từng người | Chính người đó và quản trị |
 | `settings/checkinSync` | Lần đồng bộ gần nhất, máy nào lỗi, ngày nào đã có dữ liệu đủ, trạng thái cảnh báo từng ngày. **Không có tên hay mã NV** | Mọi người đã đăng nhập |
 | `meal_alerts/{ngày}_{tài khoản}` | Ai đã được gửi email cảnh báo ngày nào | Quản trị |
+| `meal_surveys/{thứ 2 của tuần}` | (script khảo sát) Lịch mở/đóng khảo sát tuần và trạng thái email mời. **Không có tên hay email** | Mọi người đã đăng nhập |
+| `meal_surveys/{tuần}/private/invited` | (script khảo sát) Ai được mời (họ tên, bộ phận, email), ai đã nhận thư (`sentEmails`), ai **không rõ** đã nhận chưa (`uncertainEmails`, chỉ có khi một thư gửi không rõ kết quả) | Quản trị |
+| `meal_surveys/{tuần}/private/lock` | (script khảo sát) Quyền gửi lời mời của tuần: máy nào đang gửi, tới lúc nào — để hai máy không cùng gửi | Quản trị |
 
 Lượt chấm được gán cho tài khoản theo **mã NV trên đơn đăng ký tháng đó**
 (giống tab Đối soát); người không có đơn thì theo mã trong hồ sơ. Hai tài khoản
@@ -398,6 +409,297 @@ Xem trong Firebase Console: `settings` → `checkinSync` → `alerts` → ngày.
 
 `expected` / `missing` là số người đáng lẽ ăn / chưa chấm của từng bữa;
 `sent` là tổng số email đã gửi trong ngày.
+
+---
+
+## Khảo sát bữa ăn hằng tuần
+
+**15:00 thứ 6** hằng tuần, script `survey-invite.mjs` gửi email mời **CBGV-NV
+có đăng ký ăn trong tuần** làm khảo sát chất lượng phục vụ suất ăn của tuần đó.
+Thư đi từ hộp thư Nhóm Dinh dưỡng qua đúng đường email cảnh báo
+(`/api/meal-alerts`, cùng khoá bí mật); nút **Tham gia khảo sát** trong thư mở
+trang `/khao-sat` của phần mềm. Hạn trả lời **12h00 thứ 2 tuần sau** (quản trị
+gia hạn hoặc đóng sớm được — thư luôn ghi đúng hạn đang đặt lúc gửi). Kết quả
+xem ở trang Quản trị → tab **Khảo sát bữa ăn**.
+
+Script này **độc lập** với `sync-checkins.mjs`: không hỏi máy nhận diện, không
+cần `alerts.enabled` bật, chỉ dùng lại `alerts.endpoint` và `alerts.secret`.
+
+### Cài đặt (làm một lần)
+
+1. Chép đè **cả thư mục** agent mới vào `C:\DKAN-Agent` — có thêm
+   `survey-invite.mjs`, `khao-sat-bua-an.bat` và các file mới trong `lib\`.
+   **Giữ nguyên** `config.json` và `firebase-key.json`.
+2. Bản web đang chạy (Vercel) phải là bản có trang **/khao-sat** — endpoint
+   của bản cũ không biết loại thư `survey-invite` (script báo `HTTP 400`).
+   Cập nhật web **trước hoặc cùng lúc** với agent: bản agent này gửi kèm hạn
+   trả lời thật (`closesAt`) để thư ghi đúng hạn, và cần endpoint báo rõ thư
+   "có thể đã đi" (`maybeSent`) để không gửi trùng (xem **Thư "không rõ đã đi
+   chưa"**).
+3. Mở `config.json`, thêm khối `survey` (chép từ `config.example.json`), **để
+   tắt** cho tới khi chạy thử xong:
+
+   ```json
+   "survey": {
+     "enabled": false
+   }
+   ```
+
+   Không có khoá mới nào: script dùng `alerts.endpoint` và `alerts.secret` đã
+   khai ở mục 6 (phải là khoá thật, giống hệt `MEAL_ALERT_SECRET` trên Vercel).
+   Thiếu `alerts.endpoint`, khoá còn là chữ mẫu `DIEN_...` hay quá ngắn thì
+   script báo lỗi cấu hình, mã thoát `0x1`, không gửi gì.
+
+   Trên Vercel: `PUBLIC_APP_URL` là địa chỉ nút **Tham gia khảo sát** trong thư;
+   `MEAL_ALERT_CC` (mặc định dinhduong@) là hộp thư đứng ở ô **To** và nhận thư
+   trả lời. Người được mời nằm ở **Bcc** — không ai thấy địa chỉ của người khác.
+
+### Chạy thử
+
+```
+node survey-invite.mjs --dry-run
+```
+
+Chạy được **bất cứ lúc nào**, kể cả khi `survey.enabled` còn tắt hay chưa tới
+15:00 thứ 6. Script đọc hệ thống (cần `firebase-key.json`) rồi in: tuần nào,
+số đơn đăng ký, số người được mời, đã gửi trước đó bao nhiêu, sẽ gửi mấy thư,
+5 người nhận đầu tiên (địa chỉ đã che, vd. `n***@hoangmaistarschool.edu.vn`) và
+**kết luận** lần chạy thật lúc này sẽ làm gì. **Không gửi email, không ghi gì.**
+Xem tuần khác: `node survey-invite.mjs --dry-run --week 2026-10-05` (ngày thứ 2
+của tuần).
+
+So số người được mời với số CBGV-NV đăng ký ăn tháng này — phải gần bằng nhau.
+Rồi sửa `"enabled": true`.
+
+### Chạy tự động — task thứ tư trong Task Scheduler
+
+| Task | Lịch (3 trigger) | Program/script | Add arguments |
+|---|---|---|---|
+| `DKAN 4 - Khao sat 15h thu 6` | ① **Thứ 6, 15:00**, lặp mỗi 15 phút trong 1 giờ; ② **hằng ngày 07:30**, lặp mỗi 1 giờ trong 5 giờ; ③ **lúc khởi động máy**, chờ 5 phút | `C:\DKAN-Agent\khao-sat-bua-an.bat` | `--quiet` |
+
+Tạo như các task ở mục **Chạy tự động** (Create Task..., Run whether user is
+logged on or not, Run with highest privileges, Start in `C:\DKAN-Agent`), khác ở:
+
+- Tab **Triggers** — bấm **New...** ba lần:
+  1. **Weekly**, Start **15:00**, Recur every **1** weeks on: chỉ tích
+     **Friday**; ở **Advanced settings** tích **Repeat task every: 15
+     minutes**, **for a duration of: 1 hour**. Đây là lần gửi chính.
+  2. **Daily**, Start **07:30**, Recur every **1** days; **Repeat task every:
+     1 hour**, **for a duration of: 5 hours** (07:30 → 12:30). Đây là các lần
+     **gửi bù** thứ 7, chủ nhật, sáng thứ 2 khi chiều thứ 6 gửi không được
+     (mất mạng, Vercel/Microsoft lỗi, máy tắt) — xem mục **Gửi bù** để biết
+     chính xác khi nào lần chạy tự động còn gửi, khi nào phải chạy tay.
+  3. Begin the task: **At startup**, tích **Delay task for: 5 minutes** (chờ
+     mạng lên). Máy bật lại sau khi tắt suốt chiều thứ 6 thì gửi bù ngay.
+- Tab **Settings**: như các task kia — tích **Run task as soon as possible
+  after a scheduled start is missed**, **Stop the task if it runs longer than:
+  1 hour**, và **If the task is already running... : Do not start a new
+  instance**.
+
+Trigger ② và ③ chạy cả những ngày không có gì để gửi — **rất rẻ**: trước 15:00
+thứ 6 script thoát ngay, không đọc hệ thống; tuần đã gửi xong thì chỉ đọc 2
+document rồi thôi.
+
+Lần 15:00 gửi; các lần sau chỉ gửi nốt cho người **chắc chắn chưa nhận** (thư
+lỗi mà Microsoft Graph chắc chắn chưa gửi), không thì thấy "đã gửi xong" và
+thôi. Thư **không rõ đã đi chưa** thì không bao giờ tự gửi lại — nên không ai
+tự nhận hai thư. Chạy tay trùng lúc
+task đang chạy thì lần sau tự chờ (file `khao-sat.lock` cạnh script, chỉ có
+trong lúc chạy). Chạy thêm **từ máy khác** (cùng `config.json` +
+`firebase-key.json`, vd. máy quản trị IT) đúng lúc máy HAC đang gửi cũng không
+gửi trùng: lần chạy giữ **quyền gửi** của tuần trên hệ thống
+(`meal_surveys/{tuần}/private/lock`, tự hết sau 10 phút nếu lần chạy chết giữa
+chừng); lần chạy kia báo `Một lần chạy khác (máy ...) đang gửi` và thôi.
+
+`--quiet` ghi toàn bộ kết quả vào **`khao-sat.log`** cạnh file `.bat` (quá 5 MB
+thì đổi tên thành `khao-sat.old.log`). Hai file log này đã được cấu hình để
+Git bỏ qua. Bấm đúp `khao-sat-bua-an.bat` (không `--quiet`) là chạy tay, xem kết
+quả trên màn hình — **có gửi thật** nếu đúng giờ; muốn xem thử thì dùng
+`--dry-run` như trên.
+
+| Last Run Result | Ý nghĩa |
+|---|---|
+| `0x0` | Ổn: đã gửi xong, hoặc không có gì phải làm (chưa tới giờ, đã gửi rồi, tuần nghỉ, khảo sát đã đóng, máy khác đang gửi, tính năng đang tắt) |
+| `0x1` | Lỗi cấu hình hoặc lỗi chung (sai tham số, thiếu khoá Firebase, không đọc được hệ thống...) — **lần này chưa gửi lời mời nào**, xem `khao-sat.log`. Lần chạy kế tiếp thử lại |
+| `0x2` | Có thư gửi lỗi, hoặc thư **không rõ** đã đi chưa (trạng thái `partial` hoặc `error`). Người chắc chắn chưa gửi được thì lần chạy **tự động** gửi nốt — nhưng chỉ trong khung ở mục **Gửi bù** (tới trước 12:00 thứ 2 và còn ít nhất 1 giờ tới hạn); ngoài khung đó phải chạy tay `--week` (giờ cuối trước hạn: thêm `--force`). Người **không rõ** thì **không bao giờ** tự gửi lại — chạy `--force --week`. Xem `reason` |
+| `0x3` | **Đã gửi** lời mời nhưng sau đó lỗi (thường là không ghi được trạng thái email lên hệ thống). Danh sách đã nhận đã ghi sau từng thư nên lần sau không gửi trùng và tự ghi lại trạng thái; xem `khao-sat.log` |
+
+### Mỗi lần chạy, script làm gì
+
+1. `survey.enabled` phải là `true` (chạy thử thì bỏ qua bước này).
+2. Chọn tuần: tuần chứa hôm nay (giờ Việt Nam) — riêng **sáng thứ 2 trước
+   12:00** là tuần vừa qua (khảo sát của nó còn mở). Mốc 12:00 này là hạn
+   **mặc định**: quản trị gia hạn tuần trước sang thứ 3, 4... thì từ 12:00 thứ
+   2 lần chạy tự động vẫn chuyển sang tuần mới. `--week` chọn tuần khác.
+3. **Chưa tới 15:00 thứ 6** của tuần đó: không làm gì, không đọc hệ thống.
+4. Tuần đó **đã gửi xong**: không làm gì.
+5. **Cả tuần nghỉ** (thứ 2–6 đều là ngày nghỉ khai ở tab Cấu hình): ghi trạng
+   thái `skipped`, **không mở khảo sát**, không gửi.
+6. Khảo sát tuần đó **đã đóng** (quá hạn, hoặc quản trị bấm "Đóng ngay"): không
+   gửi. Gửi **bù** (sau thứ 6) mà còn **chưa tới 1 giờ** là hết hạn trả lời:
+   cũng không gửi (không ai kịp trả lời) — trừ khi chạy `--force`.
+7. Người được mời: có **đơn đăng ký ăn** của tháng (tuần vắt qua hai tháng thì
+   cả hai tháng) **đã có hiệu lực trước thứ 6**, có đăng ký ít nhất một bữa,
+   không thuộc danh sách loại trừ (Bếp Vina). Địa chỉ lấy từ **tài khoản đăng
+   nhập** (không lấy trên đơn), chỉ gửi tới `@hoangmaistarschool.edu.vn`; hai
+   tài khoản chung một địa chỉ thì gửi một lần. Bỏ người đã nhận thư ở lần
+   chạy trước.
+8. **Mở khảo sát** (document `meal_surveys/{tuần}`) trong **một giao dịch**
+   cùng lần đọc lại document tuần ngay lúc đó: quyết định lại (quản trị có thể
+   vừa bấm "Đóng ngay" trong lúc script tra danh sách — khi đó không gửi), giành
+   **quyền gửi** của tuần (`private/lock`), và chỉ ghi **phần còn thiếu**: chưa
+   có giờ mở thì mở từ lúc đó **theo giờ máy chủ** (đồng hồ máy HAC lệch cũng
+   không làm Thầy/Cô bấm link bị từ chối), chưa có hạn thì 12:00 thứ 2 tuần sau.
+   Giờ mở/hạn quản trị **đã đặt, gia hạn hay đóng sớm** thì không bao giờ bị
+   ghi lại.
+9. Gửi theo thư, mỗi thư tối đa **400 người Bcc**. **Trước mỗi thư** đọc lại
+   hạn đóng và quyền gửi (quản trị đóng giữa chừng thì dừng); hạn vừa đọc gửi
+   kèm cho endpoint nên dòng "Thời hạn hoàn thành khảo sát" trong thư là hạn
+   **thật** lúc gửi (đã gia hạn thì ghi hạn mới). Sau **mỗi thư**
+   ghi ngay ai đã nhận (`private/invited`); không ghi được thì **dừng gửi** các
+   thư còn lại để lần sau không gửi trùng. Thư **không rõ đã đi chưa** (xem
+   dưới) được ghi riêng và **không tự gửi lại**.
+10. Ghi trạng thái email vào document tuần (chỉ số đếm, không tên, không email)
+    — chỉ khối `email`, không đụng giờ mở/hạn.
+
+### Gửi bù
+
+**Lần chạy tự động** (Task Scheduler, không `--week`, không `--force`) gửi —
+hay gửi nốt — lời mời của tuần X khi **cả hai** điều sau đúng lúc nó chạy:
+
+- nó chạy từ **15:00 thứ 6** tuần X tới **trước 12:00 thứ 2** tuần sau (từ
+  12:00 thứ 2 nó chỉ lo tuần mới), và khảo sát **chưa đóng**;
+- nếu đã qua thứ 6 (gửi **bù**): còn **ít nhất 1 giờ** tới hạn thật (không ai
+  kịp trả lời một khảo sát sắp đóng). Thứ 6 thì không xét điều này.
+
+Với lịch ở trên, các lần chạy theo lịch đó là:
+
+| Ngày | Giờ chạy theo lịch có gửi | Trigger |
+|---|---|---|
+| Thứ 6 tuần X | 15:00, 15:15, 15:30, 15:45, 16:00 (quản trị rút hạn về chiều thứ 6 thì chỉ các lần trước hạn) | ① |
+| Thứ 7, chủ nhật | 07:30, 08:30, 09:30, 10:30, 11:30, 12:30 (lần nào còn ≥ 1 giờ tới hạn) | ② |
+| Thứ 2 tuần sau | 07:30, 08:30, 09:30, 10:30 với hạn mặc định 12:00 — lần 11:30 không gửi (còn 30 phút). Đã gia hạn tới 12:30 thứ 2 trở đi thì có cả 11:30. Lần 12:30 đã là tuần mới | ② |
+| Lúc bật máy (5 phút sau khởi động) | bất kỳ giờ nào thỏa hai điều trên | ③ |
+
+Với hạn mặc định 12:00 thứ 2, lần theo lịch cuối cùng là **10:30 thứ 2** (bật
+máy thì trước 11:00). Log ghi rõ `GỬI BÙ`, trạng thái có ghi chú "Gửi bù sau
+15:00 thứ 6"; khảo sát mở từ lúc gửi bù.
+
+Lần chạy tự động **KHÔNG** gửi — phải chạy tay trên máy HAC — trong các trường
+hợp:
+
+- **Đã qua 12:00 thứ 2**, kể cả khi quản trị đã **gia hạn** tuần đó sang thứ
+  3, 4...: lần chạy tự động chỉ xét tuần mới. Chạy
+  `node survey-invite.mjs --week <thứ 2 của tuần đó>` (được khi khảo sát còn
+  mở và còn ít nhất 1 giờ tới hạn).
+- **Còn dưới 1 giờ tới hạn thật** (vd. 11:00 → 12:00 thứ 2, hay giờ cuối trước
+  hạn quản trị đã đặt): cả lần tự động lẫn `--week` đều không gửi (báo `chỉ
+  còn N phút`). Muốn vẫn mời: quản trị **Gia hạn** rồi chạy `--week`, hoặc
+  chạy thêm `--force` (`node survey-invite.mjs --force`, hay `--force --week
+  <thứ 2>` nếu đã sang tuần mới).
+- **Người "không rõ đã nhận"** (xem dưới): không bao giờ tự gửi lại, ở bất kỳ
+  lần chạy nào không có `--force`. Chạy `node survey-invite.mjs --force --week
+  <thứ 2>` nếu đã xác nhận họ chưa nhận.
+- **Khảo sát đã đóng** (quá hạn, hoặc quản trị bấm "Đóng ngay"): không gửi, kể
+  cả `--force` (mời làm một khảo sát đã đóng là vô ích). Muốn vẫn thu ý kiến:
+  quản trị bấm **Gia hạn** trong tab Khảo sát bữa ăn, rồi chạy
+  `node survey-invite.mjs --week <thứ 2 của tuần đó>` — thư ghi **hạn mới**.
+
+Khi còn người chưa gửi được, `reason` của trạng thái email (Firebase
+Console: `meal_surveys` → tuần → `email`) ghi lần chạy **theo lịch** kế tiếp
+sẽ gửi nốt và lần theo lịch cuối cùng cho tuần đó (`Lần chạy sau sẽ gửi nốt
+(lần theo lịch kế tiếp ...)`), hoặc `Không còn lần chạy tự động nào gửi nốt`
+kèm lệnh chạy tay (khảo sát đã đóng thì kèm lời nhắc gia hạn trước). Câu này
+tính từ lúc lần chạy kết thúc, theo hạn lúc đó, và không tính lần bật máy. Tab Khảo sát bữa ăn không hiện câu này mà tự tính lại
+việc cần làm theo giờ hiện tại và hạn đang lưu (quản trị có thể đã gia hạn sau
+đó).
+
+Các cách chạy tay khác:
+
+- **Gửi bù bằng tay** sau 15:00 thứ 6: chạy `node survey-invite.mjs` (tuần
+  này, hoặc tuần vừa qua nếu là sáng thứ 2 trước 12:00) hoặc
+  `node survey-invite.mjs --week 2026-10-05`.
+- **Gửi sớm, không chờ 15:00 thứ 6** (vd. thứ 6 trường nghỉ, muốn gửi từ chiều
+  thứ 5): `node survey-invite.mjs --force`. `--force` bỏ qua kiểm tra giờ (kể
+  cả quy tắc "còn chưa tới 1 giờ") và **gửi lại cho người "không rõ đã nhận"**
+  (xem dưới); vẫn **không gửi lại** người đã nhận, tuần đã gửi xong, không gửi
+  cho tuần nghỉ, không gửi khi khảo sát đã đóng. Khảo sát mở từ lúc chạy.
+
+### Trạng thái email
+
+Xem ở tab **Khảo sát bữa ăn** (hoặc Firebase Console: `meal_surveys` → tuần →
+`email`).
+
+| Trạng thái | Nghĩa | Lần chạy sau |
+|---|---|---|
+| `sent` | Mọi thư đều đi; `sent` người đã nhận | Bỏ qua — không bao giờ gửi lại tuần này |
+| `partial` | Có thư lỗi; dừng giữa chừng (không ghi được danh sách đã nhận, hay quản trị đóng khảo sát giữa chừng); hoặc có thư **không rõ đã đi chưa**. Người đã nhận vẫn được nhớ. Lý do ở `reason` | Lần chạy tự động gửi nốt cho người chắc chắn chưa nhận **chỉ trong khung tự động** ở mục **Gửi bù** (thứ 6 từ 15:00; thứ 7, CN, sáng thứ 2 tới trước 12:00 và còn ≥ 1 giờ tới hạn). Ngoài khung đó — kể cả khi quản trị đã gia hạn — phải chạy tay `--week <thứ 2>` (giờ cuối trước hạn: thêm `--force`). Người **không rõ** thì không bao giờ tự gửi lại (`--force --week`) |
+| `error` | Chưa ai nhận được thư (endpoint lỗi, sai khoá...) — xem `reason`. Khảo sát vẫn đã mở | Thử gửi lại như `partial` (cùng khung tự động, ngoài khung thì chạy tay). Lỗi do cấu hình (sai khoá, bản web cũ) thì sửa xong mới hết |
+| `skipped` | Không gửi: cả tuần nghỉ, hoặc không có ai để mời (chưa ai đăng ký, hay mọi tài khoản thiếu email trường). Khảo sát **không** được mở | Kiểm tra lại; tuần có suất ăn trở lại (quản trị bỏ ngày nghỉ) thì gửi |
+
+Các trường còn lại: `at` lúc ghi trạng thái, `sentAt` lúc thư cuối cùng đi,
+`recipients` số người được mời, `sent` số người đã nhận thư, `failed` số người
+lần này chắc chắn chưa gửi được, `reason` ghi chú (gửi bù, số người không rõ
+đã nhận, số người không có email trường...).
+
+### Thư "không rõ đã đi chưa"
+
+Trường ~300 CBGV-NV nên thường **chỉ một thư** (Bcc) cho **cả trường**. Có
+những lỗi mà không ai biết chắc thư đã đi hay chưa:
+
+- giữa máy HAC và Vercel: endpoint không trả lời trong 90 giây, đứt kết nối
+  giữa chừng, Vercel trả trang lỗi `502`/`504`;
+- giữa Vercel và Microsoft Graph, **sau khi** Graph đã nhận yêu cầu gửi: Graph
+  không trả lời trong 10 giây, trả lỗi `5xx`, hoặc đứt kết nối. Endpoint báo
+  những trường hợp này bằng `maybeSent: true` trong kết quả (HTTP 200).
+
+Gửi lại "cho chắc" thì nếu Microsoft Graph thực ra đã gửi, **mọi CBGV-NV nhận
+hai thư** (và hộp thư gửi không lưu thư đã gửi để đối chiếu). Vì vậy script:
+
+- chỉ tự gửi lại khi **chắc chắn chưa gửi**: không kết nối được tới máy chủ,
+  máy chủ từ chối (`4xx`, kể cả `HTTP 400` vì hạn trả lời đã qua), hoặc
+  endpoint báo rõ Graph **chưa** gửi — Graph từ chối thư (`4xx`, quá tải
+  `429`) hay endpoint hết thời gian trước khi kịp gửi;
+- thư **không rõ** thì ghi người nhận vào `private/invited.uncertainEmails`,
+  trạng thái `partial`, `reason` ghi `N người KHÔNG RÕ đã nhận thư mời hay
+  chưa (Microsoft Graph có thể đã nhận thư: ...)`, mã thoát `0x2` — và
+  **không** tự gửi lại ở các lần sau, kể cả lần chạy tự động trong khung gửi
+  bù.
+
+Cách xử lý: hỏi vài Thầy/Cô xem đã nhận thư chưa (hoặc xem lượt trả lời trong
+tab Khảo sát bữa ăn có tăng không). **Đã nhận** thì thôi (trạng thái giữ
+`partial`, không ảnh hưởng khảo sát). **Chưa nhận** thì trên máy HAC chạy
+`node survey-invite.mjs --force --week <thứ 2 của tuần>` — gửi lại đúng những
+người "không rõ" (và người chưa nhận), xong thì trạng thái thành `sent`.
+
+### Lỗi thường gặp
+
+| Thông báo | Nguyên nhân / cách xử lý |
+|---|---|
+| `survey.enabled đang tắt` / `chưa có khối "survey"` | Chưa bật. Thêm/sửa `"survey": { "enabled": true }` sau khi đã chạy thử |
+| `alerts.secret vẫn là chữ mẫu` / `quá ngắn` / `alerts.endpoint đang trống` | Điền khối `alerts` như mục 6 — dùng chung với email cảnh báo |
+| `Chưa tới giờ gửi: ... gửi từ 15:00 ...` | Bình thường khi chạy trước 15:00 thứ 6. Muốn gửi sớm thì `--force`; muốn xem thử thì `--dry-run` |
+| `Khảo sát tuần ... đã đóng lúc ...` | Quá hạn trả lời hoặc quản trị đã đóng. Xem mục **Gửi bù** |
+| `... chỉ còn N phút là hết hạn trả lời ... không gửi bù` | Gửi bù quá sát hạn. Muốn vẫn mời: quản trị **Gia hạn** rồi chạy `--week <thứ 2>`, hoặc chạy `--force` |
+| `Kiểm tra lại ngay trước khi gửi: ... đã đóng` / `Thư i/n: KHÔNG gửi — khảo sát đã đóng` | Quản trị vừa đóng khảo sát trong lúc script chạy — script tôn trọng, không gửi tiếp |
+| `Thư i/n: KHÔNG gửi — không kiểm tra được trạng thái khảo sát trước khi gửi (...) — dừng gửi các thư còn lại` | Mất kết nối Firestore ngay trước thư đó. Thư đó và các thư sau **chắc chắn chưa gửi**; `reason` ghi lần chạy theo lịch nào gửi nốt, hay phải chạy tay `--week <thứ 2>` (xem mục **Gửi bù**) |
+| `Một lần chạy khác (máy ...) đang gửi lời mời tuần này` | Máy khác (hoặc lần chạy khác) đang giữ quyền gửi — bình thường, mã `0x0`. Lần chạy kia chết giữa chừng thì quyền tự hết sau 10 phút |
+| `Thư i/n: KHÔNG RÕ đã gửi hay chưa` / `N người KHÔNG RÕ đã nhận` | Xem mục **Thư "không rõ đã đi chưa"** |
+| `ĐÃ GỬI N lời mời nhưng không ghi được trạng thái email` | Mã `0x3`. Thư đã đi, danh sách đã nhận đã ghi; lần chạy sau tự ghi lại trạng thái, không gửi trùng |
+| `Endpoint trả HTTP 400: ... kind` | Bản web trên Vercel chưa có tính năng khảo sát — cập nhật web rồi chạy lại |
+| `Endpoint trả HTTP 400: Khảo sát tuần này đã đóng lúc ...` | Hạn trả lời đã qua ngay lúc gửi (quản trị vừa đóng, hoặc đồng hồ máy HAC chậm). Chưa gửi gì. Muốn vẫn mời: **Gia hạn** rồi chạy `--week <thứ 2>` |
+| `Endpoint trả HTTP 400: closesAt phải sau 00:00 thứ 2 của tuần và không quá 40 ngày sau đó` | Hạn trả lời của tuần đặt quá xa (hơn 40 ngày sau thứ 2 đầu tuần) — endpoint không in một hạn vô lý vào thư. Chưa gửi gì. Quản trị đặt lại hạn gần hơn rồi chạy `--week <thứ 2>` |
+| `Endpoint trả HTTP 401` / `500` / `404`, `Không gọi được ...` | Như email cảnh báo — xem bảng **Lỗi ở pha cảnh báo** |
+| `Không có CBGV-NV nào để mời` | Không ai có đơn đăng ký ăn tuần đó (hoặc tài khoản không có email trường). Trạng thái `skipped` |
+| `N người không có email @hoangmaistarschool.edu.vn trong tài khoản` | Tài khoản đăng nhập dùng email ngoài trường — không gửi được, cần nhắc trực tiếp |
+| `không ghi được danh sách đã nhận — DỪNG gửi tiếp` | Mất kết nối Firestore (đã thử lại 3 lần). Người của thư vừa gửi có thể nhận trùng ở lần sau; báo lại để kiểm tra |
+| `Vẫn đang có một lần gửi lời mời khác sau 10 phút chờ` | Lần chạy trước bị treo. Chắc chắn không còn `node.exe` nào chạy thì xoá `khao-sat.lock` cạnh script |
+
+Còn một khe nhỏ có thể gửi trùng: thư đã đi mà máy mất kết nối Firestore
+**đúng lúc** ghi danh sách đã nhận (đã thử lại 3 lần, trong khi Firestore vừa
+trả lời được ngay trước đó) — script dừng gửi tiếp, báo `không ghi được danh
+sách đã nhận`, và người trong **thư đó** (thường là cả trường) có thể nhận lại
+ở lần chạy sau.
 
 ---
 

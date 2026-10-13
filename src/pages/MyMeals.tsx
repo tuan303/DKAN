@@ -6,6 +6,7 @@ import { auth, db } from '../lib/firebase';
 import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
+import { SurveyBanner } from '../components/SurveyBanner';
 import {
   MEALS,
   MEAL_LABEL,
@@ -1386,6 +1387,9 @@ export default function MyMeals() {
     <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
+      {/* Đặt ngoài MyMealsView để phần trình bày vẫn thuần props (xem trước bằng
+          dữ liệu giả không đọc Firestore). Lề ngang khớp <main> của view. */}
+      <SurveyBanner className="max-w-[1440px] w-full mx-auto px-md md:px-margin lg:px-xl pt-md md:pt-lg" />
       <MyMealsView
         loading={!error && !computed}
         refreshing={refreshing}

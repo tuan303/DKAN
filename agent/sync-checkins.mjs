@@ -47,6 +47,7 @@ import {
 } from './lib/alert-plan.mjs';
 import { readAcsPage, pagingProblem, MAX_PAGES } from './lib/isapi-paging.mjs';
 import { acquireLock } from './lib/run-lock.mjs';
+import { postAlerts } from './lib/endpoint.mjs';
 // firebase-admin nạp muộn, ngay trước lúc cần Firestore: chế độ --dry-run
 // không cần tới nó, nhờ vậy kiểm tra kết nối thiết bị được ngay cả khi phần
 // Firebase chưa sẵn sàng. Test cũng không bao giờ phải nạp nó.
@@ -109,8 +110,8 @@ if (new Set(DEVICE_NAMES).size !== DEVICE_NAMES.length) fail('Hai máy trong con
 // Thiết bị treo (nhận kết nối rồi im lặng) mà không có hạn chờ thì script đứng
 // mãi, Task Scheduler không chạy được lần sau vì lần trước chưa xong.
 const DEVICE_TIMEOUT_MS = Number(config.deviceTimeoutMs) > 0 ? Number(config.deviceTimeoutMs) : 20_000;
-// Endpoint gửi email có thể phải chờ Microsoft Graph (429) — cho rộng hơn.
-const ALERT_TIMEOUT_MS = 90_000;
+// Hạn chờ endpoint gửi email (90 giây, rộng hơn vì có lúc phải chờ Microsoft
+// Graph) nằm cùng hàm gọi endpoint trong lib/endpoint.mjs.
 
 const ALERTS = args.sendAlerts ? readAlertsConfig(config.alerts) : null;
 
@@ -873,45 +874,8 @@ async function main() {
 
 // ------------------------------------------------------------- pha cảnh báo
 
-/**
- * Gửi một request tới endpoint /api/meal-alerts. Ném lỗi nếu không phải 200.
- * Không bao giờ in khoá bí mật — kể cả trong thông báo lỗi.
- */
-async function postAlerts(cfg, body) {
-  let res;
-  try {
-    res = await fetch(cfg.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.secret}` },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(ALERT_TIMEOUT_MS),
-    });
-  } catch (err) {
-    const name = err?.name || err?.cause?.name || '';
-    // TypeError ném ra TRƯỚC khi gửi (header hoặc địa chỉ không hợp lệ): thông
-    // báo gốc có thể chép nguyên "Bearer <khoá>" — không bao giờ dùng nó.
-    const why = name === 'TimeoutError'
-      ? `không trả lời trong ${ALERT_TIMEOUT_MS / 1000} giây`
-      : err instanceof TypeError && !err.cause
-        ? 'không tạo được yêu cầu gửi (kiểm tra alerts.endpoint và alerts.secret trong config.json)'
-        : (err?.cause?.code || err?.cause?.message || err?.message || 'lỗi kết nối');
-    let host = 'endpoint';
-    try { host = new URL(cfg.endpoint).host; } catch { /* đã báo ở bước kiểm tra cấu hình */ }
-    throw new Error(redact(`Không gọi được ${host} — ${why}`, cfg.secret));
-  }
-  const text = await res.text().catch(() => '');
-  let data = null;
-  try { data = JSON.parse(text); } catch { /* thân không phải JSON */ }
-  if (!res.ok) {
-    const msg = String(data?.error || data?.message || text).replace(/\s+/g, ' ').slice(0, 200);
-    const hint = res.status === 401 ? ' — alerts.secret không khớp biến MEAL_ALERT_SECRET trên Vercel'
-      : res.status === 500 && /MEAL_ALERT_SECRET/.test(msg) ? ' — đặt biến này trên Vercel (ít nhất 32 ký tự) rồi Redeploy'
-      : res.status === 404 ? ' — sai alerts.endpoint, hoặc bản web chưa có /api/meal-alerts'
-      : '';
-    throw new Error(redact(`Endpoint trả HTTP ${res.status}${msg ? `: ${msg}` : ''}${hint}`, cfg.secret));
-  }
-  return data;
-}
+// postAlerts (gọi endpoint /api/meal-alerts, che khoá trong mọi thông báo lỗi)
+// nằm ở lib/endpoint.mjs — dùng chung với script gửi lời mời khảo sát.
 
 /** Ghi một lô vào Firestore, thử lại khi lỗi (lỗi mạng thoáng qua). */
 async function commitWithRetry(db, ops) {

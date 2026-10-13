@@ -20,3 +20,5 @@ agent/*-firebase-adminsdk-*.json
 agent/dong-bo.log
 agent/dong-bo.old.log
 agent/dong-bo.lock
+agent/khao-sat.log
+agent/khao-sat.old.log
