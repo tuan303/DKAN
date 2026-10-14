@@ -1132,13 +1132,11 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Tabs navigation. max-w-full là bắt buộc: thiếu nó thì lg:w-fit cho
-            phép thanh tab rộng hơn khung, đẩy cả trang cuộn ngang ở bề ngang
-            khoảng 1024-1100px. */}
+        {/* Menu xuống hàng theo độ rộng để luôn thấy đủ mục, không phải cuộn ngang. */}
         <div
           role="tablist"
           aria-label="Khu vực quản trị"
-          className="flex gap-1 px-1 py-1 mt-xs bg-surface-container-lowest border border-outline-variant overflow-x-auto whitespace-nowrap hide-scrollbar flex-nowrap rounded-xl w-full lg:w-fit max-w-full shadow-xs"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 p-2 mt-xs bg-surface-container-lowest border border-outline-variant rounded-xl w-full min-w-0 shadow-xs"
         >
           {ADMIN_TABS.map(tab => {
             const isActive = activeTab === tab.key;
@@ -1148,7 +1146,7 @@ export default function Admin() {
                 role="tab"
                 aria-selected={isActive}
                 title={tab.label}
-                className={`px-4 py-2 text-label-md uppercase tracking-wide transition-colors rounded-lg shrink-0 inline-flex items-center gap-2 ${
+                className={`min-h-12 min-w-0 px-3 py-2 text-label-md uppercase tracking-normal transition-colors rounded-lg flex items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                   isActive
                     ? 'bg-primary text-on-primary shadow-sm'
                     : 'bg-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
@@ -1156,12 +1154,13 @@ export default function Admin() {
                 onClick={() => setActiveTab(tab.key)}
               >
                 <span
-                  className="material-symbols-outlined text-[18px]"
+                  className="material-symbols-outlined text-[18px] shrink-0"
+                  aria-hidden="true"
                   style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
                 >
                   {tab.icon}
                 </span>
-                {tab.label}
+                <span className="min-w-0 whitespace-normal break-words leading-5">{tab.label}</span>
               </button>
             );
           })}
