@@ -10,6 +10,8 @@ import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
+import { AdminWorkspace, ADMIN_TABS, type AdminTabKey } from '../components/AdminWorkspace';
+import { useCurrentAccount } from '../lib/useCurrentAccount';
 // Dùng chung quy tắc ngày với agent và trang Chấm ăn của tôi: "cuối tuần" và
 // "hôm nay" phải hiểu giống hệt nhau ở mọi nơi.
 import { formatDate, formatDayLabel, isWeekday, vnToday } from '../../agent/lib/meal-rules.mjs';
@@ -106,26 +108,10 @@ interface EventData {
 
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
-type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'menu' | 'survey' | 'logs' | 'admins';
-
 // Trần số dòng nhật ký tải về một lần. ~600 CBGV-NV, mỗi người đăng nhập vài
 // lần/ngày, nên 1000 dòng phủ được quãng một tuần. Chạm trần thì giao diện báo
 // để người xem biết phải thu hẹp khoảng ngày, chứ không âm thầm cắt bớt.
 const LOGIN_LOG_LIMIT = 1000;
-
-const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
-  { key: 'monthly', label: 'ĐK ăn hàng tháng', icon: 'calendar_month' },
-  { key: 'daily_stats', label: 'DS ĐK theo ngày', icon: 'list_alt' },
-  { key: 'cancelations', label: 'ĐK hủy ăn', icon: 'event_busy' },
-  { key: 'reconcile', label: 'Đối soát chấm ăn', icon: 'fact_check' },
-  { key: 'events', label: 'ĐK ăn sự kiện', icon: 'celebration' },
-  { key: 'blocked', label: 'Vi phạm', icon: 'gavel' },
-  { key: 'settings', label: 'Cấu hình', icon: 'settings' },
-  { key: 'menu', label: 'Thực đơn tuần', icon: 'restaurant_menu' },
-  { key: 'survey', label: 'Khảo sát bữa ăn', icon: 'rate_review' },
-  { key: 'logs', label: 'Nhật ký đăng nhập', icon: 'history' },
-  { key: 'admins', label: 'Quản trị', icon: 'admin_panel_settings' },
-];
 
 // Ngày dạng YYYY-MM-DD theo giờ máy. Không dùng toISOString() vì hàm đó đổi
 // sang UTC — quá 07:00 giờ Việt Nam là nhảy sang ngày hôm sau.
@@ -168,6 +154,7 @@ const sameDates = (a: string[], b: string[]) => a.length === b.length && a.every
 
 export default function Admin() {
   const navigate = useNavigate();
+  const account = useCurrentAccount();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -221,7 +208,8 @@ export default function Admin() {
   const [logStatusFilter, setLogStatusFilter] = useState<'all' | 'success' | 'rejected'>('all');
 
   // Tabs from URL
-  const activeTab = (searchParams.get('tab') || 'monthly') as AdminTabKey;
+  const requestedTab = searchParams.get('tab');
+  const activeTab: AdminTabKey = ADMIN_TABS.find(tab => tab.key === requestedTab)?.key ?? 'monthly';
   const setActiveTab = (tab: AdminTabKey) => setSearchParams({ tab });
   const [hasOpenedMenu, setHasOpenedMenu] = useState(activeTab === 'menu');
   useEffect(() => {
@@ -1102,7 +1090,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative">
+    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative pt-16">
       {/* Toast — top-20 để nằm dưới thanh header cố định (h-16), không đè lên */}
       {toast && (
         <div className={`fixed top-20 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
@@ -1117,52 +1105,10 @@ export default function Admin() {
         </div>
       )}
 
-      <Header />
+      <Header account={account} />
       
-      <main className="flex-1 max-w-[1440px] w-full mx-auto p-sm md:p-lg lg:p-xl flex flex-col gap-md md:gap-lg mt-16 md:mt-2">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-sm border-b md:border-b-0 border-outline-variant pb-md md:pb-0 px-md md:px-0 mt-md md:mt-0">
-          <div className="flex items-center gap-3">
-            <span className="hidden md:block w-1 h-11 rounded-full bg-secondary shrink-0" aria-hidden="true" />
-            <div>
-              <h1 className="text-headline-md md:text-headline-lg text-primary">Quản Trị Hệ Thống</h1>
-              <p className="text-body-sm md:text-body-md text-on-surface-variant mt-0.5">Quản lý đăng ký suất ăn và tài khoản quản trị.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Menu xuống hàng theo độ rộng để luôn thấy đủ mục, không phải cuộn ngang. */}
-        <div
-          role="tablist"
-          aria-label="Khu vực quản trị"
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 p-2 mt-xs bg-surface-container-lowest border border-outline-variant rounded-xl w-full min-w-0 shadow-xs"
-        >
-          {ADMIN_TABS.map(tab => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={isActive}
-                title={tab.label}
-                className={`min-h-12 min-w-0 px-3 py-2 text-label-md uppercase tracking-normal transition-colors rounded-lg flex items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                  isActive
-                    ? 'bg-primary text-on-primary shadow-sm'
-                    : 'bg-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                }`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                <span
-                  className="material-symbols-outlined text-[18px] shrink-0"
-                  aria-hidden="true"
-                  style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
-                >
-                  {tab.icon}
-                </span>
-                <span className="min-w-0 whitespace-normal break-words leading-5">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      <main className="flex-1 max-w-[1440px] w-full min-w-0 mx-auto px-3 py-6 sm:px-6 lg:p-8 flex flex-col gap-5 md:gap-6">
+        <AdminWorkspace activeTab={activeTab} onTabChange={setActiveTab} account={account} />
 
         {activeTab === 'monthly' && (
           <div className="flex flex-col gap-md lg:gap-lg">

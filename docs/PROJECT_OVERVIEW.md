@@ -39,6 +39,8 @@ flowchart LR
 | `src/pages/ScheduleMonth.tsx` | Đăng ký tháng, báo hủy theo ngày/bữa, email xác nhận, chuyển hủy sang GAS |
 | `src/pages/ScheduleEvent.tsx` | Đọc sự kiện đang mở, đăng ký và email xác nhận |
 | `src/pages/Admin.tsx` | Quản trị đăng ký, thống kê, hủy, sự kiện, vi phạm, cấu hình, quyền và nhật ký |
+| `src/components/AdminWorkspace.tsx` | Tiêu đề/thông tin tài khoản quản trị, 11 chức năng theo nhóm Suất ăn/Dinh dưỡng/Hệ thống, hộp thông tin tài khoản |
+| `src/lib/useCurrentAccount.ts` | Đọc danh tính Auth và hồ sơ nhân viên, bỏ kết quả của phiên đăng nhập cũ; dùng chung cho Header và trang quản trị |
 | `src/components/MealReconciliation.tsx` | Đối soát đăng ký với lượt chấm tự động hoặc Excel HAC; xuất Excel |
 | `src/pages/MyMeals.tsx` | Lịch sử cá nhân của tháng này và hai tháng trước |
 | `src/pages/MealSurvey.tsx` | Trả lời/sửa khảo sát trong hạn, giữ bản nháp |
@@ -218,6 +220,8 @@ Các bài test tập trung vào quy tắc suất ăn, cảnh báo, độ phủ t
 Cập nhật thực đơn ngày 14/10/2026: bổ sung kiểm thử parser thực đơn, mẫu Excel `.xlsx`/`.xls`, hệ ngày 1904, sai tuần, giới hạn tệp/hàng, HTML email và API với Microsoft Graph giả lập. Tổng bộ kiểm thử hiện tại **158 bài**. `npm test` ở gốc chạy đúng các file test nghiệp vụ/Excel, không chạy script gửi thư thử `test-email.cjs`. Giao diện thực đơn đã được xem trên máy tính và điện thoại 360px bằng bản QA chỉ dùng dữ liệu và thao tác lưu giả lập; hộp chọn file của trình duyệt QA không mở được, nên luồng import được xác minh bằng các bài roundtrip Excel. Firestore rules chưa được chạy qua emulator hay deploy trong lần cập nhật này.
 
 Cập nhật quyền thực đơn ngày 14/10/2026: kiểm tra Rules API cho thấy rules production của `dkan-4b061` chưa có `weekly_menus`. Đã đối chiếu với rules trong repo, kiểm tra biên dịch không có lỗi, chạy 6 giả lập quyền (hai super admin được đọc/xóa, nhân viên thường không được xóa, người chưa đăng nhập không được đọc) và triển khai ruleset `02b97357-1b95-43fa-b841-44f19764ea59` lúc 15:04:08 giờ Việt Nam. Đã đọc lại release `cloud.firestore` và xác minh nội dung khớp `firestore.rules`; không ghi/xóa thực đơn thật để thử quyền. `src/lib/adminAccess.ts` nay là danh sách quản trị cao nhất dùng chung cho trang quản trị và menu điều hướng, chuẩn hóa email hoa/thường và khoảng trắng; regression test đối chiếu danh sách này với rules. Tổng kiểm thử **161/161 đạt**, TypeScript và build đạt. Khi thay rules, cần triển khai Firebase riêng vì Vercel chỉ triển khai web/API.
+
+Cập nhật giao diện quản trị ngày 14/10/2026: chừa 64px cho Header ở mọi kích thước để tiêu đề không bị che; nhóm menu thành Suất ăn, Dinh dưỡng và Hệ thống, hiển thị đủ 11 chức năng với mô tả và trạng thái chọn. Thông tin tài khoản ưu tiên hồ sơ `staff/{uid}`, dùng danh tính Auth khi hồ sơ chưa có hoặc đọc lỗi, ghi rõ các trường chưa cập nhật; vai trò cao nhất chỉ dựa email Auth. Header nhận cùng hồ sơ từ Admin để không đọc lặp. QA trình duyệt dùng đúng các thành phần với hồ sơ mẫu: 320/360/768/1024/1280/1920px không tràn ngang/cắt menu/che tiêu đề; chọn 11 chức năng, URL/Back, tên/email dài, hộp thông tin/Escape/focus đều đạt. Không thay thao tác ghi dữ liệu nghiệp vụ trong lần chỉnh giao diện này.
 
 ## 9. Các điểm cần xem xét khi cập nhật
 
