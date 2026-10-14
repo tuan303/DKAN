@@ -8,6 +8,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import { SurveyResults } from '../components/SurveyResults';
+import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
 // Dùng chung quy tắc ngày với agent và trang Chấm ăn của tôi: "cuối tuần" và
 // "hôm nay" phải hiểu giống hệt nhau ở mọi nơi.
 import { formatDate, formatDayLabel, isWeekday, vnToday } from '../../agent/lib/meal-rules.mjs';
@@ -107,7 +108,7 @@ interface EventData {
 const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
-type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'survey' | 'logs' | 'admins';
+type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'menu' | 'survey' | 'logs' | 'admins';
 
 // Trần số dòng nhật ký tải về một lần. ~600 CBGV-NV, mỗi người đăng nhập vài
 // lần/ngày, nên 1000 dòng phủ được quãng một tuần. Chạm trần thì giao diện báo
@@ -122,6 +123,7 @@ const ADMIN_TABS: { key: AdminTabKey; label: string; icon: string }[] = [
   { key: 'events', label: 'ĐK ăn sự kiện', icon: 'celebration' },
   { key: 'blocked', label: 'Vi phạm', icon: 'gavel' },
   { key: 'settings', label: 'Cấu hình', icon: 'settings' },
+  { key: 'menu', label: 'Thực đơn tuần', icon: 'restaurant_menu' },
   { key: 'survey', label: 'Khảo sát bữa ăn', icon: 'rate_review' },
   { key: 'logs', label: 'Nhật ký đăng nhập', icon: 'history' },
   { key: 'admins', label: 'Quản trị', icon: 'admin_panel_settings' },
@@ -223,6 +225,10 @@ export default function Admin() {
   // Tabs from URL
   const activeTab = (searchParams.get('tab') || 'monthly') as AdminTabKey;
   const setActiveTab = (tab: AdminTabKey) => setSearchParams({ tab });
+  const [hasOpenedMenu, setHasOpenedMenu] = useState(activeTab === 'menu');
+  useEffect(() => {
+    if (activeTab === 'menu') setHasOpenedMenu(true);
+  }, [activeTab]);
 
   // Settings states
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
@@ -2281,6 +2287,13 @@ export default function Admin() {
 
         {/* Chỉ dựng khi đang mở tab: component tự đọc meal_surveys và phản
             hồi lúc được dựng, nên các tab khác không tốn lượt đọc nào. */}
+        {/* Giữ bản nhập/chỉnh sửa khi chuyển tab; chỉ tải thực đơn sau lần mở đầu. */}
+        {(activeTab === 'menu' || hasOpenedMenu) && (
+          <div hidden={activeTab !== 'menu'}>
+            <WeeklyMenuManager showToast={showToast} />
+          </div>
+        )}
+
         {activeTab === 'survey' && (
           <SurveyResults showToast={showToast} describeError={describeFirebaseError} />
         )}

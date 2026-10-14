@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import MyMeals from './pages/MyMeals';
 import MealSurvey from './pages/MealSurvey';
+import WeeklyMenu from './pages/WeeklyMenu';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/quantri" element={<Admin />} />
         <Route path="/cham-an" element={<MyMeals />} />
         <Route path="/khao-sat" element={<MealSurvey />} />
+        <Route path="/thuc-don" element={<WeeklyMenu />} />
       </Routes>
     </BrowserRouter>
   );

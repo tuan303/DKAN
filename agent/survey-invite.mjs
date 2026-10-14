@@ -9,7 +9,7 @@
  *      bù nếu tuần đó chưa gửi xong, khảo sát chưa đóng và còn ít nhất 1 giờ);
  *   3. tuần nghỉ cả tuần -> ghi 'skipped', không mở khảo sát;
  *   4. đã gửi xong -> thôi (Task Scheduler chạy lặp nhiều lần);
- *   5. tính người nhận;
+ *   5. đọc thực đơn đúng tuần (lỗi đọc/dữ liệu hỏng thì dừng), tính người nhận;
  *   6. trong MỘT giao dịch Firestore: đọc lại document tuần, quyết định lại
  *      (quản trị có thể vừa đóng khảo sát), giành quyền gửi
  *      (private/lock — chặn cả lần chạy từ máy khác) và mở khảo sát (chỉ ghi
@@ -44,6 +44,7 @@ import { cleanRegistrations, dropGhosts } from './lib/registrations.mjs';
 import { acquireLock } from './lib/run-lock.mjs';
 import { postAlerts } from './lib/endpoint.mjs';
 import { surveyWeek, surveyWeekLabel, surveyDeadlineLabel, surveyRecipientUids, toMillis } from './lib/survey.mjs';
+import { normalizeWeeklyMenu, hasMenuContent } from './lib/weekly-menu.mjs';
 import {
   parseSurveyArgs, readSurveyConfig, defaultSurveyWeekId, decideWeek, openWeekPatch, skippedWeekDoc,
   buildEmailStatus, buildInvitees, pendingInvitees, emailList, inviteBatches, mergeInvitedRecipients, inviteOutcome,
@@ -54,7 +55,7 @@ import {
 // thứ 6 (hay khi tính năng đang tắt) thoát ngay mà không cần tới nó.
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào.
-const SURVEY_AGENT_VERSION = '2026-10-13.4';
+const SURVEY_AGENT_VERSION = '2026-10-14.1';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -282,6 +283,28 @@ async function main() {
 
   if ((decision.action === 'closed' || decision.action === 'too_late') && !DRY_RUN) return EXIT_OK;
 
+  // Đọc thực đơn đúng tuần một lần cho cả đợt gửi (kể cả chạy thử), trước khi
+  // mở khảo sát và gửi lời mời. Không có document thì vẫn mời với liên kết xem thực
+  // đơn; lỗi đọc hoặc dữ liệu hỏng phải DỪNG, không làm mất thực đơn đã nhập.
+  let menu = null;
+  let menuSnap;
+  try {
+    menuSnap = await db.collection('weekly_menus').doc(weekId).get();
+  } catch (err) {
+    throw new FatalError(`Không đọc được thực đơn weekly_menus/${weekId}: ${err?.message || err} — chưa gửi lời mời nào. Lần chạy sau thử lại.`);
+  }
+  if (!menuSnap.exists) {
+    log(`  Lưu ý: chưa có thực đơn tuần ${weekId}; email khảo sát sẽ kèm liên kết xem thực đơn trên hệ thống.`);
+  } else {
+    try {
+      menu = normalizeWeeklyMenu(menuSnap.data(), weekId);
+      if (!hasMenuContent(menu)) throw new Error('Thực đơn chưa có món ăn.');
+    } catch (err) {
+      throw new FatalError(`Thực đơn weekly_menus/${weekId} không hợp lệ: ${err?.message || err} — chưa gửi lời mời nào. Nhóm Dinh dưỡng cần nhập lại thực đơn đúng mẫu.`);
+    }
+    log(`  Thực đơn   : đã có bảng thứ 2–thứ 6, sẽ đưa vào nội dung email khảo sát.`);
+  }
+
   // ---------------------------------------------- 6. người nhận
 
   // Đơn của các tháng mà tuần chạm tới (tuần vắt tháng thì cả hai).
@@ -399,7 +422,7 @@ async function main() {
   }
 
   try {
-    return await sendAll({ db, weekId, weekRef, invitedRef, lockRef, token, opened, invitees, kept, months, uids, notes });
+    return await sendAll({ db, weekId, weekRef, invitedRef, lockRef, token, opened, invitees, kept, months, uids, notes, menu });
   } finally {
     // Trả quyền gửi (chỉ khi còn là của mình). Không trả được thì quyền tự hết
     // sau SEND_LEASE_MS — lần chạy sau vẫn làm tiếp được.
@@ -417,7 +440,7 @@ async function main() {
 }
 
 /** Bước 7 (sau khi đã mở khảo sát và giữ quyền gửi) -> 8: gửi, ghi trạng thái. */
-async function sendAll({ db, weekId, weekRef, invitedRef, lockRef, token, opened, invitees, kept, months, uids, notes }) {
+async function sendAll({ db, weekId, weekRef, invitedRef, lockRef, token, opened, invitees, kept, months, uids, notes, menu }) {
   const { patch, decision, cur, invitedDoc } = opened;
   log('');
   log(`  Đã mở khảo sát: từ ${patch.opensMs === null ? `lúc này (${formatVnDateTime(opened.at.toISOString())})` : `${vnTime(patch.opensMs)} (giữ giờ đã đặt)`}` +
@@ -468,7 +491,7 @@ async function sendAll({ db, weekId, weekRef, invitedRef, lockRef, token, opened
     post: async batch => {
       let outcome;
       try {
-        outcome = inviteOutcome({ response: await postAlerts(SURVEY.cfg, inviteRequest({ weekId, closesMs, emails: batch.map(r => r.email) })) });
+        outcome = inviteOutcome({ response: await postAlerts(SURVEY.cfg, inviteRequest({ weekId, closesMs, emails: batch.map(r => r.email), menu })) });
       } catch (err) {
         outcome = inviteOutcome({ error: err });
       }

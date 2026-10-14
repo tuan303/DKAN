@@ -13,7 +13,7 @@ Lấy lượt chấm từ hai máy Hikvision trong LAN rồi ghi lên hệ thố
 Chạy trên **PC cài phần mềm HAC** — máy đó vốn đã kết nối tới hai thiết bị.
 
 Bản hiện tại: **2026-10-09.1** (script in số bản ở dòng đầu mỗi lần chạy).
-Script khảo sát: **2026-10-13.4**.
+Script khảo sát: **2026-10-14.1**.
 
 ---
 
@@ -346,7 +346,7 @@ cũ.
 | `meal_surveys/{tuần}/private/lock` | (script khảo sát) Quyền gửi lời mời của tuần: máy nào đang gửi, tới lúc nào — để hai máy không cùng gửi | Quản trị |
 
 Lượt chấm được gán cho tài khoản theo **mã NV trên đơn đăng ký tháng đó**
-(giống tab Đối soát); người không có đơn thì theo mã trong hồ sơ. Hai tài khoản
+(giống tab Đối soát); người không có đơn tháng đó không được gán lượt chấm cá nhân. Hai tài khoản
 cùng một mã thì không ai thấy lượt chấm của mã đó — trang cá nhân báo
 **trùng mã** để người đó liên hệ sửa.
 
@@ -413,6 +413,31 @@ Xem trong Firebase Console: `settings` → `checkinSync` → `alerts` → ngày.
 ---
 
 ## Khảo sát bữa ăn hằng tuần
+
+### Thực đơn kèm nội dung email khảo sát
+
+Nhóm Dinh dưỡng vào **Quản trị → Thực đơn tuần**, chọn tuần, tải **mẫu Excel**,
+điền món ăn rồi import file `.xlsx` / `.xls`. Bảng gồm thứ 2–6, bữa sáng và sáu
+mục bữa trưa: món chính, món phụ, món rau, món canh, cơm, tráng miệng. Xem trước
+và sửa nội dung nếu cần, rồi bấm **Lưu thực đơn**. Các ngày trong tệp phải khớp
+tuần đang chọn. Nhân viên xem ở menu **Thực đơn tuần** (`/thuc-don`).
+
+Thực đơn đã lưu nằm trong `weekly_menus/{thứ 2 của tuần}`. Script khảo sát bản
+**2026-10-14.1** đọc bảng đúng tuần và gửi sang `/api/meal-alerts`; endpoint dựng
+bảng HTML ngay trong nội dung thư, kèm liên kết mở thực đơn trên hệ thống.
+Không cần thêm biến môi trường hoặc khóa gửi email.
+
+Nếu tuần đó chưa có thực đơn, script ghi lưu ý trong log và email vẫn có link
+xem thực đơn. Nếu không đọc được Firestore hoặc dữ liệu thực đơn không hợp lệ,
+script dừng trước khi gửi để Nhóm Dinh dưỡng kiểm tra; không bỏ qua âm thầm bảng
+đã nhập. Thực đơn cập nhật sau khi email đã gửi vẫn hiện trên web; thư đã gửi
+giữ nội dung của thời điểm gửi.
+
+Khi triển khai tính năng, cập nhật **web/API**, deploy `firestore.rules`, rồi chép
+bản agent mới gồm `survey-invite.mjs` và **toàn bộ thư mục `lib/`** sang máy HAC.
+Giữ nguyên `config.json` và `firebase-key.json`. Chỉ cập nhật web thì agent cũ
+chưa chuyển bảng thực đơn vào email. Kiểm tra bằng
+`node survey-invite.mjs --dry-run --week <thứ 2 của tuần>` trước lần gửi theo lịch.
 
 **15:00 thứ 6** hằng tuần, script `survey-invite.mjs` gửi email mời **CBGV-NV
 có đăng ký ăn trong tuần** làm khảo sát chất lượng phục vụ suất ăn của tuần đó.

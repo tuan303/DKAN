@@ -18,10 +18,10 @@
  *   - thư CBNV luôn CC MEAL_ALERT_CC (mặc định dinhduong@), dùng sai là lộ ngay;
  *   - chữ từ bên gọi chỉ là vài trường ngắn, bị escape HTML và bẻ gãy dạng link
  *     (https://, www.) nên không thành link bấm được trong thư;
- *   - thư mời khảo sát không mang chữ nào của bên gọi: chỉ nhận mã tuần và hạn
- *     trả lời dạng thời điểm ISO (kiểm tra chặt, phải nằm trong 40 ngày từ đầu
- *     tuần); nhãn tuần và dòng "hạn" do máy chủ tự định dạng, luôn gửi To
- *     MEAL_ALERT_CC;
+ *   - thư mời khảo sát nhận mã tuần, hạn trả lời dạng ISO (kiểm tra chặt, phải
+ *     nằm trong 40 ngày từ đầu tuần) và bảng thực đơn có giới hạn độ dài, đúng
+ *     năm ngày của tuần; máy chủ escape mọi món ăn, tự dựng nhãn tuần, dòng
+ *     "hạn" và HTML theo mẫu cố định, luôn gửi To MEAL_ALERT_CC;
  *   - mỗi lần gọi tối đa 20 thư cảnh báo, hoặc 1 thư mời với tối đa 400 Bcc.
  * Nhưng endpoint không giữ trạng thái giữa các lần gọi nên KHÔNG chặn được việc
  * gọi lặp: kẻ có khoá vẫn gửi được nhiều thư mang chữ ngắn tuỳ ý trong trường và
@@ -32,6 +32,7 @@
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { formatDate } from '../agent/lib/meal-rules.mjs';
+import { normalizeWeeklyMenu, hasMenuContent, renderWeeklyMenuEmail } from '../agent/lib/weekly-menu.mjs';
 // Đuôi .js là bắt buộc: package.json đặt "type": "module" nên trên Vercel file
 // này chạy dạng ESM, mà ESM của Node không tự thêm đuôi cho đường dẫn tương đối.
 import {
@@ -119,6 +120,8 @@ interface SurveyInvite {
    */
   closesAt: number | null;
   bcc: string[];
+  /** Bảng thực đơn đúng tuần, đã kiểm tra; agent cũ không gửi thì dùng liên kết xem trên web. */
+  menu: ReturnType<typeof normalizeWeeklyMenu> | null;
 }
 
 type ParsedRequest =
@@ -299,9 +302,10 @@ function parseStaffAlert(v: unknown, i: number): StaffAlert {
 }
 
 /**
- * Thư mời khảo sát: chỉ nhận mã tuần, hạn trả lời (closesAt, không bắt buộc) và
- * danh sách người nhận. Nhãn tuần, dòng "hạn", tiêu đề, nội dung đều do máy chủ
- * tự dựng.
+ * Thư mời khảo sát: nhận mã tuần, hạn trả lời (closesAt, không bắt buộc), danh
+ * sách người nhận và thực đơn (menu, không bắt buộc để tương thích agent cũ).
+ * Nhãn tuần, dòng "hạn", tiêu đề, HTML đều do máy chủ tự dựng. Món ăn và ghi
+ * chú thực đơn chỉ là chữ có giới hạn, được escape khi đưa vào bảng HTML.
  *
  * closesAt là thời điểm (không phải chữ hiển thị): agent đọc ở document tuần, vì
  * quản trị có thể đã gia hạn hay đóng sớm — tính hạn từ mã tuần thì thư gửi bù
@@ -343,7 +347,18 @@ function parseSurveyInvite(body: Record<string, unknown>): SurveyInvite {
     firstIndex.set(k, i);
   });
 
-  return { kind: 'survey-invite', weekId, closesAt, bcc };
+  let menu: SurveyInvite['menu'] = null;
+  if (body.menu !== undefined) {
+    try {
+      menu = normalizeWeeklyMenu(body.menu, weekId);
+      if (!hasMenuContent(menu)) fail('menu phải có ít nhất một món ăn.');
+    } catch (e) {
+      if (e instanceof BadRequest) throw e;
+      fail(`menu không hợp lệ: ${e instanceof Error ? e.message : 'Sai cấu trúc thực đơn.'}`);
+    }
+  }
+
+  return { kind: 'survey-invite', weekId, closesAt, bcc, menu };
 }
 
 function parseBody(raw: unknown): unknown {
@@ -664,14 +679,15 @@ function vnDeadlineLabel(ms: number): string {
 /**
  * Thư mời khảo sát, theo mẫu email của Nhóm Dinh dưỡng ("đồng chí" đổi thành
  * "Thầy Cô"). Cùng một thư cho mọi người nhận nên không có lời chào theo tên.
- * Chữ động duy nhất là nhãn tuần (tính từ mã tuần đã kiểm tra) và hạn (định dạng
- * từ closesAt đã kiểm tra, hoặc hạn mặc định của mã tuần) — vẫn escape cho chắc.
+ * Nhãn tuần tính từ mã tuần đã kiểm tra, hạn từ closesAt hoặc hạn mặc định.
+ * Bảng thực đơn đúng tuần được dựng bằng mẫu cố định, escape từng ô.
  */
-function renderSurveyEmail(weekId: string, closesAt: number | null, appUrl: string): { subject: string; html: string } {
+function renderSurveyEmail(weekId: string, closesAt: number | null, appUrl: string, menu: SurveyInvite['menu']): { subject: string; html: string } {
   const weekLabel = surveyWeekLabel(weekId);
   const deadline = closesAt === null ? surveyDeadlineLabel(weekId) : vnDeadlineLabel(closesAt);
   const subject = `Khảo sát chất lượng phục vụ suất ăn CBGV-NV tuần ${weekLabel}`;
   const surveyUrl = `${appUrl}/khao-sat?tuan=${encodeURIComponent(weekId)}`;
+  const menuUrl = `${appUrl}/thuc-don?tuan=${encodeURIComponent(weekId)}`;
 
   const rows = [
     row(para('Kính gửi Quý Thầy Cô CBGV-NV,')),
@@ -699,8 +715,15 @@ function renderSurveyEmail(weekId: string, closesAt: number | null, appUrl: stri
       15,
       NAVY,
     )}<p style="margin:6px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};">Khảo sát mất khoảng 1 phút, đăng nhập bằng tài khoản Microsoft của trường.</p></td></tr></table>`),
-    row(para(`Trân trọng,<br><strong style="color:${NAVY};">Nhóm Dinh dưỡng</strong> — Trường Ngôi Sao Hoàng Mai`), '0 28px 24px'),
   ];
+
+  if (menu) {
+    rows.push(row(renderWeeklyMenuEmail(menu), '0 12px 18px'));
+  }
+  rows.push(
+    row(para(`<a href="${esc(menuUrl)}" style="color:${NAVY};text-decoration:underline;">Xem thực đơn tuần trên hệ thống</a>`, 14)),
+    row(para(`Trân trọng,<br><strong style="color:${NAVY};">Nhóm Dinh dưỡng</strong> — Trường Ngôi Sao Hoàng Mai`), '0 28px 24px'),
+  );
 
   const html = layout({
     title: subject,
@@ -750,7 +773,7 @@ async function sendSurveyInvite(r: SurveyInvite, graph: GraphConfig, deadlineAt:
   let mail: MailMessage;
   try {
     const { cc, replyTo, appUrl } = mailSettings(graph.sender);
-    const { subject, html } = renderSurveyEmail(r.weekId, r.closesAt, appUrl);
+    const { subject, html } = renderSurveyEmail(r.weekId, r.closesAt, appUrl, r.menu);
     mail = { to: cc.length ? cc : [graph.sender], bcc: r.bcc, replyTo, subject, html, saveToSentItems: false };
   } catch (e) {
     if (e instanceof Misconfigured) {

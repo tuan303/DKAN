@@ -104,6 +104,7 @@ export function Navigation({ className }: { className?: string }) {
     { to: '/events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
     // Mọi người dùng (kể cả quản trị) đều có suất ăn của riêng mình để tự kiểm tra.
     { to: '/cham-an', icon: 'fact_check', label: 'CHẤM ĂN CỦA TÔI' },
+    { to: '/thuc-don', icon: 'restaurant_menu', label: 'THỰC ĐƠN TUẦN' },
     // Khảo sát chất lượng suất ăn hằng tuần: luôn có mục để Thầy/Cô tự vào, kể
     // cả khi đã lỡ email mời hay tắt thanh nhắc; trang tự hiện tuần đang mở.
     { to: '/khao-sat', icon: 'rate_review', label: 'KHẢO SÁT' },
@@ -116,6 +117,7 @@ export function Navigation({ className }: { className?: string }) {
       displayLinks = [
         { to: '/quantri?tab=monthly', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
         { to: '/quantri?tab=events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
+        { to: '/quantri?tab=menu', icon: 'restaurant_menu', label: 'THỰC ĐƠN TUẦN' },
         { to: '/quantri?tab=settings', icon: 'settings', label: 'CẤU HÌNH' },
         { to: '/quantri?tab=admins', icon: 'admin_panel_settings', label: 'QUẢN TRỊ' },
       ];
@@ -124,10 +126,17 @@ export function Navigation({ className }: { className?: string }) {
     }
   }
 
-  // Thanh dưới trên điện thoại chia đều bề ngang: 5 mục (tài khoản quản trị)
-  // ở màn 360px chỉ còn 72px mỗi mục, nhãn 2 dòng phóng 105% đè sang mục bên
-  // cạnh. Khi chật thì nhãn chừa lề, không phóng to, giãn chữ ít lại.
+  // Nhãn ngắn trên điện thoại để 5–6 mục vẫn vừa thanh điều hướng.
   const crowded = displayLinks.length > 4;
+  const mobileLabels: Record<string, string> = {
+    '/schedule': 'ĐK ĂN THÁNG',
+    '/events': 'ĂN SỰ KIỆN',
+    '/cham-an': 'CHẤM ĂN',
+    '/thuc-don': 'THỰC ĐƠN',
+    '/quantri?tab=monthly': 'ĐK ĂN THÁNG',
+    '/quantri?tab=events': 'ĂN SỰ KIỆN',
+    '/quantri?tab=menu': 'THỰC ĐƠN',
+  };
 
   const renderLinkItems = (isMobile: boolean) => {
     return displayLinks.map(link => {
@@ -140,10 +149,11 @@ export function Navigation({ className }: { className?: string }) {
 
       if (isMobile) {
         // Các mục của CBNV nổi bật như nhau; mục QUẢN TRỊ nhạt hơn để không lấn.
-        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an' || link.to === '/khao-sat';
+        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an' || link.to === '/thuc-don' || link.to === '/khao-sat';
         return (
           <button 
             key={link.to}
+            aria-label={link.label}
             onClick={() => {
               if (isAccount) {
                 setShowAccountModal(true);
@@ -179,7 +189,7 @@ export function Navigation({ className }: { className?: string }) {
               crowded ? "tracking-normal max-[340px]:text-[9px] max-[340px]:leading-[10px] max-[340px]:mt-1" : "tracking-wider",
               isActive || isProminent ? clsx("font-bold text-primary", !crowded && "scale-105") : "font-normal opacity-80"
             )}>
-              {link.label}
+              {mobileLabels[link.to] || link.label}
             </span>
           </button>
         );

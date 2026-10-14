@@ -496,6 +496,18 @@ test('thân yêu cầu: kèm hạn trả lời THẬT (ISO) để thư ghi đún
   for (const closesMs of [null, undefined, NaN, Infinity, 1e20, '2026-10-13T10:30:00.000Z']) {
     assert.deepEqual(inviteRequest({ weekId: WEEK, closesMs: /** @type {any} */ (closesMs), emails: ['a@x'] }), { kind: 'survey-invite', weekId: WEEK, bcc: ['a@x'] }, String(closesMs));
   }
+  assert.deepEqual(inviteRequest({ weekId: WEEK, closesMs: closes, emails: body.bcc, menu: null }), body);
+});
+
+test('thân yêu cầu: kèm nguyên bảng thực đơn đúng tuần trong thư, giữ hạn thật và danh sách Bcc', () => {
+  const menu = {
+    weekId: WEEK, version: /** @type {const} */ (1), note: '',
+    days: OFF_WEEK.map(date => ({ date, breakfast: 'Phở bò', main: 'Vịt chiên riềng', side: '', vegetable: '', soup: '', rice: 'Cơm trắng', dessert: '' })),
+  };
+  const emails = ['a@hoangmaistarschool.edu.vn'];
+  const r = inviteRequest({ weekId: WEEK, closesMs: vn('2026-10-13T17:30:00').getTime(), emails, menu });
+  assert.deepEqual(r, { kind: 'survey-invite', weekId: WEEK, closesAt: '2026-10-13T10:30:00.000Z', bcc: emails, menu });
+  assert.notEqual(r.bcc, emails, 'sao chép danh sách Bcc để vòng gửi không làm đổi đầu vào');
 });
 
 test('lịch tự động: đúng 29 giờ chạy từ thứ 6 tới thứ 2 (① 15:00→16:00 mỗi 15 phút; ② 07:30→12:30 mỗi giờ)', () => {
@@ -762,8 +774,16 @@ test('script gửi lời mời: firebase-admin nạp muộn, hẹn giờ thoát 
   // Trạng thái cuối chỉ ghi khối email (không ghi lại opensAt/closesAt).
   assert.match(src, /setWithRetry\(weekRef, \{ email \}, \{ merge: true \}\)/);
   // Thư gửi kèm hạn THẬT, đọc lại trong giao dịch kiểm tra ngay trước mỗi thư.
-  assert.match(src, /postAlerts\(SURVEY\.cfg, inviteRequest\(\{ weekId, closesMs, emails: batch\.map\(r => r\.email\) \}\)\)/);
+  assert.match(src, /postAlerts\(SURVEY\.cfg, inviteRequest\(\{ weekId, closesMs, emails: batch\.map\(r => r\.email\), menu \}\)\)/);
   assert.match(src, /closesMs = toMillis\(week\?\.closesAt\) \?\? closesMs;/);
+  // Thực đơn được đọc đúng tuần, một lần, trước cả chạy thử lẫn mở khảo sát.
+  const menuRead = src.indexOf("db.collection('weekly_menus').doc(weekId).get()");
+  assert.ok(menuRead > 0 && menuRead < src.indexOf('const noOne = invitees.length === 0;'));
+  assert.equal(src.split("db.collection('weekly_menus').doc(weekId).get()").length - 1, 1);
+  assert.match(src, /normalizeWeeklyMenu\(menuSnap\.data\(\), weekId\)/);
+  assert.match(src, /if \(!hasMenuContent\(menu\)\) throw new Error/);
+  assert.match(src, /throw new FatalError\(`Không đọc được thực đơn/);
+  assert.match(src, /throw new FatalError\(`Thực đơn weekly_menus/);
   // Người nhận tính cả ngày nghỉ (không mời người cả tuần chưa có bữa nào).
   assert.match(src, /surveyRecipientUids\(\{ registrations: kept, weekId, excludedIds, offDays \}\)/);
   // Lý do tính lần chạy theo lịch kế tiếp từ lúc lần này KẾT THÚC, và biết vòng

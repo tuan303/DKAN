@@ -531,15 +531,19 @@ export function inviteOutcome({ response, error }) {
  * đã qua. Không có hạn hợp lệ (không xảy ra: batchGate dừng trước khi gửi nếu
  * document tuần thiếu closesAt) thì bỏ trường, endpoint dùng hạn mặc định.
  *
- * @param {{ weekId: string, closesMs: number | null | undefined, emails: string[] }} input
+ * `menu` đã được kiểm tra trước khi mở khảo sát; không truyền trường khi chưa
+ * có thực đơn để giữ nguyên thân yêu cầu của agent cũ.
+ *
+ * @param {{ weekId: string, closesMs: number | null | undefined, emails: string[], menu?: import('./weekly-menu.mjs').WeeklyMenu | null }} input
  */
-export function inviteRequest({ weekId, closesMs, emails }) {
+export function inviteRequest({ weekId, closesMs, emails, menu }) {
   // Không được ném lỗi: lỗi ở đây rơi vào nhánh "không rõ đã gửi" của vòng gửi.
   const d = typeof closesMs === 'number' ? new Date(closesMs) : null;
   const bcc = [...emails];
-  return d && !isNaN(d.getTime())
+  const request = d && !isNaN(d.getTime())
     ? { kind: /** @type {const} */ ('survey-invite'), weekId, closesAt: d.toISOString(), bcc }
     : { kind: /** @type {const} */ ('survey-invite'), weekId, bcc };
+  return menu ? { ...request, menu } : request;
 }
 
 // ------------------------------------------------------------- quyền gửi (lease)

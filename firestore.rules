@@ -53,6 +53,44 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Thực đơn import từ Excel: nhân viên xem, quản trị/Nhóm Dinh dưỡng cập nhật.
+    // Chỉ lưu văn bản của 7 mục x 5 ngày; không lưu tệp Excel hoặc HTML tùy ý.
+    function validMenuText(value) {
+      return value is string && value.size() <= 300;
+    }
+
+    function validMenuDay(day) {
+      return day is map
+        && day.keys().hasOnly(['date', 'breakfast', 'main', 'side', 'vegetable', 'soup', 'rice', 'dessert'])
+        && day.date is string && day.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && validMenuText(day.breakfast) && validMenuText(day.main)
+        && validMenuText(day.side) && validMenuText(day.vegetable)
+        && validMenuText(day.soup) && validMenuText(day.rice) && validMenuText(day.dessert);
+    }
+
+    function validWeeklyMenu(weekId) {
+      let menu = request.resource.data;
+      return weekId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && menu.keys().hasOnly(['weekId', 'version', 'days', 'note', 'updatedAt', 'updatedBy', 'publishedAt'])
+        && menu.weekId == weekId && menu.version == 1
+        && menu.days is list && menu.days.size() == 5
+        && validMenuDay(menu.days[0]) && validMenuDay(menu.days[1])
+        && validMenuDay(menu.days[2]) && validMenuDay(menu.days[3]) && validMenuDay(menu.days[4])
+        && menu.days[0].date == weekId
+        && menu.days[0].date < menu.days[1].date && menu.days[1].date < menu.days[2].date
+        && menu.days[2].date < menu.days[3].date && menu.days[3].date < menu.days[4].date
+        && (!('note' in menu) || (menu.note is string && menu.note.size() <= 1000))
+        && menu.updatedBy == request.auth.uid
+        && menu.updatedAt == request.time
+        && (!('publishedAt' in menu) || menu.publishedAt is timestamp);
+    }
+
+    match /weekly_menus/{weekId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && validWeeklyMenu(weekId);
+      allow delete: if isAdmin();
+    }
+
     // Lượt chấm ăn đồng bộ từ máy nhận diện. Đây là dữ liệu cá nhân (ai ăn
     // bữa nào, lúc mấy giờ) nên chỉ quản trị mới được đọc. Không ai ghi từ
     // trình duyệt: agent dùng Admin SDK nên đi thẳng, không qua rules.
