@@ -217,6 +217,8 @@ Các bài test tập trung vào quy tắc suất ăn, cảnh báo, độ phủ t
 
 Cập nhật thực đơn ngày 14/10/2026: bổ sung kiểm thử parser thực đơn, mẫu Excel `.xlsx`/`.xls`, hệ ngày 1904, sai tuần, giới hạn tệp/hàng, HTML email và API với Microsoft Graph giả lập. Tổng bộ kiểm thử hiện tại **158 bài**. `npm test` ở gốc chạy đúng các file test nghiệp vụ/Excel, không chạy script gửi thư thử `test-email.cjs`. Giao diện thực đơn đã được xem trên máy tính và điện thoại 360px bằng bản QA chỉ dùng dữ liệu và thao tác lưu giả lập; hộp chọn file của trình duyệt QA không mở được, nên luồng import được xác minh bằng các bài roundtrip Excel. Firestore rules chưa được chạy qua emulator hay deploy trong lần cập nhật này.
 
+Cập nhật quyền thực đơn ngày 14/10/2026: kiểm tra Rules API cho thấy rules production của `dkan-4b061` chưa có `weekly_menus`. Đã đối chiếu với rules trong repo, kiểm tra biên dịch không có lỗi, chạy 6 giả lập quyền (hai super admin được đọc/xóa, nhân viên thường không được xóa, người chưa đăng nhập không được đọc) và triển khai ruleset `02b97357-1b95-43fa-b841-44f19764ea59` lúc 15:04:08 giờ Việt Nam. Đã đọc lại release `cloud.firestore` và xác minh nội dung khớp `firestore.rules`; không ghi/xóa thực đơn thật để thử quyền. `src/lib/adminAccess.ts` nay là danh sách quản trị cao nhất dùng chung cho trang quản trị và menu điều hướng, chuẩn hóa email hoa/thường và khoảng trắng; regression test đối chiếu danh sách này với rules. Tổng kiểm thử **161/161 đạt**, TypeScript và build đạt. Khi thay rules, cần triển khai Firebase riêng vì Vercel chỉ triển khai web/API.
+
 ## 9. Các điểm cần xem xét khi cập nhật
 
 Đây là các khác biệt nhìn thấy trong mã nguồn, chưa được sửa trong lần khảo sát. Cần đối chiếu yêu cầu nghiệp vụ khi xử lý:

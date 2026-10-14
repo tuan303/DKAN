@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
+import { isSuperAdmin, SUPER_ADMINS } from '../lib/adminAccess';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, onSnapshot, orderBy, limit, runTransaction } from 'firebase/firestore';
 import type { LoginLogEntry } from '../lib/loginLog';
 import * as xlsx from 'xlsx';
@@ -103,9 +104,6 @@ interface EventData {
   expiresAt?: string;
 }
 
-// Phải khớp với hàm isSuperAdmin() trong firestore.rules, nếu không giao diện sẽ
-// cho vào trang quản trị nhưng Firestore lại từ chối mọi thao tác ghi.
-const SUPER_ADMINS = ['tuantm@hoangmaistarschool.edu.vn', 'tuyetkta@hoangmaistarschool.edu.vn', 'tuan303@gmail.com'];
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 type AdminTabKey = 'monthly' | 'daily_stats' | 'cancelations' | 'events' | 'blocked' | 'reconcile' | 'settings' | 'menu' | 'survey' | 'logs' | 'admins';
@@ -274,7 +272,7 @@ export default function Admin() {
       }
       
       try {
-        let isUserAdmin = !!user.email && SUPER_ADMINS.includes(user.email.toLowerCase());
+        let isUserAdmin = isSuperAdmin(user.email);
         
         if (!isUserAdmin && user.email) {
           // First check by standard doc ID
@@ -2515,7 +2513,7 @@ export default function Admin() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-sm px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded">Admin</span>
-                          {auth.currentUser?.email && SUPER_ADMINS.includes(auth.currentUser.email.toLowerCase()) && admin.id && (
+                          {isSuperAdmin(auth.currentUser?.email) && admin.id && (
                             adminToDelete?.id === admin.id ? (
                               <div className="flex items-center gap-1">
                                 <button

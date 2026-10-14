@@ -2,9 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
+import { isSuperAdmin } from '../lib/adminAccess';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-
-const SUPER_ADMIN = 'tuantm@hoangmaistarschool.edu.vn';
 
 export function Navigation({ className }: { className?: string }) {
   const location = useLocation();
@@ -33,7 +32,7 @@ export function Navigation({ className }: { className?: string }) {
           }
         } catch(e) {}
 
-        let isUserAdmin = user.email === SUPER_ADMIN;
+        let isUserAdmin = isSuperAdmin(user.email);
         if (!isUserAdmin && user.email) {
           try {
             // First check by standard doc ID
