@@ -13,6 +13,7 @@ import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
 import { AdminWorkspace } from '../components/AdminWorkspace';
 import { AdminOverview } from '../components/AdminOverview';
+import { MobileDataTable } from '../components/MobileDataTable';
 import { resolveAdminTab, type AdminTabKey } from '../lib/adminNavigation';
 import { useCurrentAccount } from '../lib/useCurrentAccount';
 // Dùng chung quy tắc ngày với agent và trang Chấm ăn của tôi: "cuối tuần" và
@@ -1093,7 +1094,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen min-w-0 flex flex-col font-body-md relative pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
+    <div className="mobile-app-shell bg-background text-on-background min-w-0 flex flex-col font-body-md relative md:pl-64">
       {/* Toast — top-20 để nằm dưới thanh header cố định (h-16), không đè lên */}
       {toast && (
         <div className={`fixed top-20 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
@@ -1243,7 +1244,20 @@ export default function Admin() {
                    </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <MobileDataTable
+                  label="Đăng ký suất ăn hàng tháng"
+                  emptyMessage="Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc."
+                  records={sortedMonthlyRegistrations.map((reg, index) => ({
+                    id: reg.id || index,
+                    title: reg.fullName,
+                    subtitle: <>Mã NV: {reg.employeeId || 'N/A'} · {reg.department || 'N/A'}</>,
+                    fields: [
+                      { label: 'Bữa sáng', value: <>{reg.adjustedBreakfastCount} suất</> },
+                      { label: 'Bữa trưa', value: <>{reg.adjustedLunchCount} suất</> },
+                      { label: 'Thời gian đăng ký', value: formatTimestamp(reg.timestamp) },
+                    ],
+                  }))}
+                >
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
@@ -1290,7 +1304,7 @@ export default function Admin() {
                         )}
                       </tbody>
                     </table>
-                </div>
+                </MobileDataTable>
               </div>
             </div>
           </div>
@@ -1437,7 +1451,22 @@ export default function Admin() {
                    </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <MobileDataTable
+                  label="Hủy đăng ký suất ăn"
+                  emptyMessage="Chưa có dữ liệu hủy đăng ký thỏa mãn điều kiện lọc."
+                  records={sortedCancelations.map((cancelation, index) => ({
+                    id: cancelation.id || index,
+                    title: cancelation.fullName,
+                    subtitle: <>Mã NV: {cancelation.employeeId || 'N/A'} · {cancelation.department || 'N/A'}</>,
+                    fields: [
+                      { label: 'Ngày hủy', value: formatCancelDate(cancelation.cancelDate) },
+                      { label: 'Bữa hủy', value: cancelation.cancelMeal === 'both' ? 'Cả 2 bữa' : cancelation.cancelMeal === 'breakfast' ? 'Sáng' : 'Trưa' },
+                      { label: 'Nhà ăn', value: cancelation.cancelCanteen === 'trunghoc' ? 'Trung học' : 'Tiểu học' },
+                      { label: 'Lý do', value: cancelation.cancelReason },
+                      { label: 'Thời gian khai báo', value: formatTimestamp(cancelation.timestamp) },
+                    ],
+                  }))}
+                >
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
@@ -1498,7 +1527,7 @@ export default function Admin() {
                         )}
                       </tbody>
                     </table>
-                </div>
+                </MobileDataTable>
               </div>
             </div>
           </div>
@@ -1717,7 +1746,21 @@ export default function Admin() {
                    </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <MobileDataTable
+                  label="Đăng ký suất ăn theo ngày"
+                  emptyMessage={!isSelectedDayWeekday ? 'Ngày được chọn là Thứ 7 hoặc Chủ Nhật (không có lịch ăn).' : 'Chưa có dữ liệu đăng ký thỏa mãn điều kiện lọc.'}
+                  records={sortedDailyRegistrations.map((reg, index) => ({
+                    id: reg.id || index,
+                    title: reg.fullName,
+                    subtitle: <>Mã NV: {reg.employeeId || 'N/A'} · {reg.department || 'N/A'}</>,
+                    fields: [
+                      { label: 'Ngày ăn', value: formatCancelDate(selectedDateStr) },
+                      ...(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'breakfast' ? [{ label: 'Bữa sáng', value: reg.eatsBreakfast ? 'Có đăng ký' : 'Không đăng ký' }] : []),
+                      ...(dailyFilterByMeal === 'all' || dailyFilterByMeal === 'lunch' ? [{ label: 'Bữa trưa', value: reg.eatsLunch ? 'Có đăng ký' : 'Không đăng ký' }] : []),
+                      { label: 'Thời gian ĐK ban đầu', value: formatTimestamp(reg.timestamp) },
+                    ],
+                  }))}
+                >
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-surface-bright border-b border-outline-variant font-label-md text-on-surface-variant text-[13px]">
                         <tr>
@@ -1776,7 +1819,7 @@ export default function Admin() {
                         )}
                       </tbody>
                     </table>
-                </div>
+                </MobileDataTable>
               </div>
             </div>
           </div>

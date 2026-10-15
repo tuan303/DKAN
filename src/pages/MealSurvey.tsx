@@ -265,7 +265,7 @@ function IntroCard({
             hết màn hình đầu tiên, Thầy/Cô phải thấy ngay câu hỏi bên dưới. */}
         <div className="rounded-lg border border-outline-variant bg-surface-container-low p-sm md:p-md flex flex-wrap items-center gap-x-md gap-y-1.5">
           {/* min-w: hẹp quá thì ô đếm ngược xuống dòng, không bóp chữ ngày giờ. */}
-          <div className="flex items-start gap-sm min-w-[14rem] flex-1">
+          <div className="flex items-start gap-sm min-w-0 sm:min-w-[14rem] basis-full sm:basis-auto flex-1">
             <span className="material-symbols-outlined text-[22px] text-primary shrink-0" aria-hidden="true">event_available</span>
             <div className="min-w-0 flex flex-col">
               <span className="text-label-sm uppercase text-on-surface-variant">Hạn trả lời</span>
@@ -309,7 +309,7 @@ function ProgressBar({ answered }: { answered: number }) {
   const total = REQUIRED.length;
   const done = answered >= total;
   return (
-    <div className="sticky top-16 md:top-0 z-30 -mx-md px-md md:mx-0 md:px-0 py-3 bg-background/95 backdrop-blur-sm">
+    <div className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] md:top-0 z-30 -mx-md px-md md:mx-0 md:px-0 py-3 bg-background/95 backdrop-blur-sm">
       <div className="flex items-center gap-3">
         <div
           role="progressbar"
@@ -435,7 +435,7 @@ function ChoiceField({
               onClick={() => onChange(o.value)}
               onKeyDown={e => onKeyDown(e, i)}
               className={clsx(
-                'group w-full min-h-[52px] px-md py-3 rounded-lg border-2 text-left flex items-center gap-3 transition-colors disabled:cursor-not-allowed disabled:opacity-70',
+                'group w-full min-h-[56px] md:min-h-[52px] px-3 md:px-md py-3 rounded-xl md:rounded-lg border-2 text-left flex items-center gap-3 transition-colors disabled:cursor-not-allowed disabled:opacity-70',
                 checked
                   ? 'border-primary bg-primary-container/35 text-on-surface'
                   : error
@@ -452,7 +452,7 @@ function ChoiceField({
               >
                 <span className={clsx('w-2.5 h-2.5 rounded-full bg-primary transition-transform', checked ? 'scale-100' : 'scale-0')} />
               </span>
-              <span className={clsx('text-body-lg leading-snug', checked ? 'font-semibold text-primary' : 'text-on-surface')}>{o.label}</span>
+              <span className={clsx('min-w-0 text-body-lg leading-snug break-words', checked ? 'font-semibold text-primary' : 'text-on-surface')}>{o.label}</span>
             </button>
           );
         })}
@@ -585,7 +585,7 @@ function SurveyForm(props: SurveyViewProps & { weekId: string; survey: SurveyWin
               type="button"
               onClick={onDiscardDraft}
               disabled={sending}
-              className="inline-flex items-start gap-1 text-left font-semibold text-primary disabled:opacity-60"
+              className="inline-flex min-h-11 md:min-h-0 items-center gap-1 text-left font-semibold text-primary disabled:opacity-60"
             >
               <span className="material-symbols-outlined text-[16px] mt-0.5" aria-hidden="true">undo</span>
               <span className="underline underline-offset-2">
@@ -641,7 +641,7 @@ function SurveyForm(props: SurveyViewProps & { weekId: string; survey: SurveyWin
               type="button"
               onClick={onCancelEdit}
               disabled={sending}
-              className="inline-flex items-center justify-center gap-2 px-lg py-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-on-surface hover:bg-surface-container transition-colors disabled:opacity-60"
+              className="inline-flex min-h-12 md:min-h-0 items-center justify-center gap-2 px-lg py-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-on-surface hover:bg-surface-container transition-colors disabled:opacity-60"
             >
               Huỷ sửa
             </button>
@@ -650,7 +650,7 @@ function SurveyForm(props: SurveyViewProps & { weekId: string; survey: SurveyWin
             type="submit"
             disabled={sending}
             aria-busy={sending}
-            className="inline-flex items-center justify-center gap-2 px-xl py-3 rounded-lg bg-primary text-on-primary text-label-lg hover:bg-primary-dark transition-colors shadow-sm disabled:opacity-75 disabled:cursor-wait sm:min-w-[220px]"
+            className="inline-flex min-h-12 md:min-h-0 items-center justify-center gap-2 px-xl py-3 rounded-lg bg-primary text-on-primary text-label-lg hover:bg-primary-dark transition-colors shadow-sm disabled:opacity-75 disabled:cursor-wait sm:min-w-[220px]"
           >
             <span className={clsx('material-symbols-outlined text-[20px]', sending && 'animate-spin')} aria-hidden="true">
               {sending ? 'progress_activity' : 'send'}
@@ -781,7 +781,7 @@ function OtherOpenNote({ otherOpen, now }: { otherOpen: SurveyViewProps['otherOp
       </p>
       <Link
         to={`/khao-sat?tuan=${otherOpen.weekId}`}
-        className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-2"
+        className="inline-flex min-h-11 md:min-h-0 items-center gap-1 font-semibold text-primary underline underline-offset-2"
       >
         Làm khảo sát ngay
         <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
@@ -795,14 +795,14 @@ function BackLinks() {
     <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-sm justify-center">
       <Link
         to="/cham-an"
-        className="inline-flex items-center justify-center gap-2 px-lg py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-primary hover:bg-surface-container transition-colors"
+        className="inline-flex min-h-11 md:min-h-0 items-center justify-center gap-2 px-lg py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-primary hover:bg-surface-container transition-colors"
       >
         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">fact_check</span>
         Chấm ăn của tôi
       </Link>
       <Link
         to="/schedule"
-        className="inline-flex items-center justify-center gap-2 px-lg py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-primary hover:bg-surface-container transition-colors"
+        className="inline-flex min-h-11 md:min-h-0 items-center justify-center gap-2 px-lg py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-lg text-primary hover:bg-surface-container transition-colors"
       >
         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">calendar_month</span>
         Đăng ký ăn hàng tháng
@@ -1006,7 +1006,7 @@ export function SurveyView(props: SurveyViewProps) {
         <div className="flex flex-col gap-xs">
           <div>
             <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Dinh dưỡng</p>
-            <h2 className="text-headline-md md:text-headline-lg text-on-surface">Khảo sát suất ăn</h2>
+            <h2 className="text-[26px] leading-tight font-bold md:text-headline-lg text-on-surface">Khảo sát suất ăn</h2>
             <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">
               Ý kiến của Thầy/Cô giúp Nhóm Dinh dưỡng nâng cao chất lượng bữa ăn
             </p>
@@ -1737,7 +1737,7 @@ export default function MealSurvey() {
   };
 
   return (
-    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
+    <div className="mobile-app-shell font-body-lg flex min-w-0 flex-col md:pl-64">
       <Header />
       <Navigation />
       <SurveyView

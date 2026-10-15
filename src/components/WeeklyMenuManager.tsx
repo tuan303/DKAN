@@ -13,7 +13,7 @@ interface WeeklyMenuManagerProps {
   showToast?: (message: string, type: 'success' | 'error') => void;
 }
 
-const CONTROL = 'inline-flex items-center justify-center gap-2 min-h-10 rounded-lg border border-outline-variant px-3 py-2 text-label-lg text-primary hover:bg-primary-container/40 disabled:opacity-50 disabled:cursor-not-allowed';
+const CONTROL = 'inline-flex min-w-0 items-center justify-center gap-2 min-h-11 rounded-xl border border-outline-variant px-3 py-2 text-label-lg text-primary hover:bg-primary-container/40 disabled:opacity-50 disabled:cursor-not-allowed';
 
 function messageOf(error: unknown) {
   if (error && typeof error === 'object' && 'code' in error && error.code === 'permission-denied') return 'Tài khoản chưa có quyền quản lý thực đơn. Vui lòng kiểm tra quyền quản trị.';
@@ -183,21 +183,25 @@ export function WeeklyMenuManager({ showToast }: WeeklyMenuManagerProps) {
           <h2 className="text-title-lg text-primary font-bold">Thực đơn hàng tuần</h2>
           <p className="text-body-md text-on-surface-variant mt-1">Nhóm Dinh dưỡng tải mẫu Excel, điền thực đơn và nhập lại lên hệ thống. Thực đơn đã lưu sẽ hiển thị cho CBGV-NV và được đưa vào email khảo sát đúng tuần.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={CONTROL} disabled={busy} onClick={() => changeWeek(shiftDate(weekId, -7))} aria-label="Tuần trước"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">chevron_left</span></button>
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor={weekInputId} className="text-label-lg">Tuần bắt đầu</label>
-            <input id={weekInputId} type="date" value={weekId} disabled={busy} onChange={event => changeWeek(event.target.value)} className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body-md disabled:opacity-50" />
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={weekInputId} className="mb-2 block text-label-lg">Tuần bắt đầu</label>
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" className={`${CONTROL} w-11 shrink-0 px-0`} disabled={busy} onClick={() => changeWeek(shiftDate(weekId, -7))} aria-label="Tuần trước"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">chevron_left</span></button>
+              <input id={weekInputId} type="date" value={weekId} disabled={busy} onChange={event => changeWeek(event.target.value)} className="min-h-11 min-w-0 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-2 py-2 text-body-md disabled:opacity-50" />
+              <button type="button" className={`${CONTROL} w-11 shrink-0 px-0`} disabled={busy} onClick={() => changeWeek(shiftDate(weekId, 7))} aria-label="Tuần sau"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">chevron_right</span></button>
+            </div>
           </div>
-          <button type="button" className={CONTROL} disabled={busy} onClick={() => changeWeek(shiftDate(weekId, 7))} aria-label="Tuần sau"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">chevron_right</span></button>
-          <button type="button" className={CONTROL} disabled={busy} onClick={() => changeWeek(weekStartOf(vnToday()))}>Tuần này</button>
-          <span className="text-body-sm text-on-surface-variant">{surveyWeekLabel(weekId)}</span>
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <span className="text-body-sm text-on-surface-variant">{surveyWeekLabel(weekId)}</span>
+            <button type="button" className={`${CONTROL} shrink-0`} disabled={busy} onClick={() => changeWeek(weekStartOf(vnToday()))}>Tuần này</button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-1 items-center gap-2 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-3">
           <button type="button" className={CONTROL} disabled={busy} onClick={() => { try { downloadWeeklyMenuTemplate(weekId); } catch (error) { setError(messageOf(error)); } }}><span className="material-symbols-outlined text-[20px]" aria-hidden="true">download</span>Tải mẫu Excel</button>
           <button type="button" disabled={busy || loadFailed} aria-controls={uploadId} className={`${CONTROL} bg-primary text-on-primary hover:bg-primary-dark`} onClick={() => fileInput.current?.click()}><span className="material-symbols-outlined text-[20px]" aria-hidden="true">upload_file</span>{reading ? 'Đang đọc Excel…' : 'Nhập file Excel'}</button>
           <input ref={fileInput} id={uploadId} type="file" accept=".xlsx,.xls" tabIndex={-1} disabled={busy || loadFailed} onChange={event => void importFile(event)} className="sr-only" aria-label="Chọn file thực đơn Excel" />
-          <p className="text-body-sm text-on-surface-variant">.xlsx / .xls, tối đa 5 MB</p>
+          <p className="text-body-sm text-on-surface-variant min-[360px]:col-span-2">.xlsx / .xls, tối đa 5 MB</p>
         </div>
         <p className="text-body-sm text-on-surface-variant">Mẫu gồm 5 cột từ thứ 2 đến thứ 6, bữa sáng và 6 nhóm món trưa. Điền tên món vào ô D3:H9, giữ nguyên tiêu đề và ngày. Ô trống dùng cho ngày nghỉ hoặc món không phục vụ.</p>
         {workbook && <div className="flex flex-wrap items-center gap-2 text-body-sm">
@@ -212,7 +216,7 @@ export function WeeklyMenuManager({ showToast }: WeeklyMenuManagerProps) {
           <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-title-md font-bold text-primary">Thực đơn tuần {surveyWeekLabel(weekId)}</h3><span className={`rounded-full px-3 py-1 text-label-md ${dirty ? 'bg-warning-container text-on-warning-container' : savedMenu ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-surface-container text-on-surface-variant'}`}>{dirty ? 'Chưa lưu thay đổi' : savedMenu ? 'Đã lưu' : 'Chưa có thực đơn'}</span></div>
           <WeeklyMenuTable menu={menu} onChange={editCell} disabled={saving || reading || loadFailed || importInvalid} />
           <div><label htmlFor={noteId} className="block text-label-lg mb-2">Ghi chú (không bắt buộc)</label><textarea id={noteId} value={menu.note ?? ''} maxLength={1000} rows={2} disabled={saving || reading || loadFailed || importInvalid} onChange={event => { setMenu(current => ({ ...current, note: event.target.value })); setNotice(null); }} placeholder="Ví dụ: Thực đơn có thể thay đổi theo nguồn thực phẩm." className="w-full rounded-lg border border-outline-variant p-3 text-body-md bg-surface-container-lowest focus:outline-2 focus:outline-primary" /></div>
-          <div className="flex flex-wrap gap-3 justify-end">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             {(dirty || importInvalid) && <button type="button" disabled={busy || loadFailed} className={CONTROL} onClick={() => { setMenu(savedMenu ?? createEmptyMenu(weekId)); setWorkbook(null); setFileName(''); setSheetName(''); setImportInvalid(false); setError(null); setNotice(null); }}>Bỏ thay đổi</button>}
             <button type="button" disabled={busy || loadFailed || importInvalid || !dirty || !hasMenuContent(menu)} onClick={() => void save()} className={`${CONTROL} bg-primary text-on-primary hover:bg-primary-dark`}><span className="material-symbols-outlined text-[20px]" aria-hidden="true">save</span>{saving ? 'Đang lưu…' : 'Lưu thực đơn'}</button>
           </div>

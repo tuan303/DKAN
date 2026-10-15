@@ -222,6 +222,27 @@
   }
 }
 
+/* Keep content clear of fixed phone navigation and device cutouts. */
+@utility mobile-app-shell {
+  min-height: 100dvh;
+  padding-top: calc(4rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  @media (min-width: 48rem) {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@utility mobile-app-header {
+  height: calc(4rem + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility mobile-bottom-nav {
+  height: calc(68px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Hiệu ứng xuất hiện cho toast / hộp thoại.
    Dự án không cài tailwindcss-animate nên các lớp animate-in, fade-in,
    zoom-in-*, slide-in-from-* trong JSX vốn không có tác dụng — định nghĩa
@@ -245,6 +266,7 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    scroll-padding-top: calc(5rem + env(safe-area-inset-top, 0px));
   }
 
   body {
@@ -253,6 +275,10 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  :where(a, button, input, select, textarea) {
+    touch-action: manipulation;
   }
 
   /* Viền focus thống nhất — bàn phím dùng được toàn bộ giao diện */
@@ -310,5 +336,13 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/* 16px fields prevent automatic focus zoom on iPhone; exclude small choices. */
+@media (max-width: 47.999rem) {
+  :where(.mobile-app-shell, #navigation-drawer, dialog) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), select, textarea) {
+    font-size: 16px;
+    min-height: 44px;
   }
 }

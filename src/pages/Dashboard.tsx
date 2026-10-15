@@ -20,29 +20,29 @@ export function DashboardView({ account }: { account: CurrentAccount | null }) {
           <h1 className="text-headline-md md:text-headline-lg text-on-surface">Tổng quan</h1>
           <p className="mt-2 text-body-md text-on-surface-variant break-words">Xin chào {account?.fullName ? <strong className="font-semibold text-on-surface">{account.fullName}</strong> : 'Thầy/Cô'}{account?.department ? <> · {account.department}</> : null}. Chào mừng đến với hệ thống suất ăn.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/schedule" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-label-lg text-on-primary shadow-xs hover:bg-primary-dark"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>Đăng ký suất ăn</Link>
-          <Link to="/cham-an" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-label-lg text-primary hover:bg-primary-container/70"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">fact_check</span>Chấm ăn của tôi</Link>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Link to="/schedule" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-label-lg text-on-primary shadow-xs hover:bg-primary-dark sm:min-h-10 sm:px-4"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span><span className="sm:hidden">Đăng ký ăn</span><span className="hidden sm:inline">Đăng ký suất ăn</span></Link>
+          <Link to="/cham-an" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary-container px-3 py-2 text-label-lg text-primary hover:bg-primary-container/70 sm:min-h-10 sm:px-4"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">fact_check</span><span className="sm:hidden">Chấm ăn</span><span className="hidden sm:inline">Chấm ăn của tôi</span></Link>
         </div>
       </div>
       <div className="flex items-start gap-3 rounded-xl bg-primary-container p-4 text-body-md text-on-primary-container">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary" aria-hidden="true"><span className="material-symbols-outlined text-[18px]">today</span></span>
-        <p className="self-center"><strong className="font-semibold">{today}.</strong> Thầy/Cô có thể đăng ký suất ăn, xem thực đơn và đối chiếu lượt chấm trong các mục bên dưới.</p>
+        <p className="self-center"><strong className="block font-semibold sm:inline">{today}.</strong> <span className="sm:hidden">Thực đơn, đăng ký và lượt chấm của Thầy/Cô.</span><span className="hidden sm:inline">Thầy/Cô có thể đăng ký suất ăn, xem thực đơn và đối chiếu lượt chấm trong các mục bên dưới.</span></p>
       </div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <section aria-labelledby="dashboard-functions" className="min-w-0 rounded-xl bg-surface-container-lowest p-5 shadow-xs sm:p-6">
+        <section aria-labelledby="dashboard-functions" className="min-w-0 rounded-xl bg-surface-container-lowest p-4 shadow-xs sm:p-6">
           <h2 id="dashboard-functions" className="text-title-md text-on-surface">Dịch vụ suất ăn</h2>
           <p className="mt-1 text-body-sm text-on-surface-variant">Các chức năng dành cho cán bộ, giáo viên và nhân viên.</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {QUICK_LINKS.map(link => <Link key={link.to} to={link.to} className="group flex min-w-0 items-start gap-3 rounded-xl border border-outline-variant/70 bg-surface-container-low/50 p-4 transition-colors hover:border-primary/25 hover:bg-primary/5">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5">
+            {QUICK_LINKS.map(link => <Link key={link.to} to={link.to} className="group flex min-h-[116px] min-w-0 flex-col items-start gap-3 rounded-xl border border-outline-variant/70 bg-surface-container-low/50 p-3 transition-colors hover:border-primary/25 hover:bg-primary/5 sm:min-h-0 sm:flex-row sm:p-4">
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${link.tone}`} aria-hidden="true"><span className="material-symbols-outlined text-[22px]">{link.icon}</span></span>
-              <span className="min-w-0"><span className="block text-label-lg text-on-surface group-hover:text-primary">{link.label}</span><span className="mt-1 block text-body-sm text-on-surface-variant">{link.detail}</span></span>
+              <span className="min-w-0"><span className="block text-label-lg text-on-surface group-hover:text-primary">{link.label}</span><span className="mt-1 hidden text-body-sm text-on-surface-variant sm:block">{link.detail}</span></span>
             </Link>)}
           </div>
         </section>
         <div className="min-w-0 space-y-4">
-          <section aria-labelledby="dashboard-account" className="rounded-xl bg-surface-container-lowest p-5 shadow-xs sm:p-6">
-            <div className="flex items-center justify-between gap-2"><h2 id="dashboard-account" className="text-title-md text-on-surface">Tài khoản của tôi</h2><button type="button" onClick={() => window.dispatchEvent(new Event('open-account-modal'))} className="text-label-sm text-primary hover:underline">Chi tiết</button></div>
+          <section aria-labelledby="dashboard-account" className="rounded-xl bg-surface-container-lowest p-4 shadow-xs sm:p-6">
+            <div className="flex items-center justify-between gap-2"><h2 id="dashboard-account" className="text-title-md text-on-surface">Tài khoản của tôi</h2><button type="button" onClick={() => window.dispatchEvent(new Event('open-account-modal'))} className="min-h-11 px-2 text-label-md text-primary hover:underline">Chi tiết</button></div>
             <p className="mt-4 text-label-lg text-on-surface break-words">{account?.fullName || 'Đang tải thông tin…'}</p>
             <p className="mt-1 text-body-sm text-on-surface-variant break-all">{account?.email}</p>
             <dl className="mt-4 grid grid-cols-2 gap-2 text-body-sm"><div className="rounded-lg bg-surface-container p-3"><dt className="text-on-surface-variant">Mã nhân viên</dt><dd className="mt-1 font-semibold break-words">{account?.employeeId || 'Chưa cập nhật'}</dd></div><div className="rounded-lg bg-surface-container p-3"><dt className="text-on-surface-variant">Phòng ban</dt><dd className="mt-1 font-semibold break-words">{account?.department || 'Chưa cập nhật'}</dd></div></dl>
@@ -60,5 +60,5 @@ export function DashboardView({ account }: { account: CurrentAccount | null }) {
 
 export default function Dashboard() {
   const account = useCurrentAccount();
-  return <div className="min-h-screen min-w-0 flex flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64"><Header account={account} /><Navigation /><DashboardView account={account} /><Footer /></div>;
+  return <div className="mobile-app-shell min-w-0 flex flex-col md:pl-64"><Header account={account} /><Navigation /><DashboardView account={account} /><Footer /></div>;
 }

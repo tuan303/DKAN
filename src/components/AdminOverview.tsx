@@ -23,17 +23,17 @@ export function AdminOverview() {
     <section aria-labelledby="admin-quick-actions" className="min-w-0">
       <h2 id="admin-quick-actions" className="text-title-md text-on-surface">Thao tác thường dùng</h2>
       <p className="mt-1 text-body-sm text-on-surface-variant">Mở nhanh các công việc hằng ngày của bộ phận quản trị và dinh dưỡng.</p>
-      <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+      <div className="mt-4 grid min-w-0 grid-cols-2 gap-3 2xl:grid-cols-4">
         {QUICK_FUNCTIONS.map(key => {
           const tab = ADMIN_TABS.find(item => item.key === key);
           if (!tab) return null;
-          return <Link key={key} to={`/quantri?tab=${key}`} className={`group flex min-w-0 flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 ${LINK_FOCUS}`}>
+          return <Link key={key} to={`/quantri?tab=${key}`} className={`group flex min-h-[112px] min-w-0 flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-3 shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 sm:p-4 ${LINK_FOCUS}`}>
             <div className="flex items-center justify-between gap-3">
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tab.tone}`} aria-hidden="true"><span className="material-symbols-outlined text-[22px]">{tab.icon}</span></span>
-              <span className="material-symbols-outlined text-[20px] text-outline group-hover:text-primary" aria-hidden="true">arrow_forward</span>
+              <span className="material-symbols-outlined hidden text-[20px] text-outline group-hover:text-primary sm:inline-block" aria-hidden="true">arrow_forward</span>
             </div>
-            <span className="mt-4 block text-label-lg text-on-surface group-hover:text-primary">{tab.label}</span>
-            <span className="mt-1 block text-body-sm text-on-surface-variant">{tab.description}</span>
+            <span className="mt-3 block text-label-lg text-on-surface group-hover:text-primary sm:mt-4">{tab.label}</span>
+            <span className="mt-1 hidden text-body-sm text-on-surface-variant sm:block">{tab.description}</span>
           </Link>;
         })}
       </div>

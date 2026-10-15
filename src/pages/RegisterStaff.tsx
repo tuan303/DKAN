@@ -92,18 +92,18 @@ export default function RegisterStaff() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-background flex flex-col">
+    <div className="min-h-dvh bg-background text-on-background flex flex-col pb-[env(safe-area-inset-bottom)]">
       <Header />
       
-      <main className="mx-auto w-full max-w-[680px] flex-grow px-4 pb-8 pt-24 sm:px-6 sm:pb-12 sm:pt-28">
-        <div className="mb-6">
+      <main className="mx-auto w-full max-w-[680px] flex-grow px-4 pb-6 pt-[calc(80px+env(safe-area-inset-top))] sm:px-6 sm:pb-12 sm:pt-[calc(112px+env(safe-area-inset-top))]">
+        <div className="mb-5 sm:mb-6">
           <p className="text-xs font-medium text-on-surface-variant">Tài khoản nhà trường / Hồ sơ nhân viên</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">Thông tin nhân viên</h1>
           <p className="mt-2 text-body-md text-on-surface-variant">Hoàn thiện hồ sơ để đăng ký và theo dõi suất ăn của bạn.</p>
         </div>
         <section aria-labelledby="profile-title" aria-busy={loading} className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-xs">
           
-          <div className="flex items-start gap-3 border-b border-outline-variant p-5 sm:p-6">
+          <div className="flex items-start gap-3 border-b border-outline-variant p-4 sm:p-6">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-primary" aria-hidden="true">
               <span className="material-symbols-outlined text-[22px]">manage_accounts</span>
             </span>
@@ -113,7 +113,7 @@ export default function RegisterStaff() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-6 p-5 sm:p-6">
+          <div className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-6">
             
             {error && (
               <div role="alert" className="rounded-lg border border-error/20 bg-error-container p-3 text-body-sm text-on-error-container break-words">
@@ -137,7 +137,7 @@ export default function RegisterStaff() {
                   placeholder="Họ và tên của bạn" 
                   required 
                   aria-describedby="fullName-hint"
-                  className="block min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container py-2.5 pl-10 pr-3 text-body-md text-on-surface-variant focus-visible:outline-2 focus-visible:outline-primary"
+                  className="block min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container py-2.5 pl-10 pr-3 text-base sm:text-body-md text-on-surface-variant focus-visible:outline-2 focus-visible:outline-primary"
                 />
               </div>
               <p id="fullName-hint" className="text-body-sm text-on-surface-variant">Lấy từ tên hiển thị của email nhà trường, không thể chỉnh sửa tại đây.</p>
@@ -166,7 +166,7 @@ export default function RegisterStaff() {
                   required
                   aria-invalid={employeeId.length > 0 && !idValid}
                   aria-describedby="employeeId-hint"
-                  className={`block min-h-11 w-full rounded-lg border bg-surface-container-lowest py-2.5 pl-10 pr-3 text-body-md text-on-surface placeholder-on-surface-variant transition-shadow focus:outline-none focus:ring-2 tabular ${
+                  className={`block min-h-11 w-full rounded-lg border bg-surface-container-lowest py-2.5 pl-10 pr-3 text-base sm:text-body-md text-on-surface placeholder-on-surface-variant transition-shadow focus:outline-none focus:ring-2 tabular ${
                     employeeId.length > 0 && !idValid
                       ? 'border-error focus:ring-error focus:border-error'
                       : 'border-outline-variant focus:ring-primary focus:border-primary'
@@ -196,7 +196,7 @@ export default function RegisterStaff() {
                   required 
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="block min-h-11 w-full min-w-0 appearance-none rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-9 text-body-md text-on-surface transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="block min-h-11 w-full min-w-0 appearance-none rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-9 text-base sm:text-body-md text-on-surface transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="" disabled>Chọn phòng ban / tổ / khối</option>
                   <option value="BAN LÃNH ĐẠO">BAN LÃNH ĐẠO</option>
@@ -243,7 +243,7 @@ export default function RegisterStaff() {
 
           </div>
 
-          <div className="flex flex-col-reverse justify-end gap-3 border-t border-outline-variant bg-surface-container-low px-5 py-4 sm:flex-row sm:px-6">
+          <div className="flex flex-col-reverse justify-end gap-2 border-t border-outline-variant bg-surface-container-low px-4 py-4 sm:flex-row sm:gap-3 sm:px-6">
             <button 
               type="button" 
               onClick={() => navigate(loginPath)}

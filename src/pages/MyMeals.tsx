@@ -458,7 +458,7 @@ function TodayCard({
             onClick={onReload}
             disabled={refreshing}
             aria-busy={refreshing}
-            className="self-start sm:self-center shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-md text-primary hover:bg-surface-container transition-colors disabled:opacity-60 disabled:cursor-wait"
+            className="w-full sm:w-auto min-h-11 md:min-h-0 self-start sm:self-center shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-label-md text-primary hover:bg-surface-container transition-colors disabled:opacity-60 disabled:cursor-wait"
           >
             <span className={clsx('material-symbols-outlined text-[18px]', refreshing && 'animate-spin')} aria-hidden="true">
               {refreshing ? 'progress_activity' : 'refresh'}
@@ -473,8 +473,8 @@ function TodayCard({
 
 function DayRow({ day: { result: day, hold }, registration, isToday }: { day: DayView; registration: Registration | null; isToday: boolean }) {
   return (
-    <li className="px-md md:px-lg py-3 grid grid-cols-2 @xl:grid-cols-[170px_1fr_1fr] gap-x-3 gap-y-2 items-start">
-      <div className="col-span-2 @xl:col-span-1 flex items-center gap-2 @xl:pt-1">
+    <li className="px-md md:px-lg py-4 md:py-3 grid grid-cols-1 @[20rem]:grid-cols-2 @xl:grid-cols-[170px_1fr_1fr] gap-x-3 gap-y-2 items-start">
+      <div className="@[20rem]:col-span-2 @xl:col-span-1 flex flex-wrap items-center gap-2 @xl:pt-1">
         <span className="text-label-lg text-on-surface tabular">{formatDayLabel(day.date)}</span>
         {isToday && <span className="px-2 py-0.5 rounded-full bg-primary text-on-primary text-label-sm">Hôm nay</span>}
       </div>
@@ -482,7 +482,7 @@ function DayRow({ day: { result: day, hold }, registration, isToday }: { day: Da
         const status = day.meals[meal];
         const note = mealNote(status, registration, meal);
         return (
-          <div key={meal} className="flex flex-col gap-1 min-w-0">
+          <div key={meal} className="flex flex-col gap-1.5 min-w-0 rounded-lg bg-surface-container-low p-2.5 @xl:rounded-none @xl:bg-transparent @xl:p-0">
             {/* Trên máy tính đã có tiêu đề cột; vẫn giữ nhãn cho trình đọc màn hình. */}
             <span className="text-label-sm text-on-surface-variant uppercase @xl:sr-only">{MEAL_LABEL[meal]}</span>
             <StatusChip status={status} hold={hold} />
@@ -491,7 +491,7 @@ function DayRow({ day: { result: day, hold }, registration, isToday }: { day: Da
         );
       })}
       {day.unrecognized.length > 0 && (
-        <div className="col-span-2 @xl:col-start-2">
+        <div className="@[20rem]:col-span-2 @xl:col-start-2">
           <UnrecognizedNote times={day.unrecognized} />
         </div>
       )}
@@ -532,7 +532,7 @@ function SummaryTiles({ days, isCurrentMonth, showTiles }: { days: DayView[]; is
               </span>
               {t.label}
             </dt>
-            <dd className="text-headline-md tabular">
+            <dd className="text-[26px] leading-tight font-bold md:text-headline-md tabular">
               {t.value} <span className="text-body-sm">bữa</span>
             </dd>
           </div>
@@ -592,7 +592,7 @@ function HistoryCard({
               aria-pressed={m === month}
               aria-label={monthLabel(m)}
               className={clsx(
-                'px-2 md:px-3 py-2 rounded-md text-label-md whitespace-nowrap transition-colors tabular',
+                'min-h-11 md:min-h-0 px-2 md:px-3 py-2 rounded-md text-label-md whitespace-nowrap transition-colors tabular',
                 m === month ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-high',
               )}
             >
@@ -727,7 +727,7 @@ function HelpCard() {
       </p>
       <a
         href={`mailto:${NUTRITION_EMAIL}`}
-        className="inline-flex items-center justify-center gap-2 w-full px-md py-2.5 rounded-lg bg-primary text-on-primary text-label-lg hover:bg-primary-dark transition-colors"
+        className="inline-flex min-h-11 items-center justify-center gap-2 w-full px-md py-2.5 rounded-lg bg-primary text-on-primary text-label-lg hover:bg-primary-dark transition-colors"
       >
         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">mail</span>
         Gửi email Bộ phận Dinh dưỡng
@@ -783,7 +783,7 @@ export function MyMealsView(props: MyMealsViewProps) {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-xs lg:gap-md">
         <div>
           <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
-          <h2 className="text-headline-md md:text-headline-lg text-on-surface">Chấm ăn của tôi</h2>
+          <h2 className="text-[26px] leading-tight font-bold md:text-headline-lg text-on-surface">Chấm ăn của tôi</h2>
           <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">
             Đối chiếu suất ăn Thầy/Cô đã đăng ký với lượt chấm trên máy nhận diện
           </p>
@@ -1385,7 +1385,7 @@ export default function MyMeals() {
   }, [base, months, month, currentMonth, todayIso, now]);
 
   return (
-    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
+    <div className="mobile-app-shell font-body-lg flex min-w-0 flex-col md:pl-64">
       <Header />
       <Navigation />
       {/* Đặt ngoài MyMealsView để phần trình bày vẫn thuần props (xem trước bằng

@@ -17,6 +17,8 @@ import DatePickerDefault from "react-multi-date-picker";
 import "react-multi-date-picker/styles/layouts/mobile.css";
 
 const DatePicker = (DatePickerDefault as any).default || DatePickerDefault;
+const PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => `Tháng ${index + 1}`);
+const PICKER_WEEK_DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 export default function ScheduleMonth() {
   const [breakfastChoice, setBreakfastChoice] = useState('');
@@ -629,7 +631,7 @@ export default function ScheduleMonth() {
   };
 
   return (
-    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
+    <div className="mobile-app-shell font-body-lg flex min-w-0 flex-col md:pl-64">
       <Header />
       <Navigation />
       {/* Nhắc khảo sát suất ăn tuần (chỉ hiện khi đang mở mà Thầy/Cô chưa trả
@@ -637,26 +639,26 @@ export default function ScheduleMonth() {
       <SurveyBanner className="max-w-[1440px] w-full mx-auto px-md md:px-margin lg:px-xl pt-md md:pt-lg" />
 
       <main className="flex-1 max-w-[1440px] w-full mx-auto py-md md:py-lg flex flex-col gap-md md:gap-lg">
-        <section className="space-y-xl px-0 md:px-margin lg:px-xl">
+        <section className="space-y-5 px-0 md:space-y-xl md:px-margin lg:px-xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-md px-md md:px-0">
             <div className="min-w-0">
               <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
-              <h2 className="text-headline-md md:text-headline-lg text-on-surface">Đăng ký ăn hàng tháng</h2>
+              <h2 className="text-2xl font-bold leading-tight md:text-headline-lg text-on-surface">Đăng ký ăn hàng tháng</h2>
               <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn bữa ăn thầy/cô muốn đăng ký ăn tại trường</p>
             </div>
             {/* Month Selector */}
-            <div className="w-full lg:w-auto shrink-0 flex items-center justify-between gap-md bg-surface-container-lowest border border-outline-variant rounded-xl p-sm">
+            <div className="w-full lg:w-auto shrink-0 flex items-center justify-between gap-sm bg-surface-container-lowest border border-outline-variant rounded-xl p-1 md:gap-md md:p-sm">
               <button 
                 onClick={handlePrevMonth}
                 aria-label="Tháng trước"
-                className="min-h-10 min-w-10 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
+                className="min-h-11 min-w-11 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
               <span className="text-label-lg text-on-surface min-w-[120px] text-center tabular">Tháng {monthString}, {selectedYear}</span>
               <button 
                 onClick={handleNextMonth}
                 aria-label="Tháng sau"
-                className="min-h-10 min-w-10 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
+                className="min-h-11 min-w-11 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
@@ -666,7 +668,7 @@ export default function ScheduleMonth() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
             <div className="xl:col-span-2 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-full">
-              <div role="group" aria-label="Đăng ký hoặc hủy suất ăn" className="grid grid-cols-2 gap-1 rounded-xl p-1 bg-surface-container mb-lg">
+              <div role="group" aria-label="Đăng ký hoặc hủy suất ăn" className="grid grid-cols-2 gap-1 rounded-xl p-1 bg-surface-container mb-5 md:mb-lg">
                   <button
                     onClick={() => setActiveMainTab('register')}
                     aria-pressed={activeMainTab === 'register'}
@@ -678,7 +680,7 @@ export default function ScheduleMonth() {
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px] shrink-0 hidden sm:inline" aria-hidden="true">edit_calendar</span>
-                    Đăng ký hàng tháng
+                    <span className="sm:hidden">Đăng ký tháng</span><span className="hidden sm:inline">Đăng ký hàng tháng</span>
                   </button>
                   <button
                     onClick={() => setActiveMainTab('cancel')}
@@ -691,19 +693,19 @@ export default function ScheduleMonth() {
                     )}
                   >
                     <span className="material-symbols-outlined text-[18px] shrink-0 hidden sm:inline" aria-hidden="true">event_busy</span>
-                    Hủy đăng ký ăn
+                    <span className="sm:hidden">Hủy ăn</span><span className="hidden sm:inline">Hủy đăng ký ăn</span>
                   </button>
               </div>
 
               {activeMainTab === 'register' ? (
                 <div className="space-y-md">
                   <div className="space-y-sm">
-                    <h4 className="text-headline-sm text-on-surface border-b border-outline-variant pb-sm">Lựa chọn bữa ăn · {monthString}/{selectedYear}</h4>
+                    <h4 className="text-base font-semibold md:text-headline-sm text-on-surface border-b border-outline-variant pb-sm">Lựa chọn bữa ăn · {monthString}/{selectedYear}</h4>
                     
                     {/* Day Row 1 */}
-                    <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                        <div className="flex items-center gap-md">
-                          <div className="w-12 h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                    <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-3 sm:p-md bg-surface-container-low rounded-xl border border-outline-variant gap-3 md:gap-md transition-colors">
+                        <div className="flex min-w-0 items-center gap-3 md:gap-md">
+                          <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                             <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
                           </div>
                           <div>
@@ -712,8 +714,8 @@ export default function ScheduleMonth() {
                           </div>
                         </div>
                         
-                        <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
-                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                        <div className="grid grid-cols-2 gap-2 w-full 2xl:w-auto">
+                          <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", breakfastChoice === 'yes' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                             <input 
                               type="radio" 
                               name="breakfast" 
@@ -726,7 +728,7 @@ export default function ScheduleMonth() {
                             />
                             <span className="text-label-md text-on-surface select-none">Có ăn</span>
                           </label>
-                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                          <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", breakfastChoice === 'no' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                             <input 
                               type="radio" 
                               name="breakfast" 
@@ -740,9 +742,9 @@ export default function ScheduleMonth() {
                       </div>
 
                       {/* Day Row 2 */}
-                      <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                        <div className="flex items-center gap-md">
-                          <div className="w-12 h-12 shrink-0 bg-warning-container rounded-xl flex items-center justify-center text-on-warning-container">
+                      <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-3 sm:p-md bg-surface-container-low rounded-xl border border-outline-variant gap-3 md:gap-md transition-colors">
+                        <div className="flex min-w-0 items-center gap-3 md:gap-md">
+                          <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 bg-warning-container rounded-xl flex items-center justify-center text-on-warning-container">
                             <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
                           </div>
                           <div>
@@ -751,8 +753,8 @@ export default function ScheduleMonth() {
                           </div>
                         </div>
                         
-                        <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
-                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                        <div className="grid grid-cols-2 gap-2 w-full 2xl:w-auto">
+                          <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", lunchChoice === 'yes' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                             <input 
                               type="radio" 
                               name="lunch" 
@@ -765,7 +767,7 @@ export default function ScheduleMonth() {
                             />
                             <span className="text-label-md text-on-surface select-none">Có ăn</span>
                           </label>
-                          <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
+                          <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", lunchChoice === 'no' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                             <input 
                               type="radio" 
                               name="lunch" 
@@ -781,11 +783,14 @@ export default function ScheduleMonth() {
               </div>
               ) : (
                 <div className="space-y-md flex-1">
-                  <div className="p-md bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 sm:p-md bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-2 relative">
-                      <label className="font-label-md text-on-surface">Ngày hủy suất ăn <span className="text-error">*</span></label>
+                      <label htmlFor="cancel-dates" className="font-label-md text-on-surface">Ngày hủy suất ăn <span className="text-error">*</span></label>
                       <DatePicker 
+                        id="cancel-dates"
                         multiple
+                        months={PICKER_MONTHS}
+                        weekDays={PICKER_WEEK_DAYS}
                         value={cancelDates}
                         onChange={(dates: any) => {
                           const validDates = [];
@@ -802,7 +807,7 @@ export default function ScheduleMonth() {
                           setCancelDates(validDates);
                         }}
                         format="DD/MM/YYYY"
-                        placeholder="Chọn các ngày hủy (có thể chọn nhiều)"
+                        placeholder="Chọn một hoặc nhiều ngày"
                         minDate={getMinCancelDateObj()}
                         containerClassName="w-full"
                         inputClass="w-full bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
@@ -810,8 +815,9 @@ export default function ScheduleMonth() {
                       <span className="text-[12px] italic font-bold text-secondary leading-tight">Yêu cầu hủy trước {cancelExtendUntil ? new Date(cancelExtendUntil).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '16:00'} ngày hôm trước</span>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="font-label-md text-on-surface">Bữa muốn hủy <span className="text-error">*</span></label>
+                      <label htmlFor="cancel-meal" className="font-label-md text-on-surface">Bữa muốn hủy <span className="text-error">*</span></label>
                       <select 
+                        id="cancel-meal"
                         value={cancelMeal}
                         onChange={(e) => setCancelMeal(e.target.value)}
                         className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -827,8 +833,9 @@ export default function ScheduleMonth() {
                       )}
                     </div>
                     <div className="flex flex-col gap-2 md:col-span-2">
-                      <label className="font-label-md text-on-surface">Nhà ăn <span className="text-error">*</span></label>
+                      <label htmlFor="cancel-canteen" className="font-label-md text-on-surface">Nhà ăn <span className="text-error">*</span></label>
                       <select 
+                        id="cancel-canteen"
                         value={cancelCanteen}
                         onChange={(e) => setCancelCanteen(e.target.value)}
                         className="bg-surface border border-outline-variant rounded-lg p-2 focus:ring-1 focus:ring-primary focus:border-primary outline-none"
@@ -839,8 +846,9 @@ export default function ScheduleMonth() {
                       </select>
                     </div>
                     <div className="flex flex-col gap-2 md:col-span-2">
-                      <label className="font-label-md text-on-surface">Lý do hủy ăn <span className="text-error">*</span></label>
+                      <label htmlFor="cancel-reason" className="font-label-md text-on-surface">Lý do hủy ăn <span className="text-error">*</span></label>
                       <textarea 
+                        id="cancel-reason"
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
                         placeholder="Nhập lý do hủy đăng ký ăn..."
@@ -913,7 +921,7 @@ export default function ScheduleMonth() {
                     onClick={handleRegister}
                     disabled={isSubmitting || isUserBlocked}
                     className={clsx(
-                      "w-full mt-xl text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
+                      "w-full min-h-12 mt-5 md:mt-xl text-base font-semibold md:text-headline-sm px-3 py-3 md:py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
                       (!isMonthOpen || isUserBlocked)
                         ? "bg-surface-variant text-on-surface-variant opacity-70 hover:opacity-80" 
                         : "bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95"
@@ -939,7 +947,7 @@ export default function ScheduleMonth() {
                     onClick={handleCancel}
                     disabled={isCanceling || cancelDates.length === 0 || isCheckingRegistration || !userRegistrationForCancel || (userRegistrationForCancel.breakfastCount === 0 && userRegistrationForCancel.lunchCount === 0)}
                     className={clsx(
-                      "w-full mt-xl text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
+                      "w-full min-h-12 mt-5 md:mt-xl text-base font-semibold md:text-headline-sm px-3 py-3 md:py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm duration-100 disabled:opacity-60 disabled:cursor-not-allowed",
                       "bg-error text-on-error hover:bg-secondary-dark active:scale-95"
                     )}
                   >
@@ -958,15 +966,15 @@ export default function ScheduleMonth() {
       </main>
       {/* Professional Notification Modal */}
       {submitStatus && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))] animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
-          <div className={clsx(
-            "relative w-[min(calc(100vw-32px),384px)] bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+          <div role="dialog" aria-modal="true" aria-labelledby="month-status-title" className={clsx(
+            "relative w-[min(calc(100vw-32px),384px)] max-h-[calc(100dvh-32px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] bg-surface-container-lowest rounded-xl shadow-xl overflow-y-auto animate-in zoom-in-95 duration-200 border border-outline-variant",
             submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
           )}>
-            <div className="p-xl text-center flex flex-col items-center">
+            <div className="p-5 sm:p-xl text-center flex flex-col items-center">
               <div className={clsx(
-                "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
+                "w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
                 submitStatus.type === 'success' ? "bg-tertiary-container text-on-tertiary-container" : (submitStatus.type === 'info' ? "bg-primary-container text-on-primary-container" : "bg-error-container text-on-error-container")
               )}>
                 <span className="material-symbols-outlined text-[48px]">
@@ -974,7 +982,7 @@ export default function ScheduleMonth() {
                 </span>
               </div>
               
-              <h3 className={clsx(
+              <h3 id="month-status-title" className={clsx(
                 "text-headline-sm mb-sm",
                 submitStatus.type === 'success' ? "text-on-tertiary-container" : (submitStatus.type === 'info' ? "text-on-primary-container" : "text-error")
               )}>
@@ -991,7 +999,7 @@ export default function ScheduleMonth() {
               <button 
                 onClick={() => setSubmitStatus(null)}
                 className={clsx(
-                  "w-full py-3 rounded-xl text-label-lg transition-colors shadow-sm",
+                  "w-full min-h-11 py-3 rounded-xl text-label-lg transition-colors shadow-sm",
                   submitStatus.type === 'success' 
                     ? "bg-primary text-on-primary hover:bg-primary/90" 
                     : (submitStatus.type === 'info' ? "bg-primary text-on-primary hover:bg-primary-dark" : "bg-error text-on-error hover:bg-error/90")

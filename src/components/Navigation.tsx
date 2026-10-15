@@ -28,6 +28,7 @@ export function Navigation({ className, adminMode = false }: { className?: strin
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
   const [configLoading, setConfigLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
   const accountDialog = useRef<HTMLDialogElement>(null);
 
@@ -76,13 +77,13 @@ export function Navigation({ className, adminMode = false }: { className?: strin
   const closeDrawer = () => drawer.current?.close();
   const openAccount = () => {
     drawer.current?.close();
-    if (accountDialog.current && !accountDialog.current.open) accountDialog.current.showModal();
+    if (accountDialog.current && !accountDialog.current.open) { accountDialog.current.showModal(); setAccountOpen(true); }
   };
 
   useEffect(() => {
     const handleAccount = () => {
       drawer.current?.close();
-      if (accountDialog.current && !accountDialog.current.open) accountDialog.current.showModal();
+      if (accountDialog.current && !accountDialog.current.open) { accountDialog.current.showModal(); setAccountOpen(true); }
     };
     const handleNavigation = () => {
       if (drawer.current && !drawer.current.open) { drawer.current.showModal(); setDrawerOpen(true); }
@@ -96,6 +97,13 @@ export function Navigation({ className, adminMode = false }: { className?: strin
   }, []);
 
   useEffect(() => { drawer.current?.close(); }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!drawerOpen && !accountOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [drawerOpen, accountOpen]);
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -132,37 +140,39 @@ export function Navigation({ className, adminMode = false }: { className?: strin
     { to: '/quantri?tab=daily_stats', icon: 'list_alt', label: 'Theo ngày' },
     { to: '/quantri?tab=menu', icon: 'restaurant_menu', label: 'Thực đơn' },
   ] : [
+    { to: '/dashboard', icon: 'space_dashboard', label: 'Tổng quan' },
     { to: '/schedule', icon: 'calendar_month', label: 'Đăng ký' },
     { to: '/cham-an', icon: 'fact_check', label: 'Chấm ăn' },
     { to: '/thuc-don', icon: 'restaurant_menu', label: 'Thực đơn' },
   ];
+  const moreSelected = drawerOpen || !mobileLinks.some(link => link.to === activeHref);
 
   return <>
     {adminMode && <a href="#admin-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-3 focus:text-white">Bỏ qua menu, tới nội dung</a>}
     <SchoolSidebar {...sidebarProps} className={clsx('fixed inset-y-0 left-0 z-40 hidden w-64 md:flex', className)} />
-    <nav aria-label="Điều hướng trên điện thoại" className="fixed inset-x-0 bottom-0 z-50 grid h-[72px] grid-cols-4 border-t border-outline-variant bg-surface-container-lowest pb-safe shadow-[0_-2px_12px_rgb(0_0_0_/_0.04)] md:hidden">
+    <nav aria-label="Điều hướng trên điện thoại" className={clsx('mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 grid border-t border-outline-variant bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_-3px_16px_rgb(24_34_55_/_0.05)] md:hidden', adminMode ? 'grid-cols-4' : 'grid-cols-5')}>
       {mobileLinks.map(link => {
         const selected = activeHref === link.to;
-        return <Link key={link.to} to={link.to} aria-current={selected ? 'page' : undefined} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', selected ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
-          <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', selected && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]" style={{ fontVariationSettings: selected ? "'FILL' 1" : undefined }}>{link.icon}</span></span>{link.label}
+        return <Link key={link.to} to={link.to} aria-current={selected ? 'page' : undefined} className={clsx('flex min-h-[60px] min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4 transition-colors', selected ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+          <span className={clsx('flex h-7 w-11 items-center justify-center rounded-xl', selected && 'bg-primary-container text-primary')} aria-hidden="true"><span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: selected ? "'FILL' 1" : undefined }}>{link.icon}</span></span>{link.label}
         </Link>;
       })}
-      <button type="button" aria-label={adminMode ? 'Mở tất cả chức năng quản trị' : 'Mở tất cả chức năng'} aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="navigation-drawer" onClick={() => { if (drawer.current && !drawer.current.open) drawer.current.showModal(); setDrawerOpen(true); }} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', drawerOpen || (adminMode && !mobileLinks.some(link => link.to === activeHref)) ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
-        <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', (drawerOpen || (adminMode && !mobileLinks.some(link => link.to === activeHref))) && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]">apps</span></span>{adminMode ? 'Menu' : 'Tất cả'}
+      <button type="button" aria-label={adminMode ? 'Mở tất cả chức năng quản trị' : 'Mở tất cả chức năng'} aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="navigation-drawer" onClick={() => { if (drawer.current && !drawer.current.open) drawer.current.showModal(); setDrawerOpen(true); }} className={clsx('flex min-h-[60px] min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', moreSelected ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+        <span className={clsx('flex h-7 w-11 items-center justify-center rounded-xl', moreSelected && 'bg-primary-container')} aria-hidden="true"><span className="material-symbols-outlined text-[22px]">apps</span></span>{adminMode ? 'Menu' : 'Tất cả'}
       </button>
     </nav>
 
-    <dialog ref={drawer} id="navigation-drawer" aria-label="Tất cả chức năng" onClose={() => setDrawerOpen(false)} onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close(); }} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(320px,calc(100vw-32px))] max-w-none border-0 bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
-      <button type="button" autoFocus aria-label="Đóng điều hướng" onClick={closeDrawer} className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
-      <SchoolSidebar {...sidebarProps} visible={drawerOpen} className="border-r-0" onNavigate={closeDrawer} />
+    <dialog ref={drawer} id="navigation-drawer" aria-label="Tất cả chức năng" onClose={() => setDrawerOpen(false)} onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close(); }} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(360px,calc(100vw-24px))] max-w-none border-0 bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
+      <button type="button" autoFocus aria-label="Đóng điều hướng" onClick={closeDrawer} className="absolute right-0 top-[env(safe-area-inset-top,0px)] z-10 flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
+      <SchoolSidebar {...sidebarProps} visible={drawerOpen} className="border-r-0 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]" onNavigate={closeDrawer} />
     </dialog>
 
-    <dialog ref={accountDialog} aria-labelledby="account-title" onCancel={event => { if (signingOut) event.preventDefault(); }} onClick={event => { if (!signingOut && event.target === event.currentTarget) event.currentTarget.close(); }} className="m-auto max-h-[88dvh] w-[min(440px,calc(100vw-32px))] max-w-none overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
-      <div className="flex items-center justify-between gap-4 border-b border-outline-variant px-5 py-4">
+    <dialog ref={accountDialog} aria-labelledby="account-title" onClose={() => setAccountOpen(false)} onCancel={event => { if (signingOut) event.preventDefault(); }} onClick={event => { if (!signingOut && event.target === event.currentTarget) event.currentTarget.close(); }} className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-hidden rounded-t-[24px] border border-outline-variant bg-surface-container-lowest p-0 text-on-surface shadow-xl open:flex open:flex-col backdrop:bg-black/35 backdrop:backdrop-blur-[2px] sm:inset-0 sm:m-auto sm:max-h-[88dvh] sm:w-[min(440px,calc(100vw-32px))] sm:rounded-2xl">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-outline-variant px-5 py-4">
         <h2 id="account-title" className="text-headline-sm">Thông tin tài khoản</h2>
-        <button type="button" autoFocus disabled={signingOut} aria-label="Đóng thông tin tài khoản" onClick={() => accountDialog.current?.close()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high disabled:opacity-60"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
+        <button type="button" autoFocus disabled={signingOut} aria-label="Đóng thông tin tài khoản" onClick={() => accountDialog.current?.close()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high disabled:opacity-60"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
       </div>
-      <div className="space-y-5 p-5">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-amber text-lg font-bold text-on-warning" aria-hidden="true">{account?.initials || <span className="material-symbols-outlined">person</span>}</span>
           <div className="min-w-0"><p className="text-label-lg break-words">{account?.fullName || 'Tài khoản nhân viên'}</p><p className="mt-1 text-body-sm text-on-surface-variant">{account?.isSuperAdmin ? 'Quản trị cao nhất' : canManage ? 'Quản trị viên' : 'Cán bộ, giáo viên, nhân viên'}</p></div>
@@ -184,7 +194,7 @@ export function Navigation({ className, adminMode = false }: { className?: strin
         {canManage && <Link to={adminMode ? '/dashboard' : '/quantri'} onClick={() => accountDialog.current?.close()} className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary/10 px-3 text-label-md text-primary hover:bg-primary/15"><span className="material-symbols-outlined text-[19px]" aria-hidden="true">{adminMode ? 'arrow_back' : 'admin_panel_settings'}</span>{adminMode ? 'Trang cá nhân' : 'Trang quản trị'}</Link>}
         {signOutError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-body-sm text-on-error-container">{signOutError}</p>}
       </div>
-      <div className="flex gap-3 border-t border-outline-variant bg-surface-container-low p-4">
+      <div className="flex shrink-0 gap-3 border-t border-outline-variant bg-surface-container-low p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
         <button type="button" disabled={signingOut} onClick={() => accountDialog.current?.close()} className="min-h-11 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-label-md hover:bg-surface-container disabled:opacity-60">Đóng</button>
         <button type="button" disabled={signingOut} onClick={handleSignOut} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-error px-3 text-label-md text-on-error hover:bg-error-dark disabled:opacity-60"><span className={clsx('material-symbols-outlined text-[18px]', signingOut && 'animate-spin')} aria-hidden="true">{signingOut ? 'progress_activity' : 'logout'}</span>{signingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</button>
       </div>

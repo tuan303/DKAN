@@ -18,44 +18,32 @@ function HeaderContent({ account }: { account: CurrentAccount | null }) {
   const accountDetail = account?.department || (account?.isSuperAdmin ? 'Quản trị cao nhất' : 'Thông tin tài khoản');
 
   return (
-    <header className={`fixed top-0 inset-x-0 z-50 h-16 bg-surface-container-lowest border-b border-outline-variant ${isRegister ? '' : 'md:hidden'}`}>
-      <div className="w-full h-full flex justify-between items-center gap-3 px-4 md:px-6 lg:px-8">
+    <header className={`mobile-app-header fixed top-0 inset-x-0 z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant ${isRegister ? '' : 'md:hidden'}`}>
+      <div className="w-full h-full flex justify-between items-center gap-2 px-3 md:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-2">
-        {!isRegister && <button type="button" aria-label="Mở menu chức năng" onClick={() => window.dispatchEvent(new Event('open-navigation'))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-on-surface hover:bg-surface-container">
+        {!isRegister && <button type="button" aria-label="Mở menu chức năng" aria-haspopup="dialog" aria-controls="navigation-drawer" onClick={() => window.dispatchEvent(new Event('open-navigation'))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-outline-variant/70 bg-surface-container-low text-on-surface hover:bg-surface-container">
           <span className="material-symbols-outlined text-[24px]" aria-hidden="true">menu</span>
         </button>}
         <Link to="/dashboard" aria-label="Suất ăn – Trường Ngôi Sao Hoàng Mai" className="flex min-w-0 items-center gap-2 group rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-          <img
+          {isRegister ? <img
             src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png"
             alt="Trường Ngôi Sao Hoàng Mai"
-            className={`h-8 w-auto object-contain shrink-0 ${isRegister ? 'max-w-[180px]' : 'max-w-[116px] sm:max-w-[156px]'}`}
-          />
-          <span className="hidden sm:block w-px h-7 bg-outline-variant shrink-0" aria-hidden="true" />
-          <span className="hidden lg:inline text-base xl:text-lg font-bold text-on-surface whitespace-nowrap group-hover:text-primary transition-colors">
-            Đăng ký suất ăn
-          </span>
-          <span className="hidden sm:inline lg:hidden text-sm font-bold text-primary uppercase whitespace-nowrap">Đăng ký ăn</span>
+            className="h-8 w-auto max-w-[180px] object-contain shrink-0"
+          /> : <>
+            <span className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-white" aria-hidden="true"><img src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png" alt="" className="h-8 w-auto max-w-none" /></span>
+            <span className="min-w-0"><span className="block text-[14px] font-bold leading-5 text-on-surface">Suất ăn</span><span className="block truncate text-[10px] leading-4 text-on-surface-variant">{isAdmin ? 'Không gian quản trị' : 'Ngôi Sao Hoàng Mai'}</span></span>
+          </>}
         </Link>
         </div>
         
         {!isRegister ? (
           <div className="flex shrink-0 items-center gap-2 lg:gap-4">
-            {isAdmin && (
-              <Link
-                to="/schedule"
-                aria-label="Trang đăng ký ăn"
-                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/15 bg-primary-container/60 px-2.5 lg:px-3 text-on-primary-container text-label-md hover:bg-primary-container transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
-                <span className="hidden lg:inline whitespace-nowrap">Trang đăng ký ăn</span>
-              </Link>
-            )}
             <button
               type="button"
               aria-label={`Mở thông tin tài khoản${account?.fullName ? ` của ${account.fullName}` : ''}`}
               aria-haspopup="dialog"
               onClick={() => window.dispatchEvent(new Event('open-account-modal'))}
-              className="group flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+              className="group flex min-h-11 min-w-11 items-center justify-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
             >
               <span className="hidden md:flex min-w-0 flex-col max-w-[160px] xl:max-w-[210px]">
                 <span title={accountName} className="truncate text-sm font-semibold leading-5 text-on-surface group-hover:text-primary transition-colors">{accountName}</span>

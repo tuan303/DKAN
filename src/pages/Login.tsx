@@ -67,92 +67,77 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-background flex flex-col antialiased">
-      <header className="border-b border-outline-variant bg-surface-container-lowest">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-5 sm:px-6">
+    <div className="flex min-h-dvh bg-background text-on-background antialiased">
+      {/* Khôi phục bố cục gốc: ảnh trường bên trái, khu đăng nhập bên phải. */}
+      <div className="relative hidden overflow-hidden bg-[#121a4a] lg:block lg:w-1/2">
+        <img
+          src="https://hoangmaistarschool.edu.vn/thongtin/truong.jpg"
+          alt="Trường Ngôi Sao Hoàng Mai"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </div>
+      <main className="relative z-10 flex min-h-dvh w-full min-w-0 flex-col items-center bg-surface px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] shadow-[-20px_0_40px_-10px_rgba(210,18,53,0.1)] sm:px-8 lg:w-1/2">
+        <header className="flex w-full shrink-0 justify-center">
           <img
             src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png"
             alt="Trường Ngôi Sao Hoàng Mai"
-            className="h-9 w-auto max-w-[190px] object-contain sm:h-10"
+            className="h-[50px] w-auto max-w-full object-contain md:h-[60px]"
           />
-          <span className="hidden h-8 w-px bg-outline-variant sm:block" aria-hidden="true" />
-          <span className="hidden text-sm font-semibold text-on-surface sm:block">Đăng ký ăn</span>
-        </div>
-      </header>
-
-      <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[1fr_440px] lg:gap-16 lg:py-16">
-        <section className="min-w-0">
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-medium text-on-surface-variant">
-            <span className="h-2 w-2 rounded-full bg-secondary" aria-hidden="true" />
-            Dành cho Cán bộ, Giáo viên và Nhân viên
-          </span>
-          <h1 className="mt-5 max-w-[512px] text-3xl font-bold leading-tight tracking-tight text-on-surface sm:text-4xl">
-            Đăng ký suất ăn<br className="hidden sm:block" /> tại nhà trường
-          </h1>
-          <p className="mt-4 max-w-[448px] text-body-lg text-on-surface-variant">
-            Chủ động đăng ký bữa ăn, xem thực đơn và theo dõi lịch sử chấm ăn trong cùng một hệ thống.
-          </p>
-          <div className="mt-8 hidden space-y-5 lg:block">
-            {[
-              { icon: 'calendar_month', title: 'Đăng ký suất ăn', detail: 'Đăng ký hàng tháng và các sự kiện của trường.', color: 'bg-primary-container text-primary' },
-              { icon: 'restaurant_menu', title: 'Thực đơn hàng tuần', detail: 'Theo dõi các món ăn trong tuần.', color: 'bg-warning-container text-on-warning-container' },
-              { icon: 'fact_check', title: 'Lịch sử chấm ăn', detail: 'Tra cứu và đối chiếu các bữa ăn của bạn.', color: 'bg-tertiary-container text-on-tertiary-container' },
-            ].map((item) => (
-              <div key={item.title} className="flex items-start gap-3">
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.color}`} aria-hidden="true">
-                  <span className="material-symbols-outlined text-[21px]">{item.icon}</span>
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">{item.title}</p>
-                  <p className="mt-1 text-body-sm text-on-surface-variant">{item.detail}</p>
-                </div>
+        </header>
+        <div className="flex w-full max-w-[420px] flex-1 flex-col">
+          <section aria-labelledby="login-title" aria-busy={loading} className="flex flex-1 flex-col justify-center gap-y-7 py-8 md:gap-y-12 md:py-10">
+            <div className="flex flex-col items-center gap-y-3 text-center sm:gap-y-4">
+              <div className="mb-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-navy text-white shadow-md md:h-16 md:w-16" aria-hidden="true">
+                <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section aria-labelledby="login-title" aria-busy={loading} className="min-w-0 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-xs sm:p-8">
-          <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-container text-primary" aria-hidden="true">
-            <span className="material-symbols-outlined text-[26px]">account_circle</span>
-          </span>
-          <h2 id="login-title" className="mt-5 text-2xl font-bold text-on-surface">Đăng nhập</h2>
-          <p className="mt-2 text-body-md text-on-surface-variant">Sử dụng tài khoản Microsoft của nhà trường để tiếp tục.</p>
-
-          {error && (
-            <div role="alert" className="mt-5 flex items-start gap-2 rounded-lg border border-error/20 bg-error-container p-3 text-body-sm text-on-error-container">
-              <span className="material-symbols-outlined shrink-0 text-[20px]" aria-hidden="true">error</span>
-              <span className="min-w-0 break-words">{error}</span>
+              <div className="min-w-0">
+                <h1 id="login-title" className="mb-xs text-xl font-bold leading-snug uppercase tracking-tight text-brand-navy md:text-headline-md">Hệ thống đăng ký suất ăn</h1>
+                <span className="mb-3 inline-block h-[3px] w-10 rounded-full bg-secondary" aria-hidden="true" />
+                <p className="text-body-sm text-on-surface-variant md:text-body-md">
+                  Đăng nhập để đăng ký suất ăn hàng tháng và các sự kiện của nhà trường.
+                </p>
+              </div>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={handleMicrosoftLogin}
-            disabled={loading}
-            className="mt-6 flex min-h-12 w-full items-center justify-center gap-3 rounded-lg bg-primary px-3 py-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white" aria-hidden="true">
-              <svg className="h-[18px] w-[18px]" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0 0h10v10H0z" fill="#f25022" />
-                <path d="M11 0h10v10H11z" fill="#7fba00" />
-                <path d="M0 11h10v10H0z" fill="#00a4ef" />
-                <path d="M11 11h10v10H11z" fill="#ffb900" />
-              </svg>
-            </span>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập bằng Microsoft'}
-          </button>
-          <div className="mt-5 rounded-lg bg-surface-container-low p-4">
-            <p className="text-xs font-semibold text-on-surface">Email nhà trường</p>
-            <p className="mt-1 break-all text-body-sm text-on-surface-variant">@hoangmaistarschool.edu.vn</p>
-          </div>
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant pt-5 text-body-sm">
-            <span className="text-on-surface-variant">Bạn cần hỗ trợ đăng nhập?</span>
-            <a className="rounded font-semibold text-primary underline-offset-4 transition-colors hover:text-primary-dark hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" href="https://zalo.me/664388665648927162" target="_blank" rel="noopener noreferrer">
-              Liên hệ hỗ trợ
-            </a>
-          </div>
-        </section>
+
+            <div className="flex min-w-0 flex-col gap-y-4">
+              {error && (
+                <div role="alert" className="flex items-start gap-2 rounded-lg border border-error/25 bg-error-container p-3 text-body-md text-on-error-container">
+                  <span className="material-symbols-outlined shrink-0 text-[20px]" aria-hidden="true">error</span>
+                  <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleMicrosoftLogin}
+                disabled={loading}
+                className="flex min-h-12 w-full items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-label-lg text-on-surface shadow-xs transition-all duration-200 hover:border-brand-navy/40 hover:bg-surface-container-low hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy disabled:cursor-not-allowed disabled:opacity-75 md:gap-md md:px-margin md:py-md"
+              >
+                <svg className="h-5 w-5 shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M0 0h10v10H0z" fill="#f25022" />
+                  <path d="M11 0h10v10H11z" fill="#7fba00" />
+                  <path d="M0 11h10v10H0z" fill="#00a4ef" />
+                  <path d="M11 11h10v10H11z" fill="#ffb900" />
+                </svg>
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập bằng Microsoft'}
+              </button>
+              <div className="flex items-center gap-sm" aria-hidden="true">
+                <div className="h-px flex-1 bg-outline-variant" />
+                <span className="text-center text-[10px] font-semibold leading-4 tracking-[0.1em] text-brand-navy sm:text-label-sm sm:tracking-[0.16em]">HỆ THỐNG NỘI BỘ DÀNH CHO CBGV-NV</span>
+                <div className="h-px flex-1 bg-outline-variant" />
+              </div>
+              <div className="flex min-w-0 flex-col items-center text-center">
+                <p className="text-body-sm text-on-surface-variant [overflow-wrap:anywhere] md:text-body-md">
+                  Sử dụng email @hoangmaistarschool.edu.vn để truy cập.
+                </p>
+                <a className="mt-1 inline-flex min-h-11 items-center justify-center rounded px-3 text-label-md text-secondary underline-offset-4 transition-colors hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy" href="https://zalo.me/664388665648927162" target="_blank" rel="noopener noreferrer">
+                  Cần hỗ trợ?
+                </a>
+              </div>
+            </div>
+          </section>
+          <div className="shrink-0"><Footer /></div>
+        </div>
       </main>
-      <div className="px-4 pb-3"><Footer /></div>
     </div>
   );
 }

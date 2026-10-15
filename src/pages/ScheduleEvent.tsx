@@ -209,16 +209,16 @@ export default function ScheduleEvent() {
   };
 
   return (
-    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
+    <div className="mobile-app-shell font-body-lg flex min-w-0 flex-col md:pl-64">
       <Header />
       <Navigation />
       
       <main className="flex-1 max-w-[1440px] w-full mx-auto py-md md:py-lg flex flex-col gap-md md:gap-lg">
-        <section className="space-y-xl px-0 md:px-margin lg:px-xl">
+        <section className="space-y-5 px-0 md:space-y-xl md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
               <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
-              <h2 className="text-headline-md md:text-headline-lg text-on-surface">Đăng ký ăn sự kiện</h2>
+              <h2 className="text-2xl font-bold leading-tight md:text-headline-lg text-on-surface">Đăng ký ăn sự kiện</h2>
               <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export default function ScheduleEvent() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             <div className="xl:col-span-2 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-full">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm mb-md border-b border-outline-variant pb-md">
-                <h3 className="text-headline-sm text-on-surface">Sự kiện đang mở đăng ký</h3>
+                <h3 className="text-base font-semibold md:text-headline-sm text-on-surface">Sự kiện đang mở đăng ký</h3>
               </div>
 
               <div className="space-y-sm">
@@ -241,18 +241,18 @@ export default function ScheduleEvent() {
                     </p>
                   </div>
                 ) : events.map(evt => (
-                  <div key={evt.id} className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
-                    <div className="flex items-center gap-md">
-                      <div className="w-12 h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                  <div key={evt.id} className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-3 sm:p-md bg-surface-container-low rounded-xl border border-outline-variant gap-3 md:gap-md transition-colors">
+                    <div className="flex min-w-0 items-center gap-3 md:gap-md">
+                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                         <span className="material-symbols-outlined text-[24px]">event</span>
                       </div>
-                      <div>
-                        <h5 className="font-headline-sm text-[16px] text-on-surface w-full max-w-[200px] md:max-w-none">{evt.name}</h5>
+                      <div className="min-w-0">
+                        <h5 className="font-semibold text-base leading-relaxed text-on-surface break-words">{evt.name}</h5>
                       </div>
                     </div>
                     
-                    <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
-                      <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors`}>
+                    <div className="grid grid-cols-2 gap-2 w-full 2xl:w-auto">
+                      <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", eventChoices[evt.id] === 'yes' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                         <input 
                           type="radio" 
                           name={`event_${evt.id}`} 
@@ -262,7 +262,7 @@ export default function ScheduleEvent() {
                         />
                         <span className="text-label-md text-on-surface select-none">Có ăn</span>
                       </label>
-                      <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors`}>
+                      <label className={clsx("flex min-h-11 items-center justify-center gap-2 cursor-pointer border px-3 py-2 rounded-lg transition-colors", eventChoices[evt.id] === 'no' ? "border-primary bg-primary-container" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container")}>
                         <input 
                           type="radio" 
                           name={`event_${evt.id}`}
@@ -286,16 +286,14 @@ export default function ScheduleEvent() {
                 {events.filter(e => eventChoices[e.id] === 'yes').length === 0 ? (
                   <p className="text-body-md text-on-surface-variant">Thầy/Cô chưa chọn sự kiện đăng ký ăn.</p>
                 ) : events.filter(e => eventChoices[e.id] === 'yes').map(e => (
-                  <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
-                    <div className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-primary">event</span>
-                      <span className="text-body-md text-on-surface max-w-[120px] md:max-w-none truncate">
-                        {e.name.split(' ').length > 3 
-                          ? e.name.split(' ').slice(0, 3).join(' ') + '...' 
-                          : e.name}
+                  <div key={e.id} className="flex justify-between items-start gap-3 bg-surface p-3 sm:p-md rounded-lg border border-outline-variant">
+                    <div className="flex min-w-0 items-start gap-sm">
+                      <span className="material-symbols-outlined mt-0.5 text-primary" aria-hidden="true">event</span>
+                      <span className="min-w-0 break-words text-body-md text-on-surface">
+                        {e.name}
                       </span>
                     </div>
-                    <span className="text-headline-md text-primary ml-2">
+                    <span className="shrink-0 whitespace-nowrap text-lg font-bold md:text-headline-md text-primary">
                       1 <span className="text-body-md text-on-surface-variant">suất</span>
                     </span>
                   </div>
@@ -304,7 +302,7 @@ export default function ScheduleEvent() {
               <button 
                 onClick={handleRegister}
                 disabled={isSubmitting || events.length === 0}
-                className={`w-full mt-xl text-on-primary text-headline-sm py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${events.length === 0 ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
+                className={`w-full min-h-12 mt-5 md:mt-xl text-on-primary text-base font-semibold md:text-headline-sm px-3 py-3 md:py-md rounded-lg transition-colors shadow-sm flex items-center justify-center gap-sm ${events.length === 0 ? 'bg-surface-variant text-on-surface-variant opacity-70 cursor-pointer hover:bg-surface-variant' : 'bg-primary hover:bg-primary-container hover:text-on-primary-container active:scale-95 duration-100 disabled:opacity-60 disabled:cursor-not-allowed'}`}
               >
                 {isSubmitting ? (
                   <span className="material-symbols-outlined animate-spin">refresh</span>
@@ -319,25 +317,25 @@ export default function ScheduleEvent() {
       </main>
       {/* Professional Notification Modal */}
       {submitStatus && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))] animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setSubmitStatus(null)}></div>
-          <div className={clsx(
-            "relative w-[min(calc(100vw-32px),384px)] bg-surface rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant",
+          <div role="dialog" aria-modal="true" aria-labelledby="event-status-title" className={clsx(
+            "relative w-[min(calc(100vw-32px),384px)] max-h-[calc(100dvh-32px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] bg-surface-container-lowest rounded-xl shadow-xl overflow-y-auto animate-in zoom-in-95 duration-200 border border-outline-variant",
             submitStatus.type === 'error' ? "border-error/20" : "border-primary/20"
           )}>
-            <div className="p-xl text-center flex flex-col items-center">
+            <div className="p-5 sm:p-xl text-center flex flex-col items-center">
               <div className={clsx(
-                "w-20 h-20 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
-                submitStatus.type === 'success' ? "bg-tertiary-container text-on-tertiary-container" : "bg-error-container text-on-error-container"
+                "w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center mb-md shadow-sm border-4 border-surface",
+                submitStatus.type === 'success' ? "bg-tertiary-container text-on-tertiary-container" : (submitStatus.type === 'info' ? "bg-primary-container text-on-primary-container" : "bg-error-container text-on-error-container")
               )}>
                 <span className="material-symbols-outlined text-[48px]">
-                  {submitStatus.type === 'success' ? 'check_circle' : 'error'}
+                  {submitStatus.type === 'success' ? 'check_circle' : (submitStatus.type === 'info' ? 'info' : 'error')}
                 </span>
               </div>
               
-              <h3 className={clsx(
+              <h3 id="event-status-title" className={clsx(
                 "text-headline-sm mb-sm",
-                submitStatus.type === 'success' ? "text-on-tertiary-container" : "text-error"
+                submitStatus.type === 'success' ? "text-on-tertiary-container" : (submitStatus.type === 'info' ? "text-on-primary-container" : "text-error")
               )}>
                 {submitStatus.type === 'success' ? 'Thành công!' : 'Thông báo'}
               </h3>
@@ -352,10 +350,10 @@ export default function ScheduleEvent() {
               <button 
                 onClick={() => setSubmitStatus(null)}
                 className={clsx(
-                  "w-full py-3 rounded-xl text-label-lg transition-colors shadow-sm",
+                  "w-full min-h-11 py-3 rounded-xl text-label-lg transition-colors shadow-sm",
                   submitStatus.type === 'success' 
                     ? "bg-primary text-on-primary hover:bg-primary/90" 
-                    : "bg-error text-on-error hover:bg-error/90"
+                    : (submitStatus.type === 'info' ? "bg-primary text-on-primary hover:bg-primary-dark" : "bg-error text-on-error hover:bg-error/90")
                 )}
               >
                 Đóng

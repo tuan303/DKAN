@@ -234,6 +234,14 @@ QA tối ưu menu dùng ứng dụng thật với Firebase giả lập và chặ
 
 Sửa bố cục đăng nhập ngày 15/10/2026: `max-w-lg/md` trong Tailwind nhận các token spacing tùy chỉnh, khiến tiêu đề/mô tả chỉ rộng 24/16px. Đổi riêng hai giới hạn này thành 512/448px rõ ràng và ghi chú cạnh cấu hình spacing để tránh tái diễn. TypeScript/build đạt; kiểm tra trình duyệt bản build tại 320/390/768/1024/1280/1920px xác nhận chiều rộng văn bản đúng, tiêu đề hai dòng và không tràn ngang. Không đổi hoặc thực hiện luồng đăng nhập Microsoft.
 
+Cập nhật mobile và trình bày thực đơn ngày 15/10/2026: khung `mobile-app-shell` chừa khoảng cho header, thanh điều hướng và safe area; dùng chiều cao động, ô nhập/chọn 16px và vùng chạm lớn. Header mobile hiển thị logo gọn và danh tính không gian Cá nhân/Quản trị. Điều hướng cá nhân có 5 mục (Tổng quan, Đăng ký, Chấm ăn, Thực đơn, Tất cả), quản trị có 4 mục. Menu và tài khoản khóa cuộn nền, đóng lại khôi phục cuộn; hộp tài khoản mobile nằm dưới màn hình, giữ header/footer, chỉ nội dung cuộn. Tổng quan dùng lối tắt 2×2; biểu mẫu đăng ký/hủy/sự kiện và khảo sát có lựa chọn rõ ràng, thông báo cuộn được. Lịch hủy có tháng/thứ tiếng Việt và label liên kết ô nhập.
+
+Ba danh sách quản trị đăng ký tháng/ngày/hủy ăn dùng `MobileDataTable`: thẻ đọc từ chính mảng đã lọc/sắp xếp, có nút chuyển sang bảng gốc để xem đủ cột và sắp xếp; desktop luôn dùng bảng. Phần xem thực đơn có bảng 6 cột sạch theo màu navy, nhấn ngày hiện tại, phân biệt bữa sáng/trưa; mobile dùng thẻ ngày, tự mở hôm nay nếu trong tuần. Phần nhập thực đơn giữ nguyên 35 ô, toolbar và thao tác lưu tối ưu mobile; mẫu Excel và bảng email không đổi.
+
+Theo yêu cầu khôi phục, Login lấy lại trình bày trước đợt đổi giao diện từ `1d792721^` (ảnh trường bên trái, logo và đăng nhập navy/đỏ bên phải). Mobile một cột cuộn tự nhiên, không khóa chiều cao/cắt nội dung. Toàn bộ phần xác thực, nhật ký, kiểm tra email và `safeNextPath` giữ nguyên.
+
+Kiểm chứng: TypeScript/build đạt, 161 kiểm thử nghiệp vụ đạt. QA ứng dụng thật với Firebase giả lập và chặn ghi/API: 9 trang cộng 2 mục quản trị tại 320/390px; 7 trang nghiệp vụ tại 768/1280px; Login và thực đơn tại 320/390/768/1280/1920px không tràn ngang. Đã kiểm tra lọc danh sách/thẻ/bảng, lịch ngày hủy, radio khảo sát 56px và tiến độ, menu tìm kiếm, Escape/khôi phục cuộn, hộp tài khoản giữ nút đóng, mở thẻ ngày và giữ đủ 7×5 món. Ảnh xem trước của các trang nội bộ dùng dữ liệu minh họa; không gửi thư hoặc ghi dữ liệu thật.
+
 ## 9. Các điểm cần xem xét khi cập nhật
 
 Đây là các khác biệt nhìn thấy trong mã nguồn, chưa được sửa trong lần khảo sát. Cần đối chiếu yêu cầu nghiệp vụ khi xử lý:
