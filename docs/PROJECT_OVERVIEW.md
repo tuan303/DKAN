@@ -39,7 +39,7 @@ flowchart LR
 | `src/pages/ScheduleMonth.tsx` | Đăng ký tháng, báo hủy theo ngày/bữa, email xác nhận, chuyển hủy sang GAS |
 | `src/pages/ScheduleEvent.tsx` | Đọc sự kiện đang mở, đăng ký và email xác nhận |
 | `src/pages/Admin.tsx` | Quản trị đăng ký, thống kê, hủy, sự kiện, vi phạm, cấu hình, quyền và nhật ký |
-| `src/components/AdminWorkspace.tsx` | Tiêu đề chức năng quản trị, 11 khóa chức năng dùng chung với sidebar, bộ chọn chức năng trên điện thoại |
+| `src/components/AdminWorkspace.tsx`, `AdminOverview.tsx`, `src/lib/adminNavigation.ts` | Tiêu đề, tổng quan với thao tác nhanh, danh mục 11 chức năng theo 4 nhóm và khóa điều hướng dùng chung |
 | `src/components/SchoolSidebar.tsx`, `Navigation.tsx` | Sidebar theo nhóm, menu điện thoại, tài khoản và đăng xuất; quản trị có đủ 11 chức năng |
 | `src/lib/useCurrentAccount.ts` | Đọc danh tính Auth và hồ sơ nhân viên, bỏ kết quả của phiên đăng nhập cũ; dùng chung cho Header và trang quản trị |
 | `src/components/MealReconciliation.tsx` | Đối soát đăng ký với lượt chấm tự động hoặc Excel HAC; xuất Excel |
@@ -228,6 +228,10 @@ Cập nhật toàn bộ giao diện ngày 15/10/2026 theo mẫu ứng dụng Nh�
 
 Kiểm tra lần cập nhật 15/10: TypeScript, build và 161 kiểm thử đều đạt. QA dùng đúng toàn bộ ứng dụng với Firebase giả lập, không kết nối/ghi dữ liệu thật: 9 trang ở 320/768/1280px, 7 trang nội bộ ở 1920px; đủ 11 mục quản trị và bộ chọn trên điện thoại; menu drawer/Escape, dialog tài khoản, bản nháp thực đơn khi chuyển mục đều hoạt động. Đã xử lý tràn ban đầu do font icon chưa tải bằng cách giữ sẵn bề rộng icon. Các bảng lớn vẫn cuộn ngang bên trong khung.
 
+Tối ưu thao tác quản trị ngày 15/10/2026: `/quantri` mặc định mở Tổng quan quản trị, có 4 lối tắt thường dùng và danh mục đủ 11 chức năng với mô tả. Menu chia Vận hành hằng ngày / Đăng ký suất ăn / Dinh dưỡng / Hệ thống; ô tìm kiếm bỏ qua dấu và hoa/thường, hỗ trợ tìm theo tên, nhóm, mô tả. Sidebar giữ logo, chuyển Cá nhân/Quản trị, tìm kiếm và tài khoản cố định; danh sách cuộn riêng và tự đưa mục đang chọn vào vùng nhìn thấy. Điện thoại có Tổng quan / Theo ngày / Thực đơn / Menu dẫn thẳng tới nghiệp vụ quản trị, drawer không trộn các chức năng cá nhân; bộ chọn chức năng có thêm Tổng quan. Các URL chức năng cũ vẫn hoạt động. Đổi tháng chỉ hiện trạng thái tải trong phần nội dung, không tháo khung quản trị hoặc mất bản nhập thực đơn.
+
+QA tối ưu menu dùng ứng dụng thật với Firebase giả lập và chặn mọi thao tác ghi/API: đủ 12 điểm đến (Tổng quan + 11 chức năng) trên desktop 1280px và điện thoại 320px; tìm không dấu/hoa và không có kết quả; chuyển Cá nhân/Quản trị ở 768px; cuộn tới mục cuối ở màn hình 1024×600; menu/Escape, lối tắt thực đơn, và giữ bản nháp sau đổi tháng đều đạt. Không tràn ngang. TypeScript, build và 161 kiểm thử đạt. Ảnh xem trước dùng hồ sơ mẫu.
+
 ## 9. Các điểm cần xem xét khi cập nhật
 
 Đây là các khác biệt nhìn thấy trong mã nguồn, chưa được sửa trong lần khảo sát. Cần đối chiếu yêu cầu nghiệp vụ khi xử lý:
@@ -235,10 +239,10 @@ Kiểm tra lần cập nhật 15/10: TypeScript, build và 161 kiểm thử đ�
 1. **Thống kê và số suất:** `ScheduleMonth.tsx` đếm thứ 2–6 nhưng chưa trừ `mealOffDays`. Thống kê ngày tại `Admin.tsx` chỉ xét số suất lớn hơn 0 và báo hủy, chưa xét `firstMealDate`/ngày nghỉ như đối soát. Vì vậy đăng ký giữa tháng hoặc ngày nghỉ có thể cho số liệu khác nhau giữa các màn hình.
 2. **API từ web:** `api/send-email.ts` và `api/gas.ts`, cùng các route tương ứng trong `server.ts`, chưa xác thực người gọi. Nên ưu tiên kiểm tra khi cập nhật tích hợp email/GAS.
 3. **Rules báo hủy/sự kiện:** điều kiện `resource == null` chưa ràng buộc UID và ID document của bản ghi mới như nhánh đăng ký tháng. Cần bổ sung kiểm tra quyền sở hữu khi chỉnh rules cho hai luồng này.
-4. **Menu quản trị:** `Navigation.tsx` có một tài khoản quản trị cố định, trong khi `Admin.tsx` và rules có ba; hiển thị menu có thể khác quyền thực tế nếu thiếu document `admins` tương ứng.
+4. **Menu quản trị:** danh sách quản trị cao nhất đã dùng chung `adminAccess.ts`, đối chiếu với rules qua kiểm thử. Danh mục chức năng, nhóm, nhãn và URL lấy từ `adminNavigation.ts` để sidebar, tổng quan và bộ chọn điện thoại không lệch nhau.
 5. **Đăng ký sự kiện và hủy nhiều tháng:** form sự kiện kiểm tra đăng ký lặp dựa trên sự kiện mở đầu tiên; form hủy tải đơn tháng của ngày đầu trong danh sách. Cần xem lại khi bổ sung đăng ký từng sự kiện hoặc hủy xuyên tháng.
 6. **Khác biệt local/Vercel:** GAS trong Express kiểm tra HTTP upstream, bản Vercel hiện trả thành công sau fetch kể cả khi upstream trả lỗi. Cần thống nhất khi sửa xử lý lỗi.
-7. **Dashboard và hiệu năng:** dashboard còn số liệu mẫu; các trang quản trị/khảo sát lớn và build chưa tách chunk theo route. Đây là các điểm sửa khi cần dashboard thật hoặc tối ưu tải trang.
+7. **Dashboard và hiệu năng:** tổng quan cá nhân và quản trị hiển thị hồ sơ, thao tác nhanh và liên kết nghiệp vụ; chưa có thống kê chấm ăn toàn trường trên tổng quan. Các trang quản trị/khảo sát lớn và build chưa tách chunk theo route; cần đánh giá khi bổ sung dashboard số liệu hoặc tối ưu tải trang.
 8. **Múi giờ và cấu hình tháng:** form đăng ký/hủy dùng giờ máy, module dùng chung dùng giờ Việt Nam; khóa cấu hình `MM` không phân biệt năm. Cần đánh giá khi hỗ trợ người dùng ở múi giờ khác hoặc quản lý nhiều năm.
 9. **Tài liệu agent:** câu mô tả việc gán lượt chấm trong `agent/README.md` đã được cập nhật ngày 14/10/2026: chỉ gán theo đơn đăng ký tháng; người không có đơn tháng không được gán lượt chấm cá nhân, khớp `projection.mjs`.
 

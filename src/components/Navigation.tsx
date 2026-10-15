@@ -5,7 +5,7 @@ import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { isSuperAdmin } from '../lib/adminAccess';
 import { useCurrentAccount } from '../lib/useCurrentAccount';
-import { ADMIN_TABS } from './AdminWorkspace';
+import { ADMIN_MENU_GROUPS, ADMIN_TABS, resolveAdminTab } from '../lib/adminNavigation';
 import { SchoolSidebar, type SchoolNavigationGroup, type SchoolNavigationLink } from './SchoolSidebar';
 
 const PERSONAL_LINKS: SchoolNavigationLink[] = [
@@ -17,17 +17,6 @@ const PERSONAL_LINKS: SchoolNavigationLink[] = [
 const NUTRITION_LINKS: SchoolNavigationLink[] = [
   { to: '/thuc-don', icon: 'restaurant_menu', label: 'Thực đơn tuần', tone: 'bg-[#16a2b8] text-white' },
   { to: '/khao-sat', icon: 'rate_review', label: 'Khảo sát bữa ăn', tone: 'bg-[#249e59] text-white' },
-];
-const ADMIN_TONES: Record<string, string> = {
-  monthly: 'bg-[#ff4050] text-white', daily_stats: 'bg-[#16a2b8] text-white', cancelations: 'bg-[#ed675d] text-white',
-  reconcile: 'bg-[#6554d9] text-white', events: 'bg-[#f39a00] text-white', blocked: 'bg-[#ce7650] text-white',
-  menu: 'bg-[#16a2b8] text-white', survey: 'bg-[#249e59] text-white', settings: 'bg-[#778393] text-white',
-  logs: 'bg-[#9e58d7] text-white', admins: 'bg-[#d21235] text-white',
-};
-const ADMIN_GROUPS = [
-  { key: 'meals', label: 'Quản lý suất ăn' },
-  { key: 'nutrition', label: 'Dinh dưỡng' },
-  { key: 'system', label: 'Hệ thống' },
 ];
 
 export function Navigation({ className, adminMode = false }: { className?: string; adminMode?: boolean }) {
@@ -124,46 +113,48 @@ export function Navigation({ className, adminMode = false }: { className?: strin
     }
   };
 
-  const groups: SchoolNavigationGroup[] = adminMode ? ADMIN_GROUPS.map(group => ({
+  const groups: SchoolNavigationGroup[] = adminMode ? [
+    { key: 'overview', label: 'Không gian quản trị', links: [{ to: '/quantri?tab=overview', icon: 'space_dashboard', label: 'Tổng quan quản trị', description: 'Truy cập nhanh các công việc và toàn bộ chức năng.', tone: 'bg-[#1677e8] text-white' }] },
+    ...ADMIN_MENU_GROUPS.map(group => ({
     ...group,
-    links: ADMIN_TABS.filter(tab => tab.group === group.key).map(tab => ({ to: `/quantri?tab=${tab.key}`, icon: tab.icon, label: tab.label, tone: ADMIN_TONES[tab.key] })),
-  })) : [
+    links: ADMIN_TABS.filter(tab => tab.group === group.key).map(tab => ({ to: `/quantri?tab=${tab.key}`, icon: tab.icon, label: tab.label, description: tab.description, tone: tab.tone })),
+  }))] : [
     { key: 'personal', label: 'Cá nhân', links: PERSONAL_LINKS },
     { key: 'nutrition', label: 'Dinh dưỡng', links: NUTRITION_LINKS },
     ...(isAdmin ? [{ key: 'admin', label: 'Quản trị', links: [{ to: '/quantri', label: 'Quản trị suất ăn', icon: 'admin_panel_settings', tone: 'bg-[#d21235] text-white' }] }] : []),
   ];
   const requestedTab = new URLSearchParams(location.search).get('tab');
-  const activeHref = adminMode ? `/quantri?tab=${ADMIN_TABS.some(tab => tab.key === requestedTab) ? requestedTab : 'monthly'}` : location.pathname;
+  const activeHref = adminMode ? `/quantri?tab=${resolveAdminTab(requestedTab)}` : location.pathname;
   const canManage = adminMode || isAdmin;
   const sidebarProps = { groups, activeHref, account, isAdmin: canManage, adminMode, signingOut, onAccountClick: openAccount, onSignOut: handleSignOut };
-  const drawerGroups = adminMode ? [
-    { key: 'personal', label: 'Cá nhân', links: PERSONAL_LINKS },
-    { key: 'my-nutrition', label: 'Bữa ăn của tôi', links: NUTRITION_LINKS },
-    ...groups,
-  ] : groups;
-  const mobileLinks = [
+  const mobileLinks = adminMode ? [
+    { to: '/quantri?tab=overview', icon: 'space_dashboard', label: 'Tổng quan' },
+    { to: '/quantri?tab=daily_stats', icon: 'list_alt', label: 'Theo ngày' },
+    { to: '/quantri?tab=menu', icon: 'restaurant_menu', label: 'Thực đơn' },
+  ] : [
     { to: '/schedule', icon: 'calendar_month', label: 'Đăng ký' },
     { to: '/cham-an', icon: 'fact_check', label: 'Chấm ăn' },
     { to: '/thuc-don', icon: 'restaurant_menu', label: 'Thực đơn' },
   ];
 
   return <>
+    {adminMode && <a href="#admin-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-3 focus:text-white">Bỏ qua menu, tới nội dung</a>}
     <SchoolSidebar {...sidebarProps} className={clsx('fixed inset-y-0 left-0 z-40 hidden w-64 md:flex', className)} />
     <nav aria-label="Điều hướng trên điện thoại" className="fixed inset-x-0 bottom-0 z-50 grid h-[72px] grid-cols-4 border-t border-outline-variant bg-surface-container-lowest pb-safe shadow-[0_-2px_12px_rgb(0_0_0_/_0.04)] md:hidden">
       {mobileLinks.map(link => {
-        const selected = !adminMode && location.pathname === link.to;
+        const selected = activeHref === link.to;
         return <Link key={link.to} to={link.to} aria-current={selected ? 'page' : undefined} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', selected ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
           <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', selected && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]" style={{ fontVariationSettings: selected ? "'FILL' 1" : undefined }}>{link.icon}</span></span>{link.label}
         </Link>;
       })}
-      <button type="button" aria-label="Mở tất cả chức năng" aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="navigation-drawer" onClick={() => { if (drawer.current && !drawer.current.open) drawer.current.showModal(); setDrawerOpen(true); }} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', adminMode || drawerOpen ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
-        <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', (adminMode || drawerOpen) && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]">apps</span></span>Tất cả
+      <button type="button" aria-label={adminMode ? 'Mở tất cả chức năng quản trị' : 'Mở tất cả chức năng'} aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="navigation-drawer" onClick={() => { if (drawer.current && !drawer.current.open) drawer.current.showModal(); setDrawerOpen(true); }} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', drawerOpen || (adminMode && !mobileLinks.some(link => link.to === activeHref)) ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+        <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', (drawerOpen || (adminMode && !mobileLinks.some(link => link.to === activeHref))) && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]">apps</span></span>{adminMode ? 'Menu' : 'Tất cả'}
       </button>
     </nav>
 
     <dialog ref={drawer} id="navigation-drawer" aria-label="Tất cả chức năng" onClose={() => setDrawerOpen(false)} onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close(); }} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(320px,calc(100vw-32px))] max-w-none border-0 bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
-      <button type="button" autoFocus aria-label="Đóng điều hướng" onClick={closeDrawer} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
-      <SchoolSidebar {...sidebarProps} groups={drawerGroups} className="border-r-0" onNavigate={closeDrawer} />
+      <button type="button" autoFocus aria-label="Đóng điều hướng" onClick={closeDrawer} className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
+      <SchoolSidebar {...sidebarProps} visible={drawerOpen} className="border-r-0" onNavigate={closeDrawer} />
     </dialog>
 
     <dialog ref={accountDialog} aria-labelledby="account-title" onCancel={event => { if (signingOut) event.preventDefault(); }} onClick={event => { if (!signingOut && event.target === event.currentTarget) event.currentTarget.close(); }} className="m-auto max-h-[88dvh] w-[min(440px,calc(100vw-32px))] max-w-none overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">

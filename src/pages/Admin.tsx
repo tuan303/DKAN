@@ -11,7 +11,9 @@ import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
-import { AdminWorkspace, ADMIN_TABS, type AdminTabKey } from '../components/AdminWorkspace';
+import { AdminWorkspace } from '../components/AdminWorkspace';
+import { AdminOverview } from '../components/AdminOverview';
+import { resolveAdminTab, type AdminTabKey } from '../lib/adminNavigation';
 import { useCurrentAccount } from '../lib/useCurrentAccount';
 // Dùng chung quy tắc ngày với agent và trang Chấm ăn của tôi: "cuối tuần" và
 // "hôm nay" phải hiểu giống hệt nhau ở mọi nơi.
@@ -210,7 +212,7 @@ export default function Admin() {
 
   // Tabs from URL
   const requestedTab = searchParams.get('tab');
-  const activeTab: AdminTabKey = ADMIN_TABS.find(tab => tab.key === requestedTab)?.key ?? 'monthly';
+  const activeTab = resolveAdminTab(requestedTab);
   const setActiveTab = (tab: AdminTabKey) => setSearchParams({ tab });
   const [hasOpenedMenu, setHasOpenedMenu] = useState(activeTab === 'menu');
   useEffect(() => {
@@ -1079,7 +1081,7 @@ export default function Admin() {
   const { items: sortedEventRegistrations, requestSort: requestSortEvent, sortConfig: sortConfigEvent } = useSortableData(eventRegistrations);
   const { items: sortedLoginLogs, requestSort: requestSortLogs, sortConfig: sortConfigLogs } = useSortableData(filteredLoginLogs);
 
-  if (!isAdmin || loading) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-md">
@@ -1109,8 +1111,16 @@ export default function Admin() {
       <Header account={account} />
       <Navigation adminMode />
       
-      <main className="flex-1 max-w-[1440px] w-full min-w-0 mx-auto px-3 py-6 sm:px-6 lg:p-8 flex flex-col gap-5 md:gap-6">
+      <main id="admin-content" tabIndex={-1} className="flex-1 max-w-[1440px] w-full min-w-0 mx-auto px-3 py-6 sm:px-6 lg:p-8 flex flex-col gap-5 md:gap-6 outline-none">
         <AdminWorkspace activeTab={activeTab} onTabChange={setActiveTab} account={account} />
+
+        {loading && <div role="status" className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
+          <span className="material-symbols-outlined animate-spin text-[24px] text-primary" aria-hidden="true">progress_activity</span>
+          Đang tải dữ liệu tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}…
+        </div>}
+        {/* Keep tab instances mounted during month reloads, including an unsaved menu draft. */}
+        <div hidden={loading} inert={loading} aria-busy={loading} className="min-w-0">
+        {activeTab === 'overview' && <AdminOverview />}
 
         {activeTab === 'monthly' && (
           <div className="flex flex-col gap-md lg:gap-lg">
@@ -2489,6 +2499,7 @@ export default function Admin() {
           </div>
         )}
 
+        </div>
       </main>
       <Footer />
     </div>
