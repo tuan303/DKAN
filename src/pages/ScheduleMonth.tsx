@@ -629,7 +629,7 @@ export default function ScheduleMonth() {
   };
 
   return (
-    <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
+    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
       {/* Nhắc khảo sát suất ăn tuần (chỉ hiện khi đang mở mà Thầy/Cô chưa trả
@@ -638,59 +638,59 @@ export default function ScheduleMonth() {
 
       <main className="flex-1 max-w-[1440px] w-full mx-auto py-md md:py-lg flex flex-col gap-md md:gap-lg">
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
-            <div>
-              <h2 className="text-headline-md md:text-headline-lg text-primary">ĐK ĂN HÀNG THÁNG</h2>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-md px-md md:px-0">
+            <div className="min-w-0">
+              <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
+              <h2 className="text-headline-md md:text-headline-lg text-on-surface">Đăng ký ăn hàng tháng</h2>
               <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">Chọn bữa ăn thầy/cô muốn đăng ký ăn tại trường</p>
             </div>
             {/* Month Selector */}
-            <div className="w-full md:w-auto flex items-center justify-between gap-md bg-surface-container-lowest md:bg-surface border border-outline-variant rounded-lg p-sm shadow-xs">
+            <div className="w-full lg:w-auto shrink-0 flex items-center justify-between gap-md bg-surface-container-lowest border border-outline-variant rounded-xl p-sm">
               <button 
                 onClick={handlePrevMonth}
-                className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
+                aria-label="Tháng trước"
+                className="min-h-10 min-w-10 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_left</span>
               </button>
-              <span className="text-headline-sm text-primary min-w-[120px] text-center">Tháng {monthString}, {selectedYear}</span>
+              <span className="text-label-lg text-on-surface min-w-[120px] text-center tabular">Tháng {monthString}, {selectedYear}</span>
               <button 
                 onClick={handleNextMonth}
-                className="p-xs hover:bg-surface-container rounded transition-colors text-on-surface-variant flex items-center justify-center">
+                aria-label="Tháng sau"
+                className="min-h-10 min-w-10 hover:bg-surface-container rounded-lg transition-colors text-on-surface-variant flex items-center justify-center">
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
             </div>
           </div>
 
           {/* Bento Grid Layout for Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
             {/* Calendar View */}
-            <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
-              {/* Cả hai tab luôn giữ màu nhận diện (đăng ký = navy, hủy = đỏ) và
-                  chữ trắng. Tab đang mở phân biệt bằng độ nổi: liền mạch với thẻ
-                  bên dưới, có đổ bóng; tab còn lại thụt xuống một chút. */}
-              <div className="flex w-full gap-1 border-b border-outline-variant mb-6 pt-2 px-2 bg-surface-container-low rounded-t-xl -mx-4 md:-mx-6 -mt-4 md:-mt-6 flex-wrap md:flex-nowrap items-end">
+            <div className="xl:col-span-2 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-full">
+              <div role="group" aria-label="Đăng ký hoặc hủy suất ăn" className="grid grid-cols-2 gap-1 rounded-xl p-1 bg-surface-container mb-lg">
                   <button
                     onClick={() => setActiveMainTab('register')}
                     aria-pressed={activeMainTab === 'register'}
                     className={clsx(
-                      "relative px-6 rounded-t-lg text-label-lg uppercase text-white transition-all flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x bg-primary border-primary",
+                      "min-h-12 min-w-0 px-2 sm:px-4 py-2.5 rounded-lg text-label-md sm:text-label-lg transition-colors flex items-center justify-center gap-2 text-center",
                       activeMainTab === 'register'
-                        ? "py-3 !border-b-primary z-10 -mb-[1px] shadow-md"
-                        : "py-2.5 brightness-90 hover:brightness-100"
+                        ? "bg-primary text-on-primary"
+                        : "text-on-surface-variant hover:bg-surface-container-high"
                     )}
                   >
-                    <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
+                    <span className="material-symbols-outlined text-[18px] shrink-0 hidden sm:inline" aria-hidden="true">edit_calendar</span>
                     Đăng ký hàng tháng
                   </button>
                   <button
                     onClick={() => setActiveMainTab('cancel')}
                     aria-pressed={activeMainTab === 'cancel'}
                     className={clsx(
-                      "relative px-6 rounded-t-lg text-label-lg uppercase text-white transition-all flex items-center justify-center gap-2 flex-1 md:flex-none md:min-w-[220px] border-t border-x bg-secondary border-secondary",
+                      "min-h-12 min-w-0 px-2 sm:px-4 py-2.5 rounded-lg text-label-md sm:text-label-lg transition-colors flex items-center justify-center gap-2 text-center",
                       activeMainTab === 'cancel'
-                        ? "py-3 !border-b-secondary z-10 -mb-[1px] shadow-md"
-                        : "py-2.5 brightness-90 hover:brightness-100"
+                        ? "bg-primary text-on-primary"
+                        : "text-on-surface-variant hover:bg-surface-container-high"
                     )}
                   >
-                    <span className="material-symbols-outlined text-[18px]">event_busy</span>
+                    <span className="material-symbols-outlined text-[18px] shrink-0 hidden sm:inline" aria-hidden="true">event_busy</span>
                     Hủy đăng ký ăn
                   </button>
               </div>
@@ -698,21 +698,21 @@ export default function ScheduleMonth() {
               {activeMainTab === 'register' ? (
                 <div className="space-y-md">
                   <div className="space-y-sm">
-                    <h4 className="text-headline-sm text-primary uppercase border-b border-outline-variant pb-xs">THÁNG {monthString}/{selectedYear}</h4>
+                    <h4 className="text-headline-sm text-on-surface border-b border-outline-variant pb-sm">Lựa chọn bữa ăn · {monthString}/{selectedYear}</h4>
                     
                     {/* Day Row 1 */}
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                    <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                         <div className="flex items-center gap-md">
-                          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                          <div className="w-12 h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                             <span className="material-symbols-outlined text-[24px]">bakery_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ ĂN BỮA SÁNG + TRƯA</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">Bữa sáng và bữa trưa</h5>
                             <p className="text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
                         
-                        <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                        <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
                           <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
                             <input 
                               type="radio" 
@@ -740,18 +740,18 @@ export default function ScheduleMonth() {
                       </div>
 
                       {/* Day Row 2 */}
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                      <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                         <div className="flex items-center gap-md">
-                          <div className="w-12 h-12 bg-secondary-container rounded-full flex items-center justify-center text-on-secondary-container">
+                          <div className="w-12 h-12 shrink-0 bg-warning-container rounded-xl flex items-center justify-center text-on-warning-container">
                             <span className="material-symbols-outlined text-[24px]">lunch_dining</span>
                           </div>
                           <div>
-                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">ĐĂNG KÝ CHỈ ĂN BỮA TRƯA</h5>
+                            <h5 className="font-headline-sm text-[16px] text-on-surface font-bold">Chỉ ăn bữa trưa</h5>
                             <p className="text-body-md text-on-surface-variant text-[13px] mt-0.5">Áp dụng cho tất cả các ngày từ Thứ 2 đến Thứ 6</p>
                           </div>
                         </div>
                         
-                        <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                        <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
                           <label className="flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors">
                             <input 
                               type="radio" 
@@ -853,10 +853,10 @@ export default function ScheduleMonth() {
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-sm flex flex-col mb-24 h-max">
+            <div className="xl:col-span-1 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-max">
               {activeMainTab === 'register' ? (
                 <>
-                  <h3 className="text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
+                  <h3 className="text-headline-sm text-on-surface mb-lg pb-sm border-b border-outline-variant">Tổng kết tháng</h3>
                   
                   {isUserBlocked && (
                     <div className="mb-4 p-sm rounded-lg text-body-md flex items-start gap-2 bg-error-container text-error">
@@ -929,7 +929,7 @@ export default function ScheduleMonth() {
                 </>
               ) : (
                 <>
-                  <h3 className="text-headline-sm text-error mb-lg pb-sm border-b border-outline-variant">Xác nhận</h3>
+                  <h3 className="text-headline-sm text-on-surface mb-lg pb-sm border-b border-outline-variant">Xác nhận hủy ăn</h3>
                   <div className="space-y-md flex-1">
                     <p className="font-body-md text-on-surface-variant text-[14px]">
                       Vui lòng kiểm tra kỹ các thông tin trước khi xác nhận hủy ăn. Sau khi gửi, thông tin sẽ được ghi nhận và gửi đến Bộ phận Dinh dưỡng.

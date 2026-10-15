@@ -57,7 +57,7 @@ const NUTRITION_EMAIL = 'dinhduong@hoangmaistarschool.edu.vn';
 const REQUIRED = SURVEY_QUESTIONS.filter(q => q.required);
 
 const CARD =
-  'bg-surface-container-lowest rounded-xl border border-outline-variant shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)]';
+  'min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant';
 
 // ====================================================================
 // Phần trình bày thuần: chỉ nhận props, không đọc Firestore, không gọi đồng
@@ -244,24 +244,17 @@ function IntroCard({
   const left = survey.closesAt - now;
   return (
     <section aria-labelledby="sv-title" className={clsx(CARD, 'overflow-hidden')}>
-      <div className="relative bg-primary text-on-primary px-md md:px-lg pt-md md:pt-lg pb-md">
-        <p className="text-label-sm uppercase tracking-[0.12em] text-on-primary/75">
+      <div className="border-b border-outline-variant px-md md:px-lg py-md md:py-lg">
+        <p className="text-label-sm text-on-surface-variant">
           Nhóm Dinh dưỡng<span className="hidden sm:inline"> · Trường Ngôi Sao Hoàng Mai</span>
         </p>
-        <h3 id="sv-title" {...VIEW_HEADING} className="text-headline-sm md:text-headline-md mt-1 focus:outline-none">
+        <h3 id="sv-title" {...VIEW_HEADING} className="text-headline-sm md:text-headline-md text-on-surface mt-2 focus:outline-none">
           {SURVEY_TITLE}
         </h3>
-        <p className="text-body-md mt-1 flex items-center gap-1.5 text-on-primary/90">
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">date_range</span>
+        <p className="text-body-md mt-2 flex items-center gap-1.5 text-on-surface-variant">
+          <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">date_range</span>
           Tuần <strong className="tabular">{surveyWeekLabel(weekId)}</strong>
         </p>
-        {/* Dải màu nhận diện như đầu trang: navy - đỏ - vàng - lá */}
-        <div className="absolute inset-x-0 bottom-0 h-1 flex" aria-hidden="true">
-          <span className="flex-[4] bg-primary-dark" />
-          <span className="flex-[2] bg-secondary" />
-          <span className="flex-1 bg-warning" />
-          <span className="flex-1 bg-tertiary" />
-        </div>
       </div>
       <div className="p-md md:p-lg flex flex-col gap-sm md:gap-md">
         <p className="text-body-md text-on-surface">
@@ -316,7 +309,7 @@ function ProgressBar({ answered }: { answered: number }) {
   const total = REQUIRED.length;
   const done = answered >= total;
   return (
-    <div className="sticky top-16 z-30 -mx-md px-md md:mx-0 md:px-0 py-2 bg-background/95 backdrop-blur-sm">
+    <div className="sticky top-16 md:top-0 z-30 -mx-md px-md md:mx-0 md:px-0 py-3 bg-background/95 backdrop-blur-sm">
       <div className="flex items-center gap-3">
         <div
           role="progressbar"
@@ -1012,7 +1005,8 @@ export function SurveyView(props: SurveyViewProps) {
             tên bộ phận dài bị gãy dòng lủng củng. */}
         <div className="flex flex-col gap-xs">
           <div>
-            <h2 className="text-headline-md md:text-headline-lg text-primary">KHẢO SÁT SUẤT ĂN</h2>
+            <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Dinh dưỡng</p>
+            <h2 className="text-headline-md md:text-headline-lg text-on-surface">Khảo sát suất ăn</h2>
             <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">
               Ý kiến của Thầy/Cô giúp Nhóm Dinh dưỡng nâng cao chất lượng bữa ăn
             </p>
@@ -1743,7 +1737,7 @@ export default function MealSurvey() {
   };
 
   return (
-    <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
+    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
       <SurveyView

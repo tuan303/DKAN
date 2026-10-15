@@ -1,85 +1,112 @@
 import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { isSuperAdmin } from '../lib/adminAccess';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { useCurrentAccount } from '../lib/useCurrentAccount';
+import { ADMIN_TABS } from './AdminWorkspace';
+import { SchoolSidebar, type SchoolNavigationGroup, type SchoolNavigationLink } from './SchoolSidebar';
 
-export function Navigation({ className }: { className?: string }) {
+const PERSONAL_LINKS: SchoolNavigationLink[] = [
+  { to: '/dashboard', icon: 'space_dashboard', label: 'Tổng quan', tone: 'bg-[#1677e8] text-white' },
+  { to: '/schedule', icon: 'calendar_month', label: 'Đăng ký ăn tháng', tone: 'bg-[#ff4050] text-white' },
+  { to: '/events', icon: 'event', label: 'Suất ăn sự kiện', tone: 'bg-[#f39a00] text-white' },
+  { to: '/cham-an', icon: 'fact_check', label: 'Chấm ăn của tôi', tone: 'bg-[#6554d9] text-white' },
+];
+const NUTRITION_LINKS: SchoolNavigationLink[] = [
+  { to: '/thuc-don', icon: 'restaurant_menu', label: 'Thực đơn tuần', tone: 'bg-[#16a2b8] text-white' },
+  { to: '/khao-sat', icon: 'rate_review', label: 'Khảo sát bữa ăn', tone: 'bg-[#249e59] text-white' },
+];
+const ADMIN_TONES: Record<string, string> = {
+  monthly: 'bg-[#ff4050] text-white', daily_stats: 'bg-[#16a2b8] text-white', cancelations: 'bg-[#ed675d] text-white',
+  reconcile: 'bg-[#6554d9] text-white', events: 'bg-[#f39a00] text-white', blocked: 'bg-[#ce7650] text-white',
+  menu: 'bg-[#16a2b8] text-white', survey: 'bg-[#249e59] text-white', settings: 'bg-[#778393] text-white',
+  logs: 'bg-[#9e58d7] text-white', admins: 'bg-[#d21235] text-white',
+};
+const ADMIN_GROUPS = [
+  { key: 'meals', label: 'Quản lý suất ăn' },
+  { key: 'nutrition', label: 'Dinh dưỡng' },
+  { key: 'system', label: 'Hệ thống' },
+];
+
+export function Navigation({ className, adminMode = false }: { className?: string; adminMode?: boolean }) {
   const location = useLocation();
+  const account = useCurrentAccount();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
-  const [userInfo, setUserInfo] = useState<{name: string, email: string, employeeId?: string, department?: string} | null>(null);
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, boolean>>({});
+  const [configLoading, setConfigLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useRef<HTMLDialogElement>(null);
+  const accountDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        setUserInfo({ name: user.displayName || 'Người dùng', email: user.email || '' });
-        
-        try {
-          const staffDoc = await getDoc(doc(db, 'staff', user.uid));
-          if (staffDoc.exists()) {
-             const data = staffDoc.data();
-             setUserInfo(prev => prev ? {
-               ...prev,
-               name: data.fullName || prev.name,
-               employeeId: data.employeeId,
-               department: data.department
-             } : null);
-          }
-        } catch(e) {}
+    let active = true;
+    let requestVersion = 0;
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      const version = ++requestVersion;
+      const current = () => active && version === requestVersion && auth.currentUser?.uid === user?.uid;
+      setIsAdmin(Boolean(user && isSuperAdmin(user.email)));
+      setMonthlyStatus({});
+      setConfigLoading(Boolean(user));
+      if (!user) return;
 
-        let isUserAdmin = isSuperAdmin(user.email);
-        if (!isUserAdmin && user.email) {
+      if (!isSuperAdmin(user.email) && user.email) {
+        const email = user.email.trim().toLowerCase();
+        void (async () => {
           try {
-            // First check by standard doc ID
-            const docId = user.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-            const adminDoc = await getDoc(doc(db, 'admins', docId));
-            if (adminDoc.exists()) {
-              isUserAdmin = true;
-            } else {
-              // Fallback to checking the collection (if document has random ID)
-              const adminsSnapshot = await getDocs(collection(db, 'admins'));
-              const adminEmails = adminsSnapshot.docs.map(doc => {
-                const email = doc.data().email;
-                return typeof email === 'string' ? email.toLowerCase().trim() : '';
-              });
-              if (adminEmails.includes(user.email.toLowerCase().trim())) {
-                isUserAdmin = true;
-              }
-            }
-          } catch (err) {
-            console.error('Error checking admin status in Navigation:', err);
+            const adminDoc = await getDoc(doc(db, 'admins', email.replace(/[^a-z0-9]/g, '_')));
+            if (!current()) return;
+            if (adminDoc.exists()) { setIsAdmin(true); return; }
+            const admins = await getDocs(collection(db, 'admins'));
+            if (!current()) return;
+            setIsAdmin(admins.docs.some(snapshot => {
+              const value = snapshot.data().email;
+              return typeof value === 'string' && value.trim().toLowerCase() === email;
+            }));
+          } catch (error) {
+            if (current()) console.error('Error checking admin status in Navigation:', error);
           }
-        }
-        setIsAdmin(isUserAdmin);
-        
-        // Fetch monthly status for account info
-        try {
-          const configDoc = await getDoc(doc(db, 'settings', 'monthlyConfig'));
-          if (configDoc.exists()) {
-            setMonthlyStatus(configDoc.data() as Record<string, boolean>);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        setIsAdmin(false);
-        setUserInfo(null);
+        })();
       }
+
+      void getDoc(doc(db, 'settings', 'monthlyConfig')).then(snapshot => {
+        if (!current()) return;
+        if (snapshot.exists()) setMonthlyStatus(Object.fromEntries(Object.entries(snapshot.data()).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')));
+      }).catch(error => {
+        if (current()) console.error('Error loading registration configuration:', error);
+      }).finally(() => {
+        if (current()) setConfigLoading(false);
+      });
     });
+    return () => { active = false; requestVersion++; unsubscribe(); };
+  }, []);
 
-    const handleOpenModal = () => setShowAccountModal(true);
-    window.addEventListener('open-account-modal', handleOpenModal);
+  const closeDrawer = () => drawer.current?.close();
+  const openAccount = () => {
+    drawer.current?.close();
+    if (accountDialog.current && !accountDialog.current.open) accountDialog.current.showModal();
+  };
 
+  useEffect(() => {
+    const handleAccount = () => {
+      drawer.current?.close();
+      if (accountDialog.current && !accountDialog.current.open) accountDialog.current.showModal();
+    };
+    const handleNavigation = () => {
+      if (drawer.current && !drawer.current.open) { drawer.current.showModal(); setDrawerOpen(true); }
+    };
+    window.addEventListener('open-account-modal', handleAccount);
+    window.addEventListener('open-navigation', handleNavigation);
     return () => {
-      unsubscribe();
-      window.removeEventListener('open-account-modal', handleOpenModal);
+      window.removeEventListener('open-account-modal', handleAccount);
+      window.removeEventListener('open-navigation', handleNavigation);
     };
   }, []);
+
+  useEffect(() => { drawer.current?.close(); }, [location.pathname, location.search]);
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -87,290 +114,89 @@ export function Navigation({ className }: { className?: string }) {
     setSignOutError(null);
     try {
       await auth.signOut();
-      setShowAccountModal(false);
-      // Nạp lại hẳn trang /login thay vì chuyển route: đăng xuất xong mọi
-      // listener Firestore đang mở đều mất quyền đọc, tải lại là sạch nhất.
+      // Reload to discard Firestore listeners which lose access after sign-out.
       window.location.replace('/login');
     } catch (error) {
       console.error('Error signing out:', error);
       setSignOutError('Không đăng xuất được. Vui lòng kiểm tra kết nối mạng rồi thử lại.');
       setSigningOut(false);
+      openAccount();
     }
   };
 
-  const links = [
-    { to: '/schedule', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
-    { to: '/events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
-    // Mọi người dùng (kể cả quản trị) đều có suất ăn của riêng mình để tự kiểm tra.
-    { to: '/cham-an', icon: 'fact_check', label: 'CHẤM ĂN CỦA TÔI' },
-    { to: '/thuc-don', icon: 'restaurant_menu', label: 'THỰC ĐƠN TUẦN' },
-    // Khảo sát chất lượng suất ăn hằng tuần: luôn có mục để Thầy/Cô tự vào, kể
-    // cả khi đã lỡ email mời hay tắt thanh nhắc; trang tự hiện tuần đang mở.
-    { to: '/khao-sat', icon: 'rate_review', label: 'KHẢO SÁT' },
+  const groups: SchoolNavigationGroup[] = adminMode ? ADMIN_GROUPS.map(group => ({
+    ...group,
+    links: ADMIN_TABS.filter(tab => tab.group === group.key).map(tab => ({ to: `/quantri?tab=${tab.key}`, icon: tab.icon, label: tab.label, tone: ADMIN_TONES[tab.key] })),
+  })) : [
+    { key: 'personal', label: 'Cá nhân', links: PERSONAL_LINKS },
+    { key: 'nutrition', label: 'Dinh dưỡng', links: NUTRITION_LINKS },
+    ...(isAdmin ? [{ key: 'admin', label: 'Quản trị', links: [{ to: '/quantri', label: 'Quản trị suất ăn', icon: 'admin_panel_settings', tone: 'bg-[#d21235] text-white' }] }] : []),
+  ];
+  const requestedTab = new URLSearchParams(location.search).get('tab');
+  const activeHref = adminMode ? `/quantri?tab=${ADMIN_TABS.some(tab => tab.key === requestedTab) ? requestedTab : 'monthly'}` : location.pathname;
+  const canManage = adminMode || isAdmin;
+  const sidebarProps = { groups, activeHref, account, isAdmin: canManage, adminMode, signingOut, onAccountClick: openAccount, onSignOut: handleSignOut };
+  const drawerGroups = adminMode ? [
+    { key: 'personal', label: 'Cá nhân', links: PERSONAL_LINKS },
+    { key: 'my-nutrition', label: 'Bữa ăn của tôi', links: NUTRITION_LINKS },
+    ...groups,
+  ] : groups;
+  const mobileLinks = [
+    { to: '/schedule', icon: 'calendar_month', label: 'Đăng ký' },
+    { to: '/cham-an', icon: 'fact_check', label: 'Chấm ăn' },
+    { to: '/thuc-don', icon: 'restaurant_menu', label: 'Thực đơn' },
   ];
 
-  let displayLinks = links;
+  return <>
+    <SchoolSidebar {...sidebarProps} className={clsx('fixed inset-y-0 left-0 z-40 hidden w-64 md:flex', className)} />
+    <nav aria-label="Điều hướng trên điện thoại" className="fixed inset-x-0 bottom-0 z-50 grid h-[72px] grid-cols-4 border-t border-outline-variant bg-surface-container-lowest pb-safe shadow-[0_-2px_12px_rgb(0_0_0_/_0.04)] md:hidden">
+      {mobileLinks.map(link => {
+        const selected = !adminMode && location.pathname === link.to;
+        return <Link key={link.to} to={link.to} aria-current={selected ? 'page' : undefined} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', selected ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+          <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', selected && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]" style={{ fontVariationSettings: selected ? "'FILL' 1" : undefined }}>{link.icon}</span></span>{link.label}
+        </Link>;
+      })}
+      <button type="button" aria-label="Mở tất cả chức năng" aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="navigation-drawer" onClick={() => { if (drawer.current && !drawer.current.open) drawer.current.showModal(); setDrawerOpen(true); }} className={clsx('flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] leading-4', adminMode || drawerOpen ? 'font-semibold text-primary' : 'text-on-surface-variant')}>
+        <span className={clsx('flex h-8 w-12 items-center justify-center rounded-xl', (adminMode || drawerOpen) && 'bg-primary/10')} aria-hidden="true"><span className="material-symbols-outlined text-[23px]">apps</span></span>Tất cả
+      </button>
+    </nav>
 
-  if (isAdmin) {
-    if (location.pathname.startsWith('/quantri')) {
-      displayLinks = [
-        { to: '/quantri?tab=monthly', icon: 'calendar_month', label: 'ĐK ĂN HÀNG THÁNG' },
-        { to: '/quantri?tab=events', icon: 'event', label: 'ĐĂNG KÝ ĂN SỰ KIỆN' },
-        { to: '/quantri?tab=menu', icon: 'restaurant_menu', label: 'THỰC ĐƠN TUẦN' },
-        { to: '/quantri?tab=settings', icon: 'settings', label: 'CẤU HÌNH' },
-        { to: '/quantri?tab=admins', icon: 'admin_panel_settings', label: 'QUẢN TRỊ' },
-      ];
-    } else {
-      displayLinks = [...links, { to: '/quantri', icon: 'admin_panel_settings', label: 'QUẢN TRỊ' }];
-    }
-  }
+    <dialog ref={drawer} id="navigation-drawer" aria-label="Tất cả chức năng" onClose={() => setDrawerOpen(false)} onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close(); }} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(320px,calc(100vw-32px))] max-w-none border-0 bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
+      <button type="button" autoFocus aria-label="Đóng điều hướng" onClick={closeDrawer} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
+      <SchoolSidebar {...sidebarProps} groups={drawerGroups} className="border-r-0" onNavigate={closeDrawer} />
+    </dialog>
 
-  // Nhãn ngắn trên điện thoại để 5–6 mục vẫn vừa thanh điều hướng.
-  const crowded = displayLinks.length > 4;
-  const mobileLabels: Record<string, string> = {
-    '/schedule': 'ĐK ĂN THÁNG',
-    '/events': 'ĂN SỰ KIỆN',
-    '/cham-an': 'CHẤM ĂN',
-    '/thuc-don': 'THỰC ĐƠN',
-    '/quantri?tab=monthly': 'ĐK ĂN THÁNG',
-    '/quantri?tab=events': 'ĂN SỰ KIỆN',
-    '/quantri?tab=menu': 'THỰC ĐƠN',
-  };
-
-  const renderLinkItems = (isMobile: boolean) => {
-    return displayLinks.map(link => {
-      const isAccount = link.to === '#account';
-      const isActive = !isAccount && (
-        location.pathname + location.search === link.to ||
-        (link.to === '/quantri' && location.pathname.startsWith('/quantri')) ||
-        (link.to !== '/quantri' && !location.pathname.startsWith('/quantri') && location.pathname.startsWith(link.to))
-      );
-
-      if (isMobile) {
-        // Các mục của CBNV nổi bật như nhau; mục QUẢN TRỊ nhạt hơn để không lấn.
-        const isProminent = link.to === '/schedule' || link.to === '/events' || link.to === '/cham-an' || link.to === '/thuc-don' || link.to === '/khao-sat';
-        return (
-          <button 
-            key={link.to}
-            aria-label={link.label}
-            onClick={() => {
-              if (isAccount) {
-                setShowAccountModal(true);
-              } else {
-                window.location.href = link.to;
-              }
-            }}
-            className={clsx(
-              "flex flex-col items-center justify-center h-full flex-1 transition-all relative",
-              isActive 
-                ? "text-primary"
-                : "text-on-surface-variant hover:text-on-surface"
-            )}
-          >
-            <div className={clsx(
-              crowded ? "px-3 py-1 rounded-full transition-colors relative" : "px-5 py-1 rounded-full transition-colors relative",
-              isActive ? "bg-primary-container/40" : "hover:bg-surface-container-high",
-              isProminent && !isActive && "text-primary/70"
-            )}>
-              <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}>
-                {link.icon}
-              </span>
-              {isActive && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full md:hidden"></div>}
-            </div>
-            {/* leading-[12px]: nhãn dài xuống 2 dòng; giữ dòng 15px mặc định thì
-                icon + 2 dòng cao hơn thanh 72px và bị cắt chân chữ. mt-1.5 để
-                dấu mũ của chữ hoa (Ấ, Ậ) không chạm chấm báo mục đang chọn. */}
-            <span className={clsx(
-              // Nhãn luôn chừa 3px mỗi bên trong ô, kể cả màn rất hẹp (320px) ít mục.
-              "font-label-md text-[10px] leading-[12px] mt-1.5 text-center uppercase transition-all max-w-[min(80px,calc(100%_-_6px))]",
-              // Màn dưới 340px mà 5 mục: nhãn dài phải xuống 3 dòng — thu chữ và
-              // dòng lại cho 3 dòng vẫn nằm trọn trong thanh 72px.
-              crowded ? "tracking-normal max-[340px]:text-[9px] max-[340px]:leading-[10px] max-[340px]:mt-1" : "tracking-wider",
-              isActive || isProminent ? clsx("font-bold text-primary", !crowded && "scale-105") : "font-normal opacity-80"
-            )}>
-              {mobileLabels[link.to] || link.label}
-            </span>
-          </button>
-        );
-      }
-
-      // Desktop Link Items
-      if (isAccount) {
-        return (
-          <button 
-            key={link.to}
-            onClick={() => setShowAccountModal(true)}
-            className="flex w-full items-center gap-md px-md py-sm rounded-lg transition-colors text-on-surface-variant hover:bg-surface-container"
-          >
-            <span className="material-symbols-outlined">{link.icon}</span>
-            <span className="text-label-md">{link.label}</span>
-          </button>
-        );
-      }
-
-      return (
-        <Link 
-          key={link.to}
-          to={link.to}
-          className={clsx(
-            "flex items-center gap-md px-md py-sm rounded-lg transition-colors",
-            isActive 
-              ? "bg-primary-container text-on-primary-container font-bold" 
-              : "text-on-surface-variant hover:bg-surface-container"
-          )}
-        >
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}>
-            {link.icon}
-          </span>
-          <span className="text-label-md">{link.label}</span>
-        </Link>
-      );
-    });
-  };
-
-  return (
-    <>
-      {/* Desktop Sidebar */}
-      <aside className={clsx("fixed top-16 left-0 bottom-0 w-64 bg-surface border-r border-outline-variant hidden md:flex flex-col z-40", className)}>
-        <nav className="flex-1 py-lg flex flex-col gap-sm px-md">
-          {renderLinkItems(false)}
-        </nav>
-      </aside>
-
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-evenly items-center h-[72px] bg-surface-container-lowest pb-safe border-t border-outline-variant shadow-[0_-4px_12px_-2px_rgb(35_50_140_/_0.08)] md:hidden">
-        {renderLinkItems(true)}
-      </nav>
-
-      {/* Account Modal */}
-      {showAccountModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowAccountModal(false)}></div>
-          <div className="bg-surface-container-lowest relative w-[min(calc(100vw-32px),380px)] rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant flex flex-col max-h-[85vh]">
-            
-            {/* Header Pattern */}
-            <div className="px-6 pt-8 pb-5 flex flex-col items-center flex-shrink-0 bg-surface z-10 border-b border-outline-variant/40">
-              <div className="relative mb-4">
-                <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center shadow-sm">
-                  <span className="material-symbols-outlined text-[40px]">person</span>
-                </div>
-                <div className="absolute bottom-0 right-0 w-6 h-6 bg-tertiary border-[3px] border-surface rounded-full flex items-center justify-center"></div>
-              </div>
-              <h3 className="text-[20px] font-bold text-on-surface tracking-tight text-center w-full truncate px-2">
-                {userInfo?.name || auth.currentUser?.displayName || 'Tài khoản nhân viên'}
-              </h3>
-              <p className="text-[14px] text-on-surface-variant mt-1 text-center truncate w-full px-4">
-                {userInfo?.email || auth.currentUser?.email || ''}
-              </p>
-            </div>
-            
-            {/* Scrollable content area */}
-            <div className="overflow-y-auto px-5 py-6 flex-1 space-y-6 flex flex-col w-full min-h-0 bg-surface-container-lowest">
-              
-              {/* Detailed info table */}
-              <div className="w-full">
-                <h4 className="text-[13px] font-bold text-primary uppercase mb-3 px-1 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">badge</span>
-                  Thông tin nhân sự
-                </h4>
-                <div className="bg-surface rounded-2xl border border-outline-variant overflow-hidden w-full shadow-sm">
-                  <div className="flex flex-col sm:flex-row justify-between p-3.5 border-b border-outline-variant/50 gap-1 sm:items-center bg-surface">
-                      <span className="text-[13px] text-on-surface-variant min-w-[110px]">Họ tên</span>
-                      <span className="text-[14px] font-semibold text-on-surface sm:text-right">{userInfo?.name || auth.currentUser?.displayName || 'Trống'}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between p-3.5 border-b border-outline-variant/50 gap-1 sm:items-center bg-surface">
-                      <span className="text-[13px] text-on-surface-variant min-w-[110px]">Email</span>
-                      <span className="text-[14px] font-semibold text-on-surface sm:text-right break-words">{userInfo?.email || auth.currentUser?.email || 'Trống'}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between p-3.5 border-b border-outline-variant/50 gap-1 sm:items-center bg-surface">
-                      <span className="text-[13px] text-on-surface-variant min-w-[110px]">Mã nhân viên</span>
-                      <span className="text-[14px] font-semibold text-on-surface sm:text-right">{userInfo?.employeeId || 'Chưa cập nhật'}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between p-3.5 gap-1 sm:items-center bg-surface">
-                      <span className="text-[13px] text-on-surface-variant min-w-[110px]">Phòng ban</span>
-                      <span className="text-[14px] font-semibold text-on-surface sm:text-right">{userInfo?.department || 'Chưa cập nhật'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Section */}
-              <div className="w-full">
-                <h4 className="text-[13px] font-bold text-primary uppercase mb-3 px-1 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">event_available</span>
-                  Cấu hình tháng
-                </h4>
-                <div className="space-y-2.5">
-                  {Object.entries(monthlyStatus).sort((a,b) => a[0].localeCompare(b[0])).map(([month, isOpen]) => (
-                    <div key={month} className="flex items-center justify-between p-3.5 px-4 bg-surface rounded-2xl border border-outline-variant shadow-sm hover:border-outline transition-colors">
-                      <span className="text-[14px] text-on-surface font-medium flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
-                        Tháng {month}
-                      </span>
-                      {isOpen ? (
-                        <div className="px-3 py-1.5 bg-tertiary-container/80 text-on-tertiary-container rounded-full text-[12px] font-bold flex items-center gap-1.5 shrink-0">
-                          <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                          Mở đăng ký
-                        </div>
-                      ) : (
-                        <div className="px-3 py-1.5 bg-surface-variant/70 text-on-surface-variant rounded-full text-[12px] font-bold flex items-center gap-1.5 shrink-0">
-                          <span className="material-symbols-outlined text-[15px]">lock</span>
-                          Đã khóa
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {Object.keys(monthlyStatus).length === 0 && (
-                    <div className="p-4 bg-surface rounded-2xl border border-outline-variant text-center">
-                      <p className="italic text-on-surface-variant text-[13px]">Chưa có dữ liệu tháng...</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="p-5 border-t border-outline-variant/40 flex flex-col gap-3 flex-shrink-0 bg-surface">
-              {isAdmin && (
-                <Link 
-                  to="/quantri"
-                  onClick={() => setShowAccountModal(false)}
-                  className="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary-container hover:brightness-95 font-bold text-[15px] h-12 rounded-[14px] transition-all focus:ring-2 focus:ring-primary/50 outline-none"
-                >
-                  <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
-                  Trang quản trị
-                </Link>
-              )}
-              
-              {signOutError && (
-                <p className="text-[13px] text-on-error-container bg-error-container border border-error/25 rounded-lg px-3 py-2">
-                  {signOutError}
-                </p>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowAccountModal(false)}
-                  disabled={signingOut}
-                  className="flex-1 h-12 rounded-lg font-bold text-[15px] text-on-surface bg-surface border border-outline-variant hover:bg-surface-container transition-all disabled:opacity-60 disabled:cursor-not-allowed outline-none"
-                >
-                  Đóng
-                </button>
-                <button
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="flex-1 flex items-center justify-center gap-2 bg-error text-on-error hover:bg-error-dark font-bold text-[15px] h-12 rounded-lg transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed outline-none"
-                >
-                  <span className={`material-symbols-outlined text-[20px] ${signingOut ? 'animate-spin' : ''}`}>
-                    {signingOut ? 'progress_activity' : 'logout'}
-                  </span>
-                  {signingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
-                </button>
-              </div>
-            </div>
-          </div>
+    <dialog ref={accountDialog} aria-labelledby="account-title" onCancel={event => { if (signingOut) event.preventDefault(); }} onClick={event => { if (!signingOut && event.target === event.currentTarget) event.currentTarget.close(); }} className="m-auto max-h-[88dvh] w-[min(440px,calc(100vw-32px))] max-w-none overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-0 text-on-surface shadow-xl backdrop:bg-black/35 backdrop:backdrop-blur-[2px]">
+      <div className="flex items-center justify-between gap-4 border-b border-outline-variant px-5 py-4">
+        <h2 id="account-title" className="text-headline-sm">Thông tin tài khoản</h2>
+        <button type="button" autoFocus disabled={signingOut} aria-label="Đóng thông tin tài khoản" onClick={() => accountDialog.current?.close()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high disabled:opacity-60"><span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span></button>
+      </div>
+      <div className="space-y-5 p-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-amber text-lg font-bold text-on-warning" aria-hidden="true">{account?.initials || <span className="material-symbols-outlined">person</span>}</span>
+          <div className="min-w-0"><p className="text-label-lg break-words">{account?.fullName || 'Tài khoản nhân viên'}</p><p className="mt-1 text-body-sm text-on-surface-variant">{account?.isSuperAdmin ? 'Quản trị cao nhất' : canManage ? 'Quản trị viên' : 'Cán bộ, giáo viên, nhân viên'}</p></div>
         </div>
-      )}
-    </>
-  );
+        <dl className="divide-y divide-outline-variant rounded-xl bg-surface-container-low px-4">
+          {[
+            ['Email', account?.email || 'Chưa cập nhật'],
+            ['Mã nhân viên', account?.employeeId || 'Chưa cập nhật'],
+            ['Phòng ban', account?.department || 'Chưa cập nhật'],
+          ].map(([label, value]) => <div key={label} className="py-3"><dt className="text-body-sm text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-body-md font-medium [overflow-wrap:anywhere]">{value}</dd></div>)}
+        </dl>
+        <section aria-labelledby="account-registration-title">
+          <h3 id="account-registration-title" className="mb-2 text-label-md text-on-surface">Trạng thái đăng ký theo tháng</h3>
+          <div className="space-y-2">
+            {Object.entries(monthlyStatus).sort(([a], [b]) => a.localeCompare(b)).map(([month, isOpen]) => <div key={month} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-container-low px-3 py-2.5 text-body-sm"><span>Tháng {month}</span><span className={clsx('rounded-md px-2 py-1 text-[11px] font-semibold', isOpen ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-surface-container text-on-surface-variant')}>{isOpen ? 'Mở đăng ký' : 'Đã khóa'}</span></div>)}
+            {Object.keys(monthlyStatus).length === 0 && <p className="rounded-lg bg-surface-container-low p-3 text-body-sm text-on-surface-variant">{configLoading ? 'Đang tải cấu hình…' : 'Chưa có dữ liệu cấu hình tháng.'}</p>}
+          </div>
+        </section>
+        {canManage && <Link to={adminMode ? '/dashboard' : '/quantri'} onClick={() => accountDialog.current?.close()} className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary/10 px-3 text-label-md text-primary hover:bg-primary/15"><span className="material-symbols-outlined text-[19px]" aria-hidden="true">{adminMode ? 'arrow_back' : 'admin_panel_settings'}</span>{adminMode ? 'Trang cá nhân' : 'Trang quản trị'}</Link>}
+        {signOutError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-body-sm text-on-error-container">{signOutError}</p>}
+      </div>
+      <div className="flex gap-3 border-t border-outline-variant bg-surface-container-low p-4">
+        <button type="button" disabled={signingOut} onClick={() => accountDialog.current?.close()} className="min-h-11 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-label-md hover:bg-surface-container disabled:opacity-60">Đóng</button>
+        <button type="button" disabled={signingOut} onClick={handleSignOut} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-error px-3 text-label-md text-on-error hover:bg-error-dark disabled:opacity-60"><span className={clsx('material-symbols-outlined text-[18px]', signingOut && 'animate-spin')} aria-hidden="true">{signingOut ? 'progress_activity' : 'logout'}</span>{signingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</button>
+      </div>
+    </dialog>
+  </>;
 }

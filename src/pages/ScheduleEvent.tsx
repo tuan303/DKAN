@@ -209,7 +209,7 @@ export default function ScheduleEvent() {
   };
 
   return (
-    <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
+    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
       
@@ -217,32 +217,33 @@ export default function ScheduleEvent() {
         <section className="space-y-xl px-0 md:px-margin lg:px-xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-md px-md md:px-0">
             <div>
-              <h2 className="text-headline-md md:text-headline-lg text-primary">ĐĂNG KÝ ĂN SỰ KIỆN</h2>
+              <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
+              <h2 className="text-headline-md md:text-headline-lg text-on-surface">Đăng ký ăn sự kiện</h2>
               <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]"> Đăng ký suất ăn tham gia các sự kiện của nhà trường</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
-            <div className="lg:col-span-2 bg-surface-container-lowest md:bg-surface rounded-xl border border-outline-variant p-md md:p-lg shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] flex flex-col h-full flex-shrink-0">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm md:gap-0 mt-xl mb-md border-b border-outline-variant pb-md">
-                <h3 className="text-headline-sm text-primary">DANH SÁCH SỰ KIỆN</h3>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-md md:gap-gutter px-md md:px-0">
+            <div className="xl:col-span-2 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-full">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-sm mb-md border-b border-outline-variant pb-md">
+                <h3 className="text-headline-sm text-on-surface">Sự kiện đang mở đăng ký</h3>
               </div>
 
               <div className="space-y-sm">
                 {events.length === 0 ? (
-                  <div className="py-[60px] px-6 text-center bg-surface-container-lowest rounded-[24px] border border-outline-variant flex flex-col items-center justify-center w-full my-4 shadow-sm">
-                    <div className="w-20 h-20 bg-error/10 rounded-full flex items-center justify-center mb-6">
-                      <span className="material-symbols-outlined text-[40px] text-error">event_busy</span>
+                  <div className="py-10 px-md text-center bg-surface-container-low rounded-xl flex flex-col items-center justify-center w-full">
+                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-md">
+                      <span className="material-symbols-outlined text-[24px] text-primary" aria-hidden="true">event_available</span>
                     </div>
-                    <h3 className="text-[20px] font-bold text-error mb-3">Không có sự kiện</h3>
-                    <p className="text-[15px] text-error/80 max-w-[320px] leading-relaxed">
-                      Hiện tại không có sự kiện nào đang trong thời gian mở đăng ký ăn. Vui lòng quay lại sau!
+                    <h3 className="text-title-md font-semibold text-on-surface mb-2">Chưa có sự kiện mở đăng ký</h3>
+                    <p className="text-body-md text-on-surface-variant max-w-[320px] leading-relaxed">
+                      Các sự kiện sẽ hiển thị tại đây khi nhà trường mở đăng ký suất ăn.
                     </p>
                   </div>
                 ) : events.map(evt => (
-                  <div key={evt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
+                  <div key={evt.id} className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between p-md bg-surface-container-low rounded-xl border border-outline-variant gap-md hover:bg-surface-container-low/80 transition-colors">
                     <div className="flex items-center gap-md">
-                      <div className="w-12 h-12 bg-primary-container rounded-full flex items-center justify-center text-on-primary-container">
+                      <div className="w-12 h-12 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                         <span className="material-symbols-outlined text-[24px]">event</span>
                       </div>
                       <div>
@@ -250,7 +251,7 @@ export default function ScheduleEvent() {
                       </div>
                     </div>
                     
-                    <div className="flex gap-md w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-center">
+                    <div className="flex gap-md w-full 2xl:w-auto justify-end 2xl:justify-center">
                       <label className={`flex items-center gap-sm cursor-pointer hover:bg-surface-container p-2 rounded-lg transition-colors`}>
                         <input 
                           type="radio" 
@@ -278,12 +279,12 @@ export default function ScheduleEvent() {
             </div>
 
             {/* Summary Card */}
-            <div className="lg:col-span-1 bg-surface-bright rounded-xl border border-outline-variant p-md md:p-lg shadow-sm flex flex-col mb-24 h-max">
-              <h3 className="text-headline-sm text-primary mb-lg pb-sm border-b border-outline-variant">Thông tin xác nhận</h3>
+            <div className="xl:col-span-1 min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant p-md md:p-lg flex flex-col h-max">
+              <h3 className="text-headline-sm text-on-surface mb-lg pb-sm border-b border-outline-variant">Thông tin xác nhận</h3>
               
               <div className="space-y-md flex-1">
                 {events.filter(e => eventChoices[e.id] === 'yes').length === 0 ? (
-                  <p className="text-error italic font-body-md text-[14px]">thầy/cô không đăng ký ăn sự kiện này</p>
+                  <p className="text-body-md text-on-surface-variant">Thầy/Cô chưa chọn sự kiện đăng ký ăn.</p>
                 ) : events.filter(e => eventChoices[e.id] === 'yes').map(e => (
                   <div key={e.id} className="flex justify-between items-center bg-surface p-md rounded-lg border border-outline-variant">
                     <div className="flex items-center gap-sm">

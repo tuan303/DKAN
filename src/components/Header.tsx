@@ -18,26 +18,25 @@ function HeaderContent({ account }: { account: CurrentAccount | null }) {
   const accountDetail = account?.department || (account?.isSuperAdmin ? 'Quản trị cao nhất' : 'Thông tin tài khoản');
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 h-16 bg-surface-container-lowest border-b border-outline-variant shadow-xs">
-      <div className="absolute inset-x-0 top-0 h-[3px] flex" aria-hidden="true">
-        <span className="flex-[4] bg-primary" />
-        <span className="flex-[2] bg-secondary" />
-        <span className="flex-1 bg-warning" />
-        <span className="flex-1 bg-tertiary" />
-      </div>
+    <header className={`fixed top-0 inset-x-0 z-50 h-16 bg-surface-container-lowest border-b border-outline-variant ${isRegister ? '' : 'md:hidden'}`}>
       <div className="w-full h-full flex justify-between items-center gap-3 px-4 md:px-6 lg:px-8">
-        <Link to="/schedule" aria-label="Phần mềm đăng ký ăn – Trường Ngôi Sao Hoàng Mai" className="flex min-w-0 items-center gap-3 group rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+        <div className="flex min-w-0 items-center gap-2">
+        {!isRegister && <button type="button" aria-label="Mở menu chức năng" onClick={() => window.dispatchEvent(new Event('open-navigation'))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-on-surface hover:bg-surface-container">
+          <span className="material-symbols-outlined text-[24px]" aria-hidden="true">menu</span>
+        </button>}
+        <Link to="/dashboard" aria-label="Suất ăn – Trường Ngôi Sao Hoàng Mai" className="flex min-w-0 items-center gap-2 group rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
           <img
             src="https://hoangmaistarschool.edu.vn/thongtin/LogoNSHM.png"
             alt="Trường Ngôi Sao Hoàng Mai"
-            className="h-8 sm:h-9 w-auto max-w-[156px] sm:max-w-[180px] object-contain shrink-0"
+            className={`h-8 w-auto object-contain shrink-0 ${isRegister ? 'max-w-[180px]' : 'max-w-[116px] sm:max-w-[156px]'}`}
           />
           <span className="hidden sm:block w-px h-7 bg-outline-variant shrink-0" aria-hidden="true" />
-          <span className="hidden lg:inline text-base xl:text-lg font-bold text-primary uppercase whitespace-nowrap group-hover:text-primary-dark transition-colors">
-            Phần mềm đăng ký ăn
+          <span className="hidden lg:inline text-base xl:text-lg font-bold text-on-surface whitespace-nowrap group-hover:text-primary transition-colors">
+            Đăng ký suất ăn
           </span>
           <span className="hidden sm:inline lg:hidden text-sm font-bold text-primary uppercase whitespace-nowrap">Đăng ký ăn</span>
         </Link>
+        </div>
         
         {!isRegister ? (
           <div className="flex shrink-0 items-center gap-2 lg:gap-4">

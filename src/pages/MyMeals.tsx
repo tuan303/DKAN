@@ -204,7 +204,7 @@ const MEAL_ICON: Record<Meal, string> = { breakfast: 'bakery_dining', lunch: 'lu
 // thanh bên và cột trợ giúp, trong khi ở màn 768px không có cột trợ giúp. Theo
 // màn hình thì ô trạng thái bị bóp, chữ "Đã chấm HH:MM" gãy dòng.
 const CARD =
-  'bg-surface-container-lowest rounded-xl border border-outline-variant shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)]';
+  'min-w-0 bg-surface-container-lowest rounded-2xl border border-outline-variant';
 
 const windowText = (meal: Meal) => `${MEAL_WINDOWS[meal].from}–${MEAL_WINDOWS[meal].to}`;
 const monthLabel = (month: string) => `Tháng ${month.slice(5, 7)}/${month.slice(0, 4)}`;
@@ -340,12 +340,12 @@ function TodayCard({
   const updatedAt = sync ? sync.lastCompleteAt || sync.lastRunAt : null;
   return (
     <section aria-labelledby="mm-today-title" className={clsx(CARD, 'overflow-hidden')}>
-      <div className="px-md md:px-lg py-3 bg-primary text-on-primary flex items-center justify-between gap-2">
-        <h3 id="mm-today-title" className="text-headline-sm uppercase flex items-center gap-2">
-          <span className="material-symbols-outlined text-[22px]" aria-hidden="true">today</span>
+      <div className="px-md md:px-lg py-md border-b border-outline-variant flex flex-wrap items-center justify-between gap-2">
+        <h3 id="mm-today-title" className="text-headline-sm text-on-surface flex items-center gap-2">
+          <span className="material-symbols-outlined text-[22px] text-primary" aria-hidden="true">today</span>
           Hôm nay
         </h3>
-        <span className="text-label-lg tabular">{formatDayLabel(todayIso)}</span>
+        <span className="text-body-md text-on-surface-variant tabular">{formatDayLabel(todayIso)}</span>
       </div>
 
       <div className="@container p-md md:p-lg flex flex-col gap-sm">
@@ -580,7 +580,7 @@ function HistoryCard({
     <section aria-labelledby="mm-history-title" className={clsx(CARD, '@container overflow-hidden')}>
       <div className="p-md md:p-lg border-b border-outline-variant flex flex-col @2xl:flex-row @2xl:items-center justify-between gap-md">
         <div>
-          <h3 id="mm-history-title" className="text-headline-sm text-primary">Lịch sử chấm ăn</h3>
+          <h3 id="mm-history-title" className="text-headline-sm text-on-surface">Lịch sử chấm ăn</h3>
           <p className="text-body-sm text-on-surface-variant mt-0.5">Các ngày có suất ăn trong tháng, mới nhất ở trên.</p>
         </div>
         <div role="group" aria-label="Chọn tháng" className="grid grid-cols-3 gap-1 p-1 bg-surface-container rounded-lg w-full @2xl:w-auto">
@@ -717,7 +717,7 @@ function HistoryCard({
 function HelpCard() {
   return (
     <section aria-labelledby="mm-help-title" className={clsx(CARD, 'p-md md:p-lg flex flex-col gap-sm')}>
-      <h3 id="mm-help-title" className="text-headline-sm text-primary flex items-center gap-2">
+      <h3 id="mm-help-title" className="text-headline-sm text-on-surface flex items-center gap-2">
         <span className="material-symbols-outlined text-[22px]" aria-hidden="true">support_agent</span>
         Thấy chưa đúng?
       </h3>
@@ -750,7 +750,7 @@ function HelpCard() {
 function LegendCard() {
   return (
     <section aria-labelledby="mm-legend-title" className={clsx(CARD, 'p-md md:p-lg flex flex-col gap-sm')}>
-      <h3 id="mm-legend-title" className="text-label-lg text-on-surface uppercase">Ý nghĩa trạng thái</h3>
+      <h3 id="mm-legend-title" className="text-label-lg text-on-surface">Ý nghĩa trạng thái</h3>
       <ul className="flex flex-col gap-2.5">
         {LEGEND.map(l => (
           <li key={l.code} className="flex flex-col gap-1">
@@ -782,7 +782,8 @@ export function MyMealsView(props: MyMealsViewProps) {
           thì họ tên bị gãy dòng lủng củng. */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-xs lg:gap-md">
         <div>
-          <h2 className="text-headline-md md:text-headline-lg text-primary">CHẤM ĂN CỦA TÔI</h2>
+          <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Cá nhân</p>
+          <h2 className="text-headline-md md:text-headline-lg text-on-surface">Chấm ăn của tôi</h2>
           <p className="text-body-md text-on-surface-variant mt-xs text-[13px] md:text-[14px]">
             Đối chiếu suất ăn Thầy/Cô đã đăng ký với lượt chấm trên máy nhận diện
           </p>
@@ -1384,7 +1385,7 @@ export default function MyMeals() {
   }, [base, months, month, currentMonth, todayIso, now]);
 
   return (
-    <div className="font-body-lg flex flex-col pt-16 pb-24 md:pb-0 md:pl-64">
+    <div className="font-body-lg flex min-h-screen min-w-0 flex-col pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
       <Header />
       <Navigation />
       {/* Đặt ngoài MyMealsView để phần trình bày vẫn thuần props (xem trước bằng

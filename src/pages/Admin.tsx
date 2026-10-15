@@ -6,6 +6,7 @@ import { collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, a
 import type { LoginLogEntry } from '../lib/loginLog';
 import * as xlsx from 'xlsx';
 import { Header } from '../components/Header';
+import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import { SurveyResults } from '../components/SurveyResults';
@@ -1090,7 +1091,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md relative pt-16">
+    <div className="bg-background text-on-background min-h-screen min-w-0 flex flex-col font-body-md relative pt-16 pb-24 md:pt-0 md:pb-0 md:pl-64">
       {/* Toast — top-20 để nằm dưới thanh header cố định (h-16), không đè lên */}
       {toast && (
         <div className={`fixed top-20 right-4 z-[100] max-w-[min(420px,calc(100vw-2rem))] px-4 py-3 rounded-lg shadow-lg border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
@@ -1106,56 +1107,29 @@ export default function Admin() {
       )}
 
       <Header account={account} />
+      <Navigation adminMode />
       
       <main className="flex-1 max-w-[1440px] w-full min-w-0 mx-auto px-3 py-6 sm:px-6 lg:p-8 flex flex-col gap-5 md:gap-6">
         <AdminWorkspace activeTab={activeTab} onTabChange={setActiveTab} account={account} />
 
         {activeTab === 'monthly' && (
           <div className="flex flex-col gap-md lg:gap-lg">
-            {/* Bento Grid Layout - Summary Statistics */}
-            <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              {/* Bữa sáng = navy, bữa trưa = đỏ trường: phân biệt được ngay mà vẫn đúng nhận diện */}
-              <div className="bg-gradient-to-br from-primary to-primary-darker rounded-xl p-lg md:p-8 shadow-md flex flex-col justify-center gap-md relative overflow-hidden min-h-[200px]">
-                <div className="absolute -top-2 -right-2 opacity-[0.12] pointer-events-none" aria-hidden="true">
-                  <span className="material-symbols-outlined text-[120px] leading-none">bakery_dining</span>
-                </div>
-                <div className="flex justify-between items-start gap-3 relative z-10">
-                  <span className="text-label-md text-on-primary/90 uppercase tracking-wider">Tổng suất đăng ký ăn sáng · Tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-on-primary/80 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>bakery_dining</span>
-                </div>
-                <div className="relative z-10 flex items-baseline gap-2">
-                  <span className="text-[44px] font-extrabold text-on-primary leading-none tabular">{totalBreakfast}</span>
-                  <span className="text-body-md text-on-primary/80">suất</span>
-                </div>
-                <div className="w-full bg-black/20 rounded-full h-1 mt-auto relative z-10">
-                  <div className="bg-on-primary h-1 rounded-full" style={{ width: '100%' }}></div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-xl p-lg md:p-8 shadow-md flex flex-col justify-center gap-md relative overflow-hidden min-h-[200px]">
-                <div className="absolute -top-2 -right-2 opacity-[0.12] pointer-events-none" aria-hidden="true">
-                  <span className="material-symbols-outlined text-[120px] leading-none">lunch_dining</span>
-                </div>
-                <div className="flex justify-between items-start gap-3 relative z-10">
-                  <span className="text-label-md text-on-secondary/90 uppercase tracking-wider">Tổng suất đăng ký ăn trưa · Tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</span>
-                  <span className="material-symbols-outlined text-on-secondary/80 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>lunch_dining</span>
-                </div>
-                <div className="relative z-10 flex items-baseline gap-2">
-                  <span className="text-[44px] font-extrabold text-on-secondary leading-none tabular">{totalLunch}</span>
-                  <span className="text-body-md text-on-secondary/80">suất</span>
-                </div>
-                <div className="w-full bg-black/20 rounded-full h-1 mt-auto relative z-10">
-                  <div className="bg-on-secondary h-1 rounded-full" style={{ width: '100%' }}></div>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {[
+                { label: 'Bữa sáng', total: totalBreakfast, icon: 'bakery_dining', tone: 'bg-primary-container text-primary' },
+                { label: 'Bữa trưa', total: totalLunch, icon: 'lunch_dining', tone: 'bg-warning-container text-on-warning-container' },
+              ].map(item => <section key={item.label} className="rounded-xl bg-surface-container-lowest p-5 shadow-xs sm:p-6">
+                <div className="flex items-center justify-between gap-3"><h2 className="text-label-lg text-on-surface">Suất đăng ký {item.label.toLowerCase()}</h2><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.tone}`} aria-hidden="true"><span className="material-symbols-outlined text-[22px]">{item.icon}</span></span></div>
+                <p className="mt-3 flex items-baseline gap-2"><span className="text-[34px] font-bold leading-10 tabular text-on-surface">{item.total}</span><span className="text-body-sm text-on-surface-variant">suất</span></p>
+                <p className="mt-1 text-body-sm text-on-surface-variant">Tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</p>
+              </section>)}
             </div>
-
             {/* Daily Statistics */}
             <div className="px-md md:px-0 mt-2">
-              <div className="bg-gradient-to-r from-surface-container-lowest to-surface rounded-2xl p-md lg:p-lg shadow-sm border border-outline-variant flex flex-col gap-md">
+              <div className="bg-surface-container-lowest rounded-xl p-md lg:p-lg shadow-sm border border-outline-variant flex flex-col gap-md">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none m-0 tracking-wide font-black">THỐNG KÊ THEO NGÀY</h2>
+                    <h2 className="text-title-md text-on-surface focus:outline-none m-0 font-semibold">Thống kê theo ngày</h2>
                     <select 
                       value={selectedDay}
                       onChange={(e) => setSelectedDay(parseInt(e.target.value))}
@@ -1203,7 +1177,7 @@ export default function Admin() {
               <div className="lg:col-span-3 bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Hàng Tháng</h2>
+                    <h2 className="text-title-md text-on-surface focus:outline-none font-semibold m-0">Danh sách đăng ký tháng</h2>
                     <div className="flex items-center gap-2">
                        <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
@@ -1315,59 +1289,59 @@ export default function Admin() {
         {activeTab === 'cancelations' && (
           <div className="flex flex-col gap-md lg:gap-lg">
             <div className="px-md md:px-0 grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg">
-              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+              <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 shadow-xs border border-outline-variant flex flex-col justify-center gap-md relative overflow-hidden min-h-[160px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">event_busy</span>
                 </div>
                 <div className="flex justify-between items-center relative z-10">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">ĐÃ HỦY ĂN HÔM NAY ({globalCancelStats.todayStr})</span>
-                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>event_busy</span>
+                  <span className="font-label-lg font-semibold text-on-surface">Đã hủy ăn hôm nay ({globalCancelStats.todayStr})</span>
+                  <span className="material-symbols-outlined text-on-surface-variant" style={{ fontVariationSettings: "'FILL' 1" }}>event_busy</span>
                 </div>
                 <div className="relative z-10">
-                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
-                  <span className="text-body-md text-white/90 ml-2 font-medium">suất</span>
+                  <span className="text-[34px] text-on-surface font-bold leading-none">{globalCancelStats.todayBreakfast + globalCancelStats.todayLunch}</span>
+                  <span className="text-body-md text-on-surface-variant ml-2 font-medium">suất</span>
                 </div>
-                <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
+                <div className="text-[16px] text-on-surface-variant mt-auto font-medium flex gap-3 relative z-10 bg-surface-container px-3 py-2 rounded-lg border border-outline-variant w-fit">
                   <button onClick={() => {
                     const d = new Date();
                     setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                     setCancelMealFilter('breakfast');
-                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.todayBreakfast} Sáng</button>
+                  }} className="hover:text-on-surface transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.todayBreakfast} Sáng</button>
                   <span className="opacity-50">|</span>
                   <button onClick={() => {
                     const d = new Date();
                     setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                     setCancelMealFilter('lunch');
-                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.todayLunch} Trưa</button>
+                  }} className="hover:text-on-surface transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.todayLunch} Trưa</button>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-secondary to-secondary-dark rounded-2xl p-lg md:p-8 shadow-lg border border-white/10 flex flex-col justify-center gap-md relative overflow-hidden min-h-[220px]">
+              <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 shadow-xs border border-outline-variant flex flex-col justify-center gap-md relative overflow-hidden min-h-[160px]">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                   <span className="material-symbols-outlined text-[100px]">next_plan</span>
                 </div>
                 <div className="flex justify-between items-center relative z-10">
-                  <span className="font-label-lg font-bold text-white uppercase tracking-wider drop-shadow-sm">ĐÃ HỦY ĂN NGÀY MAI ({globalCancelStats.tomorrowStr})</span>
-                  <span className="material-symbols-outlined text-white/90" style={{ fontVariationSettings: "'FILL' 1" }}>next_plan</span>
+                  <span className="font-label-lg font-semibold text-on-surface">Đã hủy ăn ngày mai ({globalCancelStats.tomorrowStr})</span>
+                  <span className="material-symbols-outlined text-on-surface-variant" style={{ fontVariationSettings: "'FILL' 1" }}>next_plan</span>
                 </div>
                 <div className="relative z-10">
-                  <span className="font-headline-lg text-[48px] text-white font-black drop-shadow-sm leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
-                  <span className="text-body-md text-white/90 ml-2 font-medium">suất</span>
+                  <span className="text-[34px] text-on-surface font-bold leading-none">{globalCancelStats.tomorrowBreakfast + globalCancelStats.tomorrowLunch}</span>
+                  <span className="text-body-md text-on-surface-variant ml-2 font-medium">suất</span>
                 </div>
-                <div className="text-[16px] text-white/90 mt-auto font-medium flex gap-3 relative z-10 bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm border border-white/5 w-fit">
+                <div className="text-[16px] text-on-surface-variant mt-auto font-medium flex gap-3 relative z-10 bg-surface-container px-3 py-2 rounded-lg border border-outline-variant w-fit">
                   <button onClick={() => {
                     const d = new Date();
                     d.setDate(d.getDate() + 1);
                     setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                     setCancelMealFilter('breakfast');
-                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.tomorrowBreakfast} Sáng</button>
+                  }} className="hover:text-on-surface transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">bakery_dining</span> {globalCancelStats.tomorrowBreakfast} Sáng</button>
                   <span className="opacity-50">|</span>
                   <button onClick={() => {
                     const d = new Date();
                     d.setDate(d.getDate() + 1);
                     setCancelDateFilter(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                     setCancelMealFilter('lunch');
-                  }} className="hover:text-white transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.tomorrowLunch} Trưa</button>
+                  }} className="hover:text-on-surface transition-colors flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">lunch_dining</span> {globalCancelStats.tomorrowLunch} Trưa</button>
                 </div>
               </div>
             </div>
@@ -1376,7 +1350,7 @@ export default function Admin() {
               <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Hủy Ăn</h2>
+                    <h2 className="text-title-md text-on-surface focus:outline-none font-semibold m-0">Danh sách hủy suất ăn</h2>
                     <div className="flex items-center gap-2">
                        <span className="font-label-sm text-on-surface-variant font-medium">Chọn Tháng:</span>
                        <select 
@@ -1525,7 +1499,7 @@ export default function Admin() {
             {/* Event Summary */}
             {selectedEventId && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-md lg:gap-lg px-md md:px-0">
-                <div className="bg-gradient-to-br from-tertiary-container to-tertiary-container-strong rounded-2xl p-lg shadow-lg border border-tertiary/20 flex flex-col gap-md relative overflow-hidden">
+                <div className="bg-tertiary-container rounded-2xl p-lg shadow-lg border border-tertiary/20 flex flex-col gap-md relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                     <span className="material-symbols-outlined text-[100px]">restaurant</span>
                   </div>
@@ -1542,7 +1516,7 @@ export default function Admin() {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-error-container to-error-container-strong rounded-2xl p-lg shadow-lg border border-error/20 flex flex-col gap-md relative overflow-hidden">
+                <div className="bg-error-container rounded-2xl p-lg shadow-lg border border-error/20 flex flex-col gap-md relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                     <span className="material-symbols-outlined text-[100px]">no_meals</span>
                   </div>
@@ -1565,7 +1539,7 @@ export default function Admin() {
             <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col px-md md:px-0 mx-md md:mx-0">
               <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                 <div className="flex flex-col gap-2 w-full md:w-auto">
-                  <h2 className="font-headline-sm text-[18px] text-primary uppercase pr-4 focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Sự Kiện</h2>
+                  <h2 className="text-title-md text-on-surface pr-4 focus:outline-none font-semibold m-0">Danh sách đăng ký sự kiện</h2>
                   <div className="flex items-center gap-2">
                      <span className="font-label-sm text-on-surface-variant font-medium">Sự kiện:</span>
                      <select 
@@ -1651,7 +1625,7 @@ export default function Admin() {
               <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col">
                 <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
                   <div className="flex flex-col gap-2">
-                    <h2 className="font-headline-sm text-[18px] text-primary uppercase focus:outline-none font-black tracking-wide m-0">Danh Sách Đăng Ký Ăn Theo Ngày</h2>
+                    <h2 className="text-title-md text-on-surface focus:outline-none font-semibold m-0">Danh sách đăng ký theo ngày</h2>
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mt-2">
                       <div className="flex items-center gap-2">
                         <span className="font-label-sm text-on-surface-variant font-medium">Tháng:</span>
@@ -2247,7 +2221,7 @@ export default function Admin() {
 
               <div className="p-lg md:p-xl border-b border-outline-variant flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div className="flex flex-col gap-2">
-                  <h2 className="font-headline-sm text-[18px] text-primary uppercase font-black tracking-wide m-0">Nhật Ký Đăng Nhập</h2>
+                  <h2 className="text-title-md text-on-surface font-semibold m-0">Nhật ký đăng nhập</h2>
                   <p className="font-body-md text-on-surface-variant text-[13px]">
                     Mỗi lần đăng nhập bằng tài khoản Microsoft đều được ghi lại, kể cả lần bị từ chối vì sai tên miền.
                   </p>
@@ -2492,7 +2466,7 @@ export default function Admin() {
 
                   <div className="border-t border-outline-variant pt-md mt-md">
                     <h3 className="text-label-md text-on-surface mb-sm">Thêm quản trị viên mới</h3>
-                    <div className="flex flex-col sm:flex-row gap-3 max-w-md">
+                    <div className="flex flex-col sm:flex-row gap-3 max-w-[600px]">
                       <input 
                         type="email" 
                         value={newAdminEmail}

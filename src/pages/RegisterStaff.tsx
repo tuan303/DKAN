@@ -92,34 +92,41 @@ export default function RegisterStaff() {
   };
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md">
+    <div className="min-h-screen bg-background text-on-background flex flex-col">
       <Header />
       
-      {/* Main Content Canvas */}
-      <main className="flex-grow pt-20 md:pt-24 pb-md px-4 md:px-lg flex flex-col items-center justify-center">
-        <div className="w-full max-w-[600px] bg-surface-container-lowest rounded-xl shadow-[0_4px_6px_-1px_rgba(26,54,93,0.05),_0_2px_4px_-1px_rgba(26,54,93,0.03)] border border-surface-variant overflow-hidden flex flex-col">
+      <main className="mx-auto w-full max-w-[680px] flex-grow px-4 pb-8 pt-24 sm:px-6 sm:pb-12 sm:pt-28">
+        <div className="mb-6">
+          <p className="text-xs font-medium text-on-surface-variant">Tài khoản nhà trường / Hồ sơ nhân viên</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">Thông tin nhân viên</h1>
+          <p className="mt-2 text-body-md text-on-surface-variant">Hoàn thiện hồ sơ để đăng ký và theo dõi suất ăn của bạn.</p>
+        </div>
+        <section aria-labelledby="profile-title" aria-busy={loading} className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-xs">
           
-          {/* Form Header */}
-          <div className="p-md md:p-lg border-b border-surface-variant bg-surface-bright">
-            <h2 className="text-headline-md text-on-surface mb-xs">Đăng ký thông tin</h2>
-            <p className="text-body-md text-on-surface-variant italic">Trường Họ tên được mặc định theo Tên hiển thị của Email và không thể chỉnh sửa.</p>
+          <div className="flex items-start gap-3 border-b border-outline-variant p-5 sm:p-6">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-primary" aria-hidden="true">
+              <span className="material-symbols-outlined text-[22px]">manage_accounts</span>
+            </span>
+            <div className="min-w-0">
+              <h2 id="profile-title" className="text-base font-semibold text-on-surface">Hồ sơ đăng ký ăn</h2>
+              <p className="mt-1 text-body-sm text-on-surface-variant">Thông tin dùng để đối chiếu đăng ký và chấm ăn.</p>
+            </div>
           </div>
 
-          {/* Form Body */}
-          <div className="p-md md:p-lg flex flex-col gap-md md:gap-lg">
+          <div className="flex flex-col gap-6 p-5 sm:p-6">
             
             {error && (
-              <div className="bg-error-container text-on-error-container p-sm rounded-lg text-body-md">
+              <div role="alert" className="rounded-lg border border-error/20 bg-error-container p-3 text-body-sm text-on-error-container break-words">
                 {error}
               </div>
             )}
 
             {/* Full Name Field */}
-            <div className="flex flex-col gap-sm">
-              <label htmlFor="fullName" className="text-label-md text-on-surface">Họ tên</label>
+            <div className="flex min-w-0 flex-col gap-2">
+              <label htmlFor="fullName" className="text-sm font-semibold text-on-surface">Họ và tên</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
-                  <span className="material-symbols-outlined text-outline">badge</span>
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[20px] text-on-surface-variant">person</span>
                 </div>
                 <input 
                   type="text" 
@@ -129,17 +136,19 @@ export default function RegisterStaff() {
                   readOnly
                   placeholder="Họ và tên của bạn" 
                   required 
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container border border-outline-variant rounded focus:ring-0 cursor-not-allowed text-body-md text-on-surface-variant transition-shadow" 
+                  aria-describedby="fullName-hint"
+                  className="block min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container py-2.5 pl-10 pr-3 text-body-md text-on-surface-variant focus-visible:outline-2 focus-visible:outline-primary"
                 />
               </div>
+              <p id="fullName-hint" className="text-body-sm text-on-surface-variant">Lấy từ tên hiển thị của email nhà trường, không thể chỉnh sửa tại đây.</p>
             </div>
 
             {/* Employee ID Field */}
-            <div className="flex flex-col gap-sm">
-              <label htmlFor="employeeId" className="text-label-md text-on-surface">Mã nhân viên</label>
+            <div className="flex min-w-0 flex-col gap-2">
+              <label htmlFor="employeeId" className="text-sm font-semibold text-on-surface">Mã nhân viên <span className="text-error" aria-hidden="true">*</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
-                  <span className="material-symbols-outlined text-outline">badge</span>
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[20px] text-on-surface-variant">badge</span>
                 </div>
                 <input
                   type="text"
@@ -157,7 +166,7 @@ export default function RegisterStaff() {
                   required
                   aria-invalid={employeeId.length > 0 && !idValid}
                   aria-describedby="employeeId-hint"
-                  className={`block w-full pl-xl pr-md py-sm bg-surface-container-lowest border rounded focus:ring-2 text-body-md text-on-surface placeholder-outline transition-shadow tabular ${
+                  className={`block min-h-11 w-full rounded-lg border bg-surface-container-lowest py-2.5 pl-10 pr-3 text-body-md text-on-surface placeholder-on-surface-variant transition-shadow focus:outline-none focus:ring-2 tabular ${
                     employeeId.length > 0 && !idValid
                       ? 'border-error focus:ring-error focus:border-error'
                       : 'border-outline-variant focus:ring-primary focus:border-primary'
@@ -175,11 +184,11 @@ export default function RegisterStaff() {
             </div>
             
             {/* Department/Group Field */}
-            <div className="flex flex-col gap-sm">
-              <label htmlFor="department" className="text-label-md text-on-surface">Phòng ban / Tổ khối</label>
+            <div className="flex min-w-0 flex-col gap-2">
+              <label htmlFor="department" className="text-sm font-semibold text-on-surface">Phòng ban / Tổ khối <span className="text-error" aria-hidden="true">*</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none">
-                  <span className="material-symbols-outlined text-outline">domain</span>
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[20px] text-on-surface-variant">domain</span>
                 </div>
                 <select 
                   id="department" 
@@ -187,7 +196,7 @@ export default function RegisterStaff() {
                   required 
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="block w-full pl-xl pr-md py-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-primary focus:border-primary text-body-md text-on-surface appearance-none transition-shadow"
+                  className="block min-h-11 w-full min-w-0 appearance-none rounded-lg border border-outline-variant bg-surface-container-lowest py-2.5 pl-10 pr-9 text-body-md text-on-surface transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="" disabled>Chọn phòng ban / tổ / khối</option>
                   <option value="BAN LÃNH ĐẠO">BAN LÃNH ĐẠO</option>
@@ -226,21 +235,20 @@ export default function RegisterStaff() {
                   <option value="CỘNG TÁC VIÊN">CỘNG TÁC VIÊN</option>
                   <option value="Khác">Khác</option>
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-sm flex items-center pointer-events-none">
-                  <span className="material-symbols-outlined text-outline">arrow_drop_down</span>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3" aria-hidden="true">
+                  <span className="material-symbols-outlined text-[20px] text-on-surface-variant">expand_more</span>
                 </div>
               </div>
             </div>
 
           </div>
 
-          {/* Form Actions */}
-          <div className="p-md md:p-lg border-t border-surface-variant bg-surface-bright flex flex-col-reverse md:flex-row justify-end gap-sm md:gap-md">
+          <div className="flex flex-col-reverse justify-end gap-3 border-t border-outline-variant bg-surface-container-low px-5 py-4 sm:flex-row sm:px-6">
             <button 
               type="button" 
               onClick={() => navigate(loginPath)}
               disabled={loading}
-              className="w-full md:w-auto px-md py-sm bg-surface-container-lowest border border-outline text-label-md text-on-surface rounded hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
+              className="min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               Hủy
             </button>
@@ -248,14 +256,14 @@ export default function RegisterStaff() {
               type="button" 
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full md:w-auto justify-center px-md py-sm bg-primary border border-transparent text-label-md text-on-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center gap-xs disabled:opacity-50"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {loading ? 'Đang lưu...' : 'Tiếp tục'}
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
             </button>
           </div>
           
-        </div>
+        </section>
       </main>
       <Footer />
     </div>

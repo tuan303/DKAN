@@ -39,7 +39,8 @@ flowchart LR
 | `src/pages/ScheduleMonth.tsx` | Đăng ký tháng, báo hủy theo ngày/bữa, email xác nhận, chuyển hủy sang GAS |
 | `src/pages/ScheduleEvent.tsx` | Đọc sự kiện đang mở, đăng ký và email xác nhận |
 | `src/pages/Admin.tsx` | Quản trị đăng ký, thống kê, hủy, sự kiện, vi phạm, cấu hình, quyền và nhật ký |
-| `src/components/AdminWorkspace.tsx` | Tiêu đề/thông tin tài khoản quản trị, 11 chức năng theo nhóm Suất ăn/Dinh dưỡng/Hệ thống, hộp thông tin tài khoản |
+| `src/components/AdminWorkspace.tsx` | Tiêu đề chức năng quản trị, 11 khóa chức năng dùng chung với sidebar, bộ chọn chức năng trên điện thoại |
+| `src/components/SchoolSidebar.tsx`, `Navigation.tsx` | Sidebar theo nhóm, menu điện thoại, tài khoản và đăng xuất; quản trị có đủ 11 chức năng |
 | `src/lib/useCurrentAccount.ts` | Đọc danh tính Auth và hồ sơ nhân viên, bỏ kết quả của phiên đăng nhập cũ; dùng chung cho Header và trang quản trị |
 | `src/components/MealReconciliation.tsx` | Đối soát đăng ký với lượt chấm tự động hoặc Excel HAC; xuất Excel |
 | `src/pages/MyMeals.tsx` | Lịch sử cá nhân của tháng này và hai tháng trước |
@@ -50,7 +51,7 @@ flowchart LR
 | `src/components/SurveyResults.tsx` | Kết quả khảo sát, xu hướng, danh sách chưa trả lời, mở/đóng/gia hạn, xuất Excel |
 | `src/components/SurveyBanner.tsx` | Nhắc người có đăng ký ăn và chưa trả lời khảo sát còn mở |
 | `src/components/Navigation.tsx`, `Header.tsx`, `Footer.tsx`, `src/index.css` | Điều hướng và giao diện dùng chung |
-| `src/pages/Dashboard.tsx` | Trang dashboard; hiện có số liệu mẫu tĩnh |
+| `src/pages/Dashboard.tsx` | Tổng quan cá nhân: thông tin hồ sơ và lối truy cập các chức năng, không dùng số liệu mẫu cố định |
 | `agent/lib/meal-rules.mjs` | Quy tắc suất ăn dùng chung giữa đối soát, lịch sử cá nhân và cảnh báo |
 | `agent/lib/projection.mjs` | Gán lượt chấm theo mã nhân viên trên đơn sang UID tài khoản |
 | `agent/lib/sync-merge.mjs`, `isapi-paging.mjs` | Bảo toàn dữ liệu từng máy, kiểm tra phân trang và độ đầy đủ |
@@ -222,6 +223,10 @@ Cập nhật thực đơn ngày 14/10/2026: bổ sung kiểm thử parser thực
 Cập nhật quyền thực đơn ngày 14/10/2026: kiểm tra Rules API cho thấy rules production của `dkan-4b061` chưa có `weekly_menus`. Đã đối chiếu với rules trong repo, kiểm tra biên dịch không có lỗi, chạy 6 giả lập quyền (hai super admin được đọc/xóa, nhân viên thường không được xóa, người chưa đăng nhập không được đọc) và triển khai ruleset `02b97357-1b95-43fa-b841-44f19764ea59` lúc 15:04:08 giờ Việt Nam. Đã đọc lại release `cloud.firestore` và xác minh nội dung khớp `firestore.rules`; không ghi/xóa thực đơn thật để thử quyền. `src/lib/adminAccess.ts` nay là danh sách quản trị cao nhất dùng chung cho trang quản trị và menu điều hướng, chuẩn hóa email hoa/thường và khoảng trắng; regression test đối chiếu danh sách này với rules. Tổng kiểm thử **161/161 đạt**, TypeScript và build đạt. Khi thay rules, cần triển khai Firebase riêng vì Vercel chỉ triển khai web/API.
 
 Cập nhật giao diện quản trị ngày 14/10/2026: chừa 64px cho Header ở mọi kích thước để tiêu đề không bị che; nhóm menu thành Suất ăn, Dinh dưỡng và Hệ thống, hiển thị đủ 11 chức năng với mô tả và trạng thái chọn. Thông tin tài khoản ưu tiên hồ sơ `staff/{uid}`, dùng danh tính Auth khi hồ sơ chưa có hoặc đọc lỗi, ghi rõ các trường chưa cập nhật; vai trò cao nhất chỉ dựa email Auth. Header nhận cùng hồ sơ từ Admin để không đọc lặp. QA trình duyệt dùng đúng các thành phần với hồ sơ mẫu: 320/360/768/1024/1280/1920px không tràn ngang/cắt menu/che tiêu đề; chọn 11 chức năng, URL/Back, tên/email dài, hộp thông tin/Escape/focus đều đạt. Không thay thao tác ghi dữ liệu nghiệp vụ trong lần chỉnh giao diện này.
+
+Cập nhật toàn bộ giao diện ngày 15/10/2026 theo mẫu ứng dụng Nhân sự nhà trường: sidebar đầy chiều cao, logo đỏ, nền xám sáng/thẻ trắng, hành động xanh và nhãn trạng thái nhẹ. Header chỉ cố định trên điện thoại và trang hồ sơ, các trang nội bộ chừa 256px cho sidebar ở desktop. Đăng nhập, hồ sơ, đăng ký/hủy, sự kiện, chấm ăn, thực đơn, khảo sát và quản trị dùng cùng phong cách. Tổng quan bỏ các số liệu/thực đơn/hạn mẫu cố định; thông tin hồ sơ được đọc từ tài khoản và các thẻ chức năng dẫn tới trang nghiệp vụ. Sidebar có nhóm Cá nhân/Dinh dưỡng/Quản trị; chế độ quản trị chia 11 mục theo nghiệp vụ. Điện thoại dùng 4 nút và drawer chứa toàn bộ chức năng, dialog tài khoản tập trung ở Navigation. Bản nhập thực đơn vẫn giữ khi chuyển mục quản trị. Không thay quy tắc suất ăn, schema Firestore, cấu hình gửi thư hoặc mẫu email.
+
+Kiểm tra lần cập nhật 15/10: TypeScript, build và 161 kiểm thử đều đạt. QA dùng đúng toàn bộ ứng dụng với Firebase giả lập, không kết nối/ghi dữ liệu thật: 9 trang ở 320/768/1280px, 7 trang nội bộ ở 1920px; đủ 11 mục quản trị và bộ chọn trên điện thoại; menu drawer/Escape, dialog tài khoản, bản nháp thực đơn khi chuyển mục đều hoạt động. Đã xử lý tràn ban đầu do font icon chưa tải bằng cách giữ sẵn bề rộng icon. Các bảng lớn vẫn cuộn ngang bên trong khung.
 
 ## 9. Các điểm cần xem xét khi cập nhật
 
