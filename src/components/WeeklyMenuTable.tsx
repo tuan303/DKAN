@@ -14,83 +14,45 @@ const dishLabel = (label: string) => label.charAt(0) + label.slice(1).toLocaleLo
 
 function WeeklyMenuReader({ menu, captionId }: { menu: WeeklyMenu; captionId: string }) {
   const today = vnToday();
-  const initialDay = Math.max(0, menu.days.findIndex(day => day.date === today));
   return (
-    <div className="min-w-0">
-      <div className="md:hidden space-y-3" aria-label={`Thực đơn tuần ${surveyWeekLabel(menu.weekId)}`}>
-        <p className="text-body-sm text-on-surface-variant">Chạm vào từng ngày để xem thực đơn.</p>
+    <section className="min-w-0" aria-labelledby={captionId}>
+      <h2 id={captionId} className="sr-only">Thực đơn tuần {surveyWeekLabel(menu.weekId)}</h2>
+      <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {menu.days.map((day, index) => {
           const isToday = day.date === today;
           return (
-            <details key={`${menu.weekId}-${day.date}`} open={index === initialDay} className={`group rounded-2xl border bg-surface-container-lowest overflow-hidden ${isToday ? 'border-primary/40 shadow-sm' : 'border-outline-variant'}`}>
-              <summary className={`flex min-h-[76px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden ${isToday ? 'bg-primary-container/45' : 'bg-surface-container-low/70'}`}>
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className={`flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-xl ${isToday ? 'bg-brand-navy text-white' : 'border border-outline-variant bg-white text-brand-navy'}`} aria-hidden="true">
-                    <span className="text-[21px] leading-none font-bold tabular">{day.date.slice(8, 10)}</span>
-                    <span className={`mt-1 text-[10px] leading-none ${isToday ? 'text-white/80' : 'text-on-surface-variant'}`}>THÁNG {Number(day.date.slice(5, 7))}</span>
-                  </span>
-                  <span className="min-w-0 flex flex-col gap-1">
-                    <span className="text-label-lg text-brand-navy">Thứ {index + 2}{isToday && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Hôm nay</span>}</span>
-                    <span className="text-body-sm tabular text-on-surface-variant">{formatDate(day.date)}</span>
-                  </span>
-                </span>
-                <span className="material-symbols-outlined text-[20px] text-on-surface-variant transition-transform group-open:rotate-180" aria-hidden="true">expand_more</span>
-              </summary>
-              <div className="border-t border-outline-variant px-4 pb-4 pt-3">
-                <div className="rounded-xl border border-brand-amber/20 bg-brand-cream/45 p-3">
-                  <p className="mb-1.5 flex items-center gap-1.5 text-label-md text-on-warning-container"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">wb_sunny</span>Bữa sáng</p>
-                  <p className="text-body-md font-medium text-on-surface whitespace-pre-wrap break-words">{day.breakfast || '—'}</p>
-                </div>
-                <h3 className="mt-4 mb-3 flex items-center gap-1.5 text-label-md text-brand-navy"><span className="material-symbols-outlined text-[18px]" aria-hidden="true">restaurant</span>Bữa trưa</h3>
-                <dl className="divide-y divide-outline-variant">
-                  {MENU_ROWS.slice(1).map(row => (
-                    <div key={row.key} className="grid grid-cols-[82px_minmax(0,1fr)] gap-3 py-2.5 first:pt-0 last:pb-0">
-                      <dt className="text-body-sm text-on-surface-variant">{dishLabel(row.label)}</dt>
-                      <dd className={`min-w-0 text-body-md text-on-surface whitespace-pre-wrap break-words ${row.key === 'main' ? 'font-semibold' : ''}`}>{day[row.key] || '—'}</dd>
-                    </div>
-                  ))}
-                </dl>
+            <article key={day.date} aria-label={`Thực đơn thứ ${index + 2}, ${formatDate(day.date)}`} className={`min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${isToday ? 'border-indigo-400 ring-1 ring-indigo-200' : 'border-slate-200/80'}`}>
+              <header className="bg-[#6366f1] px-4 py-4 text-center text-white">
+                <h3 className="text-[19px] leading-7 font-bold">Thứ {index + 2}</h3>
+                <p className="mt-0.5 text-[13px] leading-5 tabular text-indigo-100">{formatDate(day.date)}</p>
+                {isToday && <span className="mt-2 inline-flex rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] leading-4 font-semibold">Hôm nay</span>}
+              </header>
+              <div className="p-4">
+                <section className="mb-4 border-b border-slate-100 pb-4" aria-label="Bữa sáng">
+                  <h4 className="mb-2 flex items-center gap-2 text-[14px] leading-5 font-bold text-amber-700">
+                    <span className="material-symbols-outlined shrink-0 text-[19px]" aria-hidden="true">wb_sunny</span>Bữa sáng
+                  </h4>
+                  <p className="min-w-0 pl-[27px] text-[14px] leading-[22px] text-slate-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{day.breakfast || '—'}</p>
+                </section>
+                <section aria-label="Bữa trưa">
+                  <h4 className="mb-3 flex items-center gap-2 text-[14px] leading-5 font-bold text-emerald-700">
+                    <span className="material-symbols-outlined shrink-0 text-[19px]" aria-hidden="true">restaurant</span>Bữa trưa
+                  </h4>
+                  <dl className="space-y-3 text-[13px] leading-[21px] text-slate-700">
+                    {MENU_ROWS.slice(1).map(row => (
+                      <div key={row.key} className="min-w-0 [overflow-wrap:anywhere]">
+                        <dt className="inline font-semibold text-slate-900">{dishLabel(row.label)}: </dt>
+                        <dd className="inline whitespace-pre-wrap break-words">{day[row.key] || '—'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
               </div>
-            </details>
+            </article>
           );
         })}
       </div>
-      <div className="hidden md:block overflow-x-auto rounded-2xl border border-outline-variant bg-white focus-visible:outline-2 focus-visible:outline-primary" tabIndex={0} role="region" aria-labelledby={captionId}>
-        <table className="w-full min-w-[860px] table-fixed border-collapse text-[13px] leading-6 text-on-surface">
-          <caption id={captionId} className="sr-only">Thực đơn tuần {surveyWeekLabel(menu.weekId)}</caption>
-          <colgroup><col className="w-[145px]" />{menu.days.map(day => <col key={day.date} />)}</colgroup>
-          <thead>
-            <tr className="border-b border-outline-variant">
-              <th scope="col" className="bg-surface-container-low p-4 text-left align-middle text-label-md text-on-surface-variant">Bữa ăn<br /><span className="text-body-sm font-normal">& nhóm món</span></th>
-              {menu.days.map((day, index) => {
-                const isToday = day.date === today;
-                return (
-                  <th key={day.date} scope="col" className={`p-4 text-left align-top ${isToday ? 'bg-brand-navy text-white' : 'bg-surface-container-low text-brand-navy'}`}>
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-label-lg">Thứ {index + 2}{isToday && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] leading-4 font-medium">Hôm nay</span>}</span>
-                    <span className={`mt-1 block text-body-sm font-normal tabular ${isToday ? 'text-white/80' : 'text-on-surface-variant'}`}>{formatDate(day.date)}</span>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {MENU_ROWS.map((row, rowIndex) => (
-              <tr key={row.key} className={`border-b last:border-b-0 border-outline-variant ${rowIndex === 0 ? 'bg-brand-cream/30' : 'bg-white'}`}>
-                <th scope="row" className={`p-4 text-left align-top ${rowIndex === 0 ? 'text-on-warning-container' : 'text-brand-navy'}`}>
-                  {rowIndex === 0 ? <span className="flex items-center gap-2 text-label-md"><span className="material-symbols-outlined text-[19px]" aria-hidden="true">wb_sunny</span>Bữa sáng</span> : <>
-                    {rowIndex === 1 && <span className="mb-1 block text-[10px] leading-4 tracking-wider uppercase font-medium text-primary">Bữa trưa</span>}
-                    <span className={rowIndex === 1 ? 'text-label-md' : 'text-body-sm font-medium text-on-surface-variant'}>{dishLabel(row.label)}</span>
-                  </>}
-                </th>
-                {menu.days.map(day => (
-                  <td key={day.date} className={`p-4 align-top whitespace-pre-wrap break-words ${day.date === today ? 'bg-primary/[0.045] border-x border-primary/10' : ''} ${rowIndex <= 1 ? 'font-medium' : ''}`}>{day[row.key] || <span className="text-outline">—</span>}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </section>
   );
 }
 

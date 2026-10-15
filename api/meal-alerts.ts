@@ -503,7 +503,7 @@ const row = (inner: string, padding = '0 28px 18px') => `<tr><td class="px" styl
  */
 function button(href: string, label: string): string {
   const h = esc(href);
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="left">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr><td align="left">
 <!--[if mso]>
 <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="14%" stroke="f" fillcolor="${RED}">
 <w:anchorlock/>
@@ -511,7 +511,7 @@ function button(href: string, label: string): string {
 </v:roundrect>
 <![endif]-->
 <!--[if !mso]><!-- -->
-<a href="${h}" target="_blank" style="background-color:${RED};border-radius:6px;color:#ffffff;display:inline-block;font-family:${FONT};font-size:15px;font-weight:bold;line-height:44px;text-align:center;text-decoration:none;width:240px;-webkit-text-size-adjust:none;">${esc(label)}</a>
+<a href="${h}" target="_blank" style="background-color:${RED};border-radius:6px;color:#ffffff;display:inline-block;font-family:${FONT};font-size:15px;font-weight:bold;line-height:44px;text-align:center;text-decoration:none;width:240px;max-width:100%;-webkit-text-size-adjust:none;">${esc(label)}</a>
 <!--<![endif]-->
 </td></tr></table>`;
 }
@@ -540,6 +540,9 @@ function layout(o: { title: string; preheader: string; heading: string; subheadi
 <title>${esc(o.title)}</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
+  @media only screen and (max-width: 640px) {
+    .weekly-menu-day { max-width: 100% !important; }
+  }
   @media only screen and (max-width: 480px) {
     .px { padding-left: 18px !important; padding-right: 18px !important; }
     .outer { padding: 12px 6px !important; }
@@ -680,7 +683,7 @@ function vnDeadlineLabel(ms: number): string {
  * Thư mời khảo sát, theo mẫu email của Nhóm Dinh dưỡng ("đồng chí" đổi thành
  * "Thầy Cô"). Cùng một thư cho mọi người nhận nên không có lời chào theo tên.
  * Nhãn tuần tính từ mã tuần đã kiểm tra, hạn từ closesAt hoặc hạn mặc định.
- * Bảng thực đơn đúng tuần được dựng bằng mẫu cố định, escape từng ô.
+ * Thẻ thực đơn đúng tuần được dựng bằng mẫu cố định, escape từng món.
  */
 function renderSurveyEmail(weekId: string, closesAt: number | null, appUrl: string, menu: SurveyInvite['menu']): { subject: string; html: string } {
   const weekLabel = surveyWeekLabel(weekId);

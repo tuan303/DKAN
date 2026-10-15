@@ -13,12 +13,21 @@ try {
 }
 
 const WEEK = '2026-10-05';
+const DISH_KEYS = ['breakfast', 'main', 'side', 'vegetable', 'soup', 'rice', 'dessert'];
+const DISH_ROWS = [
+  ['Phở bò', 'Bún bung ✅', 'Bánh khúc', 'Mì chũ nấu thịt, rau cải', 'Miến măng sườn mọc viên'],
+  ['Vịt chiên riềng', 'Thịt nướng xá xíu', 'Cá sốt cà chua thì là', 'Bánh Hamburger kẹp thịt bò\n+ khoai tây chiên', 'Gà chao mắm tỏi'],
+  ['Đậu thịt sốt cà chua', 'Cá chỉ chi rim mặn ngọt', 'Nem rán', 'Trứng ốp la', 'Thịt om chuối đậu'],
+  ['Cải thảo chần sốt dầu hào', 'Su su + cà rốt xào tỏi', 'Bắp cải luộc', 'Salad Rau xanh với sốt dầu dấm kiểu Pháp', 'Củ quả luộc + muối vừng'],
+  ['Canh rau dền nấu thịt băm', 'Canh bầu nấu cua', 'Canh củ quả hầm xương', 'Canh chua', 'Canh rau ngót'],
+  ['Cơm trắng', 'Cơm trắng', 'Cơm trắng', 'Cơm trắng', 'Cơm trắng'],
+  ['Quýt', 'Dưa hấu', 'Caramen', 'Thanh long', 'Sữa chua Vinamilk'],
+];
 const menuFixture = () => ({
   version: 1,
   weekId: WEEK,
   days: ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'].map((date, i) => ({
-    date, breakfast: i === 0 ? 'Phở bò' : 'Bún bung', main: 'Vịt chiên riềng', side: 'Đậu thịt sốt cà chua',
-    vegetable: 'Cải thảo chần sốt dầu hào', soup: 'Canh rau dền nấu thịt bằm', rice: 'Cơm trắng', dessert: 'Quýt',
+    date, ...Object.fromEntries(DISH_KEYS.map((key, row) => [key, DISH_ROWS[row][i]])),
   })),
 });
 
@@ -68,8 +77,9 @@ test('API survey-invite: thực đơn đúng tuần trong thân email và tươn
   };
 
   try {
-    await t.test('bảng năm ngày sau hạn trả lời; email giữ Bcc và liên kết xem thực đơn', async () => {
-      const res = await invoke({ menu: menuFixture() });
+    await t.test('năm thẻ ngày nằm sau CTA và hạn trả lời; email giữ Bcc, liên kết và hỗ trợ mobile/Outlook', async () => {
+      const menu = menuFixture();
+      const res = await invoke({ menu });
       assert.equal(res.code, 200);
       assert.deepEqual(res.body, { results: [{ ok: true, count: 1 }] });
       assert.deepEqual(requests.map(r => r.type), ['token', 'mail']);
@@ -77,13 +87,38 @@ test('API survey-invite: thực đơn đúng tuần trong thân email và tươn
       assert.deepEqual(mail.toRecipients, [{ emailAddress: { address: fixtureEnv.MS_GRAPH_SENDER } }]);
       assert.deepEqual(mail.bccRecipients, [{ emailAddress: { address: 'test-only@hoangmaistarschool.edu.vn' } }]);
       const html = mail.body.content;
-      assert.match(html, /Phở bò/);
-      assert.match(html, /Vịt chiên riềng/);
-      assert.match(html, /05\/10\/2026/);
-      assert.match(html, /09\/10\/2026/);
-      assert.ok(html.indexOf('Thời hạn hoàn thành khảo sát') < html.indexOf('Dưới đây là thực đơn tuần'));
-      assert.ok(html.indexOf('Dưới đây là thực đơn tuần') < html.lastIndexOf('Trân trọng,'));
+      const cards = html.split('<div class="weekly-menu-day"').slice(1);
+      assert.equal(cards.length, 5);
+      for (const [index, day] of menu.days.entries()) {
+        const card = cards[index];
+        assert.match(card, new RegExp(`<h3\\b[^>]*>Thứ ${index + 2}</h3>`));
+        assert.ok(card.includes(`${day.date.slice(8)}/${day.date.slice(5, 7)}/${day.date.slice(0, 4)}`));
+        for (const key of DISH_KEYS) assert.ok(card.includes(day[key].replace(/\n/g, '<br />')), `${day.date}: ${key}`);
+      }
+      const cta = html.indexOf('Tham gia khảo sát');
+      const deadline = html.indexOf('Thời hạn hoàn thành khảo sát');
+      const introduction = html.indexOf('Dưới đây là thực đơn tuần');
+      const firstCard = html.indexOf('<div class="weekly-menu-day"');
+      const signature = html.lastIndexOf('Trân trọng,');
+      assert.ok(cta >= 0 && cta < deadline && deadline < introduction && introduction < firstCard && firstCard < signature);
+      assert.match(html, /@media only screen and \(max-width: 640px\)\s*\{\s*\.weekly-menu-day\s*\{\s*max-width:\s*100% !important;?\s*\}/);
+      assert.match(html, /<!--\[if mso\]><table role="presentation"/);
+      assert.equal((html.match(/<td width="50%" valign="top">/g) || []).length, 6);
+      assert.match(html, /https:\/\/test\.invalid\/khao-sat\?tuan=2026-10-05/);
       assert.match(html, /https:\/\/test\.invalid\/thuc-don\?tuan=2026-10-05/);
+    });
+
+    await t.test('toàn bộ thư với 35 món và ghi chú ở giới hạn escape vẫn dưới 100 KiB', async () => {
+      const menu = menuFixture();
+      for (const day of menu.days) for (const key of DISH_KEYS) day[key] = '"'.repeat(300);
+      menu.note = '"'.repeat(1000);
+      const res = await invoke({ menu });
+      assert.equal(res.code, 200);
+      const html = requests[1].body.message.body.content;
+      const bytes = Buffer.byteLength(html, 'utf8');
+      assert.ok(bytes < 100 * 1024, `HTML toàn bộ thư ${bytes} byte phải dưới 100 KiB`);
+      assert.equal((html.match(/&quot;/g) || []).length, 35 * 300 + 1000);
+      t.diagnostic(`HTML toàn bộ thư có dữ liệu tối đa: ${bytes} byte UTF-8.`);
     });
 
     await t.test('escape HTML trong món ăn/ghi chú và bỏ metadata của tài liệu Firestore', async () => {

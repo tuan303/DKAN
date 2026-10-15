@@ -72,15 +72,15 @@ export default function WeeklyMenu() {
         <header>
           <p className="text-body-sm text-on-surface-variant mb-2">Suất ăn / Dinh dưỡng</p>
           <div className="flex items-start gap-3 md:gap-4">
-            <span className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-navy text-white" aria-hidden="true"><span className="material-symbols-outlined text-[26px]">restaurant_menu</span></span>
+            <span className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600" aria-hidden="true"><span className="material-symbols-outlined text-[26px]">restaurant_menu</span></span>
             <div className="min-w-0">
-              <h1 className="text-[26px] leading-tight font-bold md:text-headline-lg text-brand-navy">Thực đơn hàng tuần</h1>
+              <h1 className="text-[26px] leading-tight font-bold md:text-headline-lg text-indigo-600">Thực đơn hàng tuần</h1>
               <p className="text-body-md text-on-surface-variant mt-2">Bữa sáng và bữa trưa dành cho Cán bộ, Giáo viên, Nhân viên.</p>
             </div>
           </div>
         </header>
-        <section className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-xs">
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-md border-b border-outline-variant bg-surface-container-low/70 p-md md:p-lg">
+        <section className="min-w-0 space-y-5">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-md rounded-2xl border border-outline-variant bg-white p-md md:p-lg shadow-xs">
             <div className="min-w-0">
               <p className="mb-1.5 flex items-center gap-1.5 text-label-sm text-on-surface-variant"><span className="material-symbols-outlined text-[17px] text-primary" aria-hidden="true">date_range</span>Thực đơn trong tuần</p>
               <h2 className="text-[20px] leading-snug font-bold text-brand-navy">{surveyWeekLabel(weekId)}</h2>
@@ -98,7 +98,7 @@ export default function WeeklyMenu() {
               <button type="button" className={`${CONTROL} w-full sm:w-auto !bg-primary-container/60 !border-primary/15`} onClick={() => changeWeek(vnToday())}><span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">today</span>Tuần này</button>
             </div>
           </div>
-          <div className="p-md md:p-lg">
+          <div className="min-w-0">
           {!validLink ? <div role="alert" className="rounded-lg p-4 bg-error-container text-on-error-container"><p>Đường dẫn tuần không hợp lệ. Mã tuần phải là ngày thứ 2 theo dạng YYYY-MM-DD.</p><button type="button" onClick={() => changeWeek(vnToday())} className="underline font-semibold mt-2">Xem thực đơn tuần này</button></div> : (
             <>
               {!authReady || !user || loading || (!error && loadedWeek !== weekId) ? <p role="status" className="p-lg text-center text-on-surface-variant">Đang tải thực đơn…</p> : error ? <div role="alert" className="rounded-lg p-4 bg-error-container text-on-error-container"><p>{error}</p><button type="button" className="underline font-semibold mt-2" onClick={() => setRetry(value => value + 1)}>Thử lại</button></div> : displayMenu && hasMenuContent(displayMenu) ? <><WeeklyMenuTable menu={displayMenu} />{displayMenu.note && <aside className="mt-4 flex items-start gap-2.5 rounded-xl border border-primary/10 bg-primary-container/35 p-4"><span className="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">info</span><p className="min-w-0 text-body-md text-on-surface-variant whitespace-pre-wrap break-words"><span className="font-semibold text-brand-navy">Lưu ý từ Nhóm Dinh dưỡng<br /></span>{displayMenu.note}</p></aside>}</> : <div className="text-center rounded-xl bg-surface-container-low p-lg"><span className="material-symbols-outlined text-[40px] text-outline mb-2" aria-hidden="true">restaurant_menu</span><p className="text-title-md text-on-surface font-semibold">Tuần này chưa có thực đơn</p><p className="text-body-md text-on-surface-variant mt-1">Nhóm Dinh dưỡng sẽ cập nhật thực đơn trên hệ thống.</p></div>}

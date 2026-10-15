@@ -117,7 +117,7 @@ Email lấy địa chỉ từ tài khoản Firebase Authentication. Nhật ký `
 - Nhóm Dinh dưỡng dùng **Quản trị → Thực đơn tuần** (`/quantri?tab=menu`) để tải mẫu Excel, import, xem trước, sửa và lưu bảng thứ 2–6. Nhóm Dinh dưỡng cần tài khoản có quyền quản trị hiện có. Bản đang chỉnh được giữ khi chuyển tab quản trị; chuyển tuần hoặc đóng/tải lại trang có cảnh báo nếu chưa lưu.
 - Bảng có bữa sáng và sáu mục bữa trưa theo mẫu. Mỗi document `weekly_menus/{weekId}` có `version: 1`, năm phần tử `days` từ thứ 2 đến thứ 6, ghi chú và metadata người/thời gian cập nhật. Chỉ lưu văn bản món ăn; file Excel được đọc tại trình duyệt.
 - Nhân viên đã đăng nhập xem tại `/thuc-don`; link `/thuc-don?tuan=YYYY-MM-DD` mở đúng tuần. File import phải có các ngày khớp tuần đang chọn.
-- Agent khảo sát đọc thực đơn đúng tuần và chuyển dữ liệu đã kiểm tra vào request `survey-invite`. API dựng bảng HTML có escape nội dung để hiển thị ngay trong email, kèm link xem trên web.
+- Agent khảo sát đọc thực đơn đúng tuần và chuyển dữ liệu đã kiểm tra vào request `survey-invite`. API dựng các thẻ ngày bằng HTML có escape nội dung để hiển thị ngay trong email, kèm link xem trên web.
 - Chưa có thực đơn thì vẫn gửi khảo sát với link xem; lỗi đọc hoặc document hỏng thì dừng trước gửi. Thư cũ giữ bảng ở thời điểm gửi, web hiển thị bản cập nhật mới.
 - Triển khai cần cập nhật web/API, Firestore rules và script khảo sát + `agent/lib/` trên PC HAC; không phát sinh biến môi trường mới.
 
@@ -241,6 +241,10 @@ Ba danh sách quản trị đăng ký tháng/ngày/hủy ăn dùng `MobileDataTa
 Theo yêu cầu khôi phục, Login lấy lại trình bày trước đợt đổi giao diện từ `1d792721^` (ảnh trường bên trái, logo và đăng nhập navy/đỏ bên phải). Mobile một cột cuộn tự nhiên, không khóa chiều cao/cắt nội dung. Toàn bộ phần xác thực, nhật ký, kiểm tra email và `safeNextPath` giữ nguyên.
 
 Kiểm chứng: TypeScript/build đạt, 161 kiểm thử nghiệp vụ đạt. QA ứng dụng thật với Firebase giả lập và chặn ghi/API: 9 trang cộng 2 mục quản trị tại 320/390px; 7 trang nghiệp vụ tại 768/1280px; Login và thực đơn tại 320/390/768/1280/1920px không tràn ngang. Đã kiểm tra lọc danh sách/thẻ/bảng, lịch ngày hủy, radio khảo sát 56px và tiến độ, menu tìm kiếm, Escape/khôi phục cuộn, hộp tài khoản giữ nút đóng, mở thẻ ngày và giữ đủ 7×5 món. Ảnh xem trước của các trang nội bộ dùng dữ liệu minh họa; không gửi thư hoặc ghi dữ liệu thật.
+
+Cập nhật theo mẫu `thuc_don.html` ngày 15/10/2026: phần xem thực đơn dùng thẻ trắng cho từng ngày, tiêu đề tím chàm, nhãn bữa sáng vàng và bữa trưa xanh; hiển thị đủ ngày, tên món và sáu nhóm món trưa. Màn hình lớn xếp 5 ngày, màn hình vừa 2–3 cột, điện thoại 1 cột. Email khảo sát dùng cùng cách trình bày với 2 cột trong khung thư 600px và 1 cột trên điện thoại; CSS nội tuyến, bảng điều kiện cho Outlook desktop, không cần JavaScript, Tailwind CDN hoặc font icon ngoài. Nội dung vẫn được escape, giữ xuống dòng và bẻ link tự động trong tên món/ghi chú. Mẫu Excel, cấu trúc Firestore, 35 ô nhập, lịch gửi và người nhận không đổi. Phần dựng HTML nằm tại API, nên triển khai web/API là đủ cho máy HAC đã có agent hỗ trợ truyền thực đơn; không cần phát hành lại ZIP agent chỉ vì thay giao diện email. Bản xem trước không gửi thư thật.
+
+Kiểm chứng mẫu thẻ ngày: 165/165 kiểm thử đạt, bao gồm đủ 35 món đúng ngày, ô trống, xuống dòng, escape, liên kết và Bcc qua Graph giả lập; HTML toàn bộ thư với dữ liệu dài tối đa vẫn dưới 100 KiB. QA trình duyệt dùng trang thực đơn thật và Firebase giả tại 320/390/768/1280/1920px: đủ 7×5 món, chuyển tuần và 35 ô nhập hoạt động; món/ghi chú dài không tràn ngang. Email xem trước tại 320/390/560/900px và bản bỏ CSS đầu thư tại 320px không tràn; nút khảo sát tự co theo bề rộng ngay cả khi ứng dụng thư bỏ media query. Chưa kiểm tra trực tiếp bằng ứng dụng Outlook; chỉ kiểm tra cấu trúc HTML dự phòng và bản dựng trong trình duyệt. Không gửi thư hoặc ghi dữ liệu thật.
 
 ## 9. Các điểm cần xem xét khi cập nhật
 

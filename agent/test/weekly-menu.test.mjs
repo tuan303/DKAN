@@ -216,22 +216,64 @@ test('giới hạn file và ô; import chỉ nhận món có nội dung và lo�
   }
 });
 
-test('HTML email giống mẫu, giữ món và ngày, escape XSS và bẻ link tự động', () => {
+test('HTML email giữ đủ năm thẻ ngày, bảy nhóm món và ngắt dòng theo mẫu', () => {
+  const html = renderWeeklyMenuEmail(parseWeeklyMenuRows(sheet()));
+  const cards = html.split('<div class="weekly-menu-day"').slice(1);
+  assert.equal(cards.length, 5);
+  for (const [index, card] of cards.entries()) {
+    assert.match(card, new RegExp(`<h3\\b[^>]*>Thứ ${index + 2}</h3>`));
+    assert.ok(card.includes(DATE_LABELS[index]), `đủ ngày ${DATE_LABELS[index]}`);
+    assert.match(card, /Bữa sáng/);
+    assert.match(card, /Bữa trưa/);
+    for (const label of ['Món chính:', 'Món phụ:', 'Món rau:', 'Món canh:', 'Cơm:', 'Tráng miệng:']) {
+      assert.ok(card.includes(label), `đủ nhãn ${label} ngày ${DATE_LABELS[index]}`);
+    }
+    let previousPosition = -1;
+    for (const row of DISHES) {
+      const dish = row[index].replace(/\n/g, '<br />');
+      const position = card.indexOf(dish);
+      assert.ok(position > previousPosition, `giữ món và thứ tự ${row[index]} ngày ${DATE_LABELS[index]}`);
+      previousPosition = position;
+    }
+  }
+  assert.match(html, /Tuần từ 05\/10\/2026 – 09\/10\/2026/);
+  assert.match(html, /display:inline-block;width:100%;max-width:286px/);
+  assert.match(html, /<!--\[if mso\]><table role="presentation"/);
+  assert.equal((html.match(/<td width="50%" valign="top">/g) || []).length, 6, 'Outlook có ba hàng, mỗi hàng hai ô');
+  assert.doesNotMatch(html, /<script\b|<link\b|display:(?:grid|flex)|rowspan=/);
+});
+
+test('HTML email escape XSS, giữ ngắt dòng và bẻ link tự động', () => {
   const menu = parseWeeklyMenuRows(sheet());
   menu.days[0].breakfast = '<img src=x onerror="alert(1)"> & \'bò\'\nhttps://example.com';
   menu.note = '<script>alert(1)</script> WWW.example.com';
   const html = renderWeeklyMenuEmail(menu);
-  assert.match(html, /05\/10 – 09\/10\/2026/);
-  assert.match(html, /09\/10\/2026/);
-  assert.match(html, /THỨ 6/);
-  assert.match(html, /rowspan="6"/);
-  assert.match(html, /ĂN TRƯA/);
-  assert.match(html, /MÓN CHÍNH/);
-  assert.match(html, /background-color:#fce7d1/);
-  assert.match(html, /background-color:#d6e9f7/);
-  assert.match(html, /Bún bung ✅/);
   assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; &#39;bò&#39;<br \/>https\[:\]\/\/example\.com/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt; WWW\[\.\]example\.com/);
   assert.doesNotMatch(html, /<img|<script|<a\b|https:\/\//);
   assert.throws(() => renderWeeklyMenuEmail({ ...menu, version: 2 }), /Phiên bản/);
+});
+
+test('HTML email giữ ô trống ở đúng ngày và nhóm món, không lẫn undefined/null', () => {
+  const menu = createEmptyMenu(WEEK);
+  menu.days[0].breakfast = 'Phở bò';
+  const cards = renderWeeklyMenuEmail(menu).split('<div class="weekly-menu-day"').slice(1);
+  assert.equal(cards.length, 5);
+  for (const [index, card] of cards.entries()) {
+    assert.equal((card.match(/>—<\/p>|<\/strong> —<\/p>/g) || []).length, index === 0 ? 6 : 7);
+    assert.equal(card.includes('Phở bò'), index === 0);
+    assert.doesNotMatch(card, /undefined|null/);
+  }
+});
+
+test('HTML thực đơn ở giới hạn ký tự vẫn nằm trong ngân sách 90 KiB sau escape', t => {
+  const menu = createEmptyMenu(WEEK);
+  // Dấu ngoặc kép tăng thành sáu byte &quot;: lớn hơn chữ Việt ba byte.
+  for (const day of menu.days) for (const row of MENU_ROWS) day[row.key] = '"'.repeat(300);
+  menu.note = '"'.repeat(1000);
+  const html = renderWeeklyMenuEmail(menu);
+  const bytes = Buffer.byteLength(html, 'utf8');
+  assert.ok(bytes < 90 * 1024, `HTML thực đơn ${bytes} byte phải dưới 90 KiB`);
+  assert.equal((html.match(/&quot;/g) || []).length, 35 * 300 + 1000);
+  t.diagnostic(`HTML thực đơn có dữ liệu tối đa: ${bytes} byte UTF-8.`);
 });

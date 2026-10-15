@@ -271,21 +271,40 @@ const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 const displayText = text => escapeHtml(text).replace(/:\/\//g, '[:]//').replace(/\b(www)\./gi, '$1[.]').replace(/\n/g, '<br />');
 const dateLabel = date => `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
 
-/** HTML email theo mẫu Nhóm Dinh dưỡng, chỉ nhận văn bản và luôn escape. @param {unknown} value */
+/** Thẻ ngày theo mẫu HTML của Nhóm Dinh dưỡng; chỉ nhận văn bản và luôn escape. @param {unknown} value */
 export function renderWeeklyMenuEmail(value) {
   const menu = normalizeWeeklyMenu(value);
-  const border = 'border:1px solid #555;padding:6px 4px;text-align:center;vertical-align:middle;';
-  const peach = 'background-color:#fce7d1;';
-  const blue = 'background-color:#d6e9f7;';
-  const headings = menu.days.map((day, index) => `<th style="${border}${peach}" scope="col">THỨ ${index + 2}<br /><span style="font-size:11px">${dateLabel(day.date)}</span></th>`).join('');
-  const body = MENU_ROWS.map((row, index) => {
-    const meal = index === 0
-      ? `<th colspan="2" style="${border}${blue}color:#0755b5;" scope="row">ĂN SÁNG</th>`
-      : `${index === 1 ? `<th rowspan="6" style="${border}${peach}color:#0755b5;" scope="rowgroup">ĂN TRƯA</th>` : ''}<th style="${border}${peach}color:#bf2525;font-style:italic;" scope="row">${row.label}</th>`;
-    const dishes = menu.days.map(day => `<td style="${border}${index === 0 ? blue : ''}">${displayText(day[row.key]) || '&nbsp;'}</td>`).join('');
-    return `<tr>${meal}<td style="${border}${index === 0 ? blue : peach}">${index === 0 ? 1 : index}</td>${dishes}</tr>`;
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  const copy = `${font}font-size:14px;line-height:22px;color:#334155;word-wrap:break-word;overflow-wrap:anywhere;`;
+  const cards = menu.days.map((day, index) => {
+    const dishes = MENU_ROWS.slice(1).map(row => {
+      const label = row.label.charAt(0) + row.label.slice(1).toLocaleLowerCase('vi');
+      return `<p style="margin:0 0 10px;${copy}"><strong style="color:#0f172a;">${label}:</strong> ${displayText(day[row.key]) || '—'}</p>`;
+    }).join('');
+    // Modern clients wrap the fluid columns naturally. Outlook desktop uses
+    // these conditional table cells instead, retaining a two-column layout.
+    const before = index === 0 ? '<!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;"><tr><td width="50%" valign="top"><![endif]-->'
+      : index % 2 === 0 ? '<!--[if mso]></td></tr><tr><td width="50%" valign="top"><![endif]-->'
+        : '<!--[if mso]></td><td width="50%" valign="top"><![endif]-->';
+    return before + `<div class="weekly-menu-day" style="display:inline-block;width:100%;max-width:286px;vertical-align:top;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr><td style="padding:0 6px 14px;vertical-align:top;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border:1px solid #e2e8f0;border-radius:16px;border-collapse:separate;border-spacing:0;table-layout:fixed;background-color:#ffffff;">
+<tr><td bgcolor="#6366f1" align="center" style="padding:16px 12px;background-color:#6366f1;border-radius:14px 14px 0 0;">
+<h3 style="margin:0;${font}font-size:20px;line-height:26px;font-weight:bold;color:#ffffff;">Thứ ${index + 2}</h3>
+<p style="margin:4px 0 0;${font}font-size:13px;line-height:20px;color:#e0e7ff;">${dateLabel(day.date)}</p></td></tr>
+<tr><td style="padding:18px 16px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+<tr><td style="padding:0 0 14px;border-bottom:1px solid #e2e8f0;">
+<p style="margin:0 0 6px;${font}font-size:14px;line-height:22px;font-weight:bold;color:#b45309;">&#9728; &nbsp;Bữa sáng</p>
+<p style="margin:0;${copy}">${displayText(day.breakfast) || '—'}</p></td></tr>
+<tr><td style="padding:14px 0 0;">
+<p style="margin:0 0 10px;${font}font-size:14px;line-height:22px;font-weight:bold;color:#047857;">&#127860; &nbsp;Bữa trưa</p>
+${dishes}</td></tr></table></td></tr></table></td></tr></table></div>`;
   }).join('');
-  return `<p style="margin:20px 0 12px;font-family:Arial,sans-serif;"><strong>Dưới đây là thực đơn tuần ${surveyWeekLabel(menu.weekId)} để CBGV-NV tham khảo và đóng góp ý kiến.</strong></p>`
-    + `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:12px;line-height:1.4;table-layout:fixed;"><thead><tr><th colspan="2" style="${border}${peach}">BỮA ĂN / LOẠI MÓN</th><th style="${border}${peach}width:26px;">No</th>${headings}</tr></thead><tbody>${body}</tbody></table>`
-    + (menu.note ? `<p style="font-family:Arial,sans-serif;font-size:12px;margin:10px 0;"><strong>Ghi chú:</strong> ${displayText(menu.note)}</p>` : '');
+  const end = '<!--[if mso]></td><td width="50%" valign="top"></td></tr></table><![endif]-->';
+  return `<h2 style="margin:20px 6px 6px;text-align:center;${font}font-size:23px;line-height:30px;color:#4f46e5;">Thực đơn hàng tuần</h2>`
+    + `<p style="margin:0 6px 12px;text-align:center;${font}font-size:14px;line-height:22px;color:#64748b;">Tuần từ ${dateLabel(menu.days[0].date)} – ${dateLabel(menu.days[4].date)}</p>`
+    + `<p style="margin:0 6px 16px;${font}font-size:13px;line-height:21px;color:#64748b;">Dưới đây là thực đơn tuần ${surveyWeekLabel(menu.weekId)} để CBGV-NV tham khảo và đóng góp ý kiến.</p>`
+    + `<div style="font-size:0;line-height:0;text-align:left;">${cards}${end}</div>`
+    + (menu.note ? `<p style="margin:2px 6px 10px;padding:12px;background-color:#f8fafc;border-left:3px solid #6366f1;${copy}"><strong>Ghi chú:</strong> ${displayText(menu.note)}</p>` : '');
 }
