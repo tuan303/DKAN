@@ -232,6 +232,8 @@ Tối ưu thao tác quản trị ngày 15/10/2026: `/quantri` mặc định mở
 
 QA tối ưu menu dùng ứng dụng thật với Firebase giả lập và chặn mọi thao tác ghi/API: đủ 12 điểm đến (Tổng quan + 11 chức năng) trên desktop 1280px và điện thoại 320px; tìm không dấu/hoa và không có kết quả; chuyển Cá nhân/Quản trị ở 768px; cuộn tới mục cuối ở màn hình 1024×600; menu/Escape, lối tắt thực đơn, và giữ bản nháp sau đổi tháng đều đạt. Không tràn ngang. TypeScript, build và 161 kiểm thử đạt. Ảnh xem trước dùng hồ sơ mẫu.
 
+Sửa bố cục đăng nhập ngày 15/10/2026: `max-w-lg/md` trong Tailwind nhận các token spacing tùy chỉnh, khiến tiêu đề/mô tả chỉ rộng 24/16px. Đổi riêng hai giới hạn này thành 512/448px rõ ràng và ghi chú cạnh cấu hình spacing để tránh tái diễn. TypeScript/build đạt; kiểm tra trình duyệt bản build tại 320/390/768/1024/1280/1920px xác nhận chiều rộng văn bản đúng, tiêu đề hai dòng và không tràn ngang. Không đổi hoặc thực hiện luồng đăng nhập Microsoft.
+
 ## 9. Các điểm cần xem xét khi cập nhật
 
 Đây là các khác biệt nhìn thấy trong mã nguồn, chưa được sửa trong lần khảo sát. Cần đối chiếu yêu cầu nghiệp vụ khi xử lý:

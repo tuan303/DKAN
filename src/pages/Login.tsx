@@ -86,10 +86,10 @@ export default function Login() {
             <span className="h-2 w-2 rounded-full bg-secondary" aria-hidden="true" />
             Dành cho Cán bộ, Giáo viên và Nhân viên
           </span>
-          <h1 className="mt-5 max-w-lg text-3xl font-bold leading-tight tracking-tight text-on-surface sm:text-4xl">
+          <h1 className="mt-5 max-w-[512px] text-3xl font-bold leading-tight tracking-tight text-on-surface sm:text-4xl">
             Đăng ký suất ăn<br className="hidden sm:block" /> tại nhà trường
           </h1>
-          <p className="mt-4 max-w-md text-body-lg text-on-surface-variant">
+          <p className="mt-4 max-w-[448px] text-body-lg text-on-surface-variant">
             Chủ động đăng ký bữa ăn, xem thực đơn và theo dõi lịch sử chấm ăn trong cùng một hệ thống.
           </p>
           <div className="mt-8 hidden space-y-5 lg:block">

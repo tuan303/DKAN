@@ -114,6 +114,8 @@
   --shadow-lg: 0 4px 8px -2px rgb(35 50 140 / 0.10), 0 12px 24px -4px rgb(35 50 140 / 0.10);
   --shadow-xl: 0 8px 16px -4px rgb(35 50 140 / 0.12), 0 24px 48px -8px rgb(35 50 140 / 0.14);
 
+  /* Tailwind also uses spacing names for max-w-*; use explicit max widths
+     for content/cards instead of max-w-sm/md/lg/xl with these custom tokens. */
   --spacing-unit: 4px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
