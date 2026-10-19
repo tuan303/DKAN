@@ -92,6 +92,8 @@ export interface MyMealsViewProps {
   /** Đang tải lại ngầm, dữ liệu cũ vẫn hiện trên màn hình. */
   refreshing?: boolean;
   error: ViewError | null;
+  /** Tải lại lỗi nhưng vẫn còn dữ liệu đã tải để xem. */
+  refreshError?: ViewError | null;
   onRetry?: () => void;
   onReload?: () => void;
   /** Hồ sơ staff/{uid}; null nghĩa là Thầy/Cô chưa khai báo thông tin nhân viên. */
@@ -764,7 +766,7 @@ function LegendCard() {
 }
 
 export function MyMealsView(props: MyMealsViewProps) {
-  const { loading, error, onRetry, profile, todayIso, sync, conflict, missedSyncAt } = props;
+  const { loading, error, refreshError, onRetry, profile, todayIso, sync, conflict, missedSyncAt } = props;
   const failedDevices = sync ? sync.devices.filter(d => !d.ok) : [];
   const syncBroken = !!sync && (sync.lastRunComplete === false || failedDevices.length > 0);
   const currentMonth = todayIso.slice(0, 7);
@@ -825,6 +827,14 @@ export function MyMealsView(props: MyMealsViewProps) {
         </div>
       ) : (
         <>
+          {refreshError && (
+            <Banner tone="warning" icon="cloud_off">
+              <p>
+                Chưa tải được dữ liệu mới. {refreshError.detail} Trang vẫn hiển thị ngày hiện tại và dữ liệu đã tải;
+                lượt chấm mới có thể chưa xuất hiện. Vui lòng bấm Tải lại để cập nhật.
+              </p>
+            </Banner>
+          )}
           {(showMissed || syncBroken || conflict || currentMismatch || !profile) && (
             <div className="flex flex-col gap-sm">
               {/* Máy HAC tắt hoặc tác vụ hẹn giờ hỏng thì không có lần chạy nào
@@ -1182,11 +1192,11 @@ export default function MyMeals() {
   const [months, setMonths] = useState<Record<string, MonthData>>({});
   const [error, setError] = useState<ViewError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // "Hôm nay" và "bây giờ" chốt tại lúc tải để cả trang dùng cùng một mốc;
-  // mỗi lần tải lại (bấm nút hoặc tự động) thì lấy mốc mới.
-  const [todayIso, setTodayIso] = useState(() => vnToday());
+  // Ngày hiện tại chạy độc lập với dữ liệu: một lượt đọc Firestore chậm hoặc
+  // lỗi không được giữ thẻ "Hôm nay" ở ngày cũ. Cả trang dùng cùng một đồng hồ.
   const [now, setNow] = useState(() => new Date());
-  const [month, setMonth] = useState(() => vnToday().slice(0, 7));
+  const todayIso = vnParts(now)!.date;
+  const [month, setMonth] = useState(() => todayIso.slice(0, 7));
 
   // Mỗi lượt tải mang một số thứ tự; kết quả của lượt cũ hơn (tải lại chồng
   // lên nhau, đổi tháng giữa chừng) bị bỏ để không đè dữ liệu mới.
@@ -1208,18 +1218,23 @@ export default function MyMeals() {
         navigate(`/login?next=${SELF_PATH}`, { replace: true });
       }
     });
-    return () => unsubscribe();
+    return () => {
+      // Rời trang thì request cũ không được ghi kết quả hoặc tải tiếp qua ngày.
+      generation.current += 1;
+      unsubscribe();
+    };
   }, [navigate]);
 
   // Dữ liệu chung + tháng hiện tại (thẻ Hôm nay luôn cần tháng này) + tháng
   // đang xem. Lần đầu (và Thử lại sau lỗi) thì xoá trắng, hiện vòng tải; tải
   // lại thì giữ dữ liệu cũ trên màn hình tới khi có dữ liệu mới.
   const load = useCallback(
-    async (mode: LoadMode) => {
+    async function reloadMeals(mode: LoadMode) {
       if (!uid) return;
       const gen = ++generation.current;
       inFlight.current = true;
       const n = new Date();
+      setNow(n);
       const p = vnParts(n) ?? { date: vnToday(), time: '00:00' };
       const t = p.date;
       const current = t.slice(0, 7);
@@ -1241,25 +1256,30 @@ export default function MyMeals() {
         ]);
         if (gen !== generation.current) return;
         loadedAt.current = { day: t, time: p.time, at: n.getTime() };
-        setTodayIso(t);
-        setNow(n);
         // Không ép về `sel`: Thầy/Cô có thể vừa bấm sang tháng khác trong lúc
         // đang tải; tháng đó (nếu chưa có) sẽ được tải riêng ở effect bên dưới.
-        setMonth(prev => (recentMonths(t).includes(prev) ? prev : current));
+        setMonth(prev => {
+          const day = vnToday();
+          return recentMonths(day).includes(prev) ? prev : day.slice(0, 7);
+        });
         setBase(b);
         setMonths(other ? { [current]: cur, [sel]: other } : { [current]: cur });
         setError(null);
       } catch (e) {
         if (gen !== generation.current) return;
         console.error('Không tải được dữ liệu chấm ăn:', e);
-        // Tự tải lại mà lỗi (vd mạng điện thoại chưa kịp bật lại khi mở lại
-        // tab): giữ dữ liệu đang hiện, lần kiểm tra sau thử lại — trừ khi đã
-        // sang ngày mới, vì khi đó thẻ "Hôm nay" đang hiện ngày hôm qua.
-        if (mode !== 'auto' || loadedAt.current?.day !== t) setError(toViewError(e));
+        // Nếu đã có dữ liệu, báo lỗi tải lại ngay trên trang thay vì che cả
+        // thẻ Hôm nay. Ngày mới vẫn hiện và bữa chưa có dữ liệu vẫn chưa chốt.
+        setError(toViewError(e));
       } finally {
         if (gen === generation.current) {
           inFlight.current = false;
           setRefreshing(false);
+          // Request có thể chạy qua nửa đêm. Không lấy ngày chụp lúc bắt đầu
+          // để kéo đồng hồ lùi lại; tải tiếp ngày/tháng mới ngay khi hoàn tất.
+          const latest = new Date();
+          setNow(latest);
+          if (vnParts(latest)?.date !== t) void reloadMeals('auto');
         }
       }
     },
@@ -1273,10 +1293,11 @@ export default function MyMeals() {
   // Tự tải lại khi trang để mở lâu (xem needsRefresh). Kiểm tra mỗi phút chỉ
   // là so giờ, không đọc Firestore; chỉ khi cần mới tải.
   useEffect(() => {
-    if (!uid) return;
     const check = (trigger: 'visible' | 'tick') => {
-      if (document.visibilityState !== 'visible' || inFlight.current || !loadedAt.current) return;
-      if (needsRefresh(loadedAt.current, new Date(), trigger)) void load('auto');
+      const at = new Date();
+      setNow(at);
+      if (!uid || document.visibilityState !== 'visible' || inFlight.current || !loadedAt.current) return;
+      if (needsRefresh(loadedAt.current, at, trigger)) void load('auto');
     };
     const onVisible = () => check('visible');
     const timer = window.setInterval(() => check('tick'), 60_000);
@@ -1291,6 +1312,16 @@ export default function MyMeals() {
       window.removeEventListener('pageshow', onVisible);
     };
   }, [uid, load]);
+
+  // Khi sang tháng, đi theo tháng mới nếu đang xem tháng hiện tại; giữ nguyên
+  // lựa chọn nếu Thầy/Cô chủ động xem lịch sử. Không chờ tải dữ liệu xong.
+  const previousCurrentMonth = useRef(todayIso.slice(0, 7));
+  useEffect(() => {
+    const current = todayIso.slice(0, 7);
+    const previous = previousCurrentMonth.current;
+    previousCurrentMonth.current = current;
+    setMonth(selected => selected === previous || !recentMonths(todayIso).includes(selected) ? current : selected);
+  }, [todayIso]);
 
   // Tháng cũ chỉ tải khi Thầy/Cô bấm chọn.
   useEffect(() => {
@@ -1394,7 +1425,8 @@ export default function MyMeals() {
       <MyMealsView
         loading={!error && !computed}
         refreshing={refreshing}
-        error={error}
+        error={base ? null : error}
+        refreshError={base ? error : null}
         onRetry={() => void load('initial')}
         onReload={() => void load('manual')}
         profile={base?.profile ?? null}
