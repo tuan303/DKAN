@@ -7,6 +7,7 @@ import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import { SurveyBanner } from '../components/SurveyBanner';
+import { personalHistoryDates } from '../lib/mealHistory';
 import {
   MEALS,
   MEAL_LABEL,
@@ -18,7 +19,6 @@ import {
   formatVnDateTime,
   isUsableId,
   isWeekday,
-  mealDaysOfMonth,
   normId,
   toMinutes,
   vnParts,
@@ -258,7 +258,7 @@ function summarize(days: DayView[]) {
         if (code === 'pending' && hold === 'conflict') c.conflictHeld++;
       }
     }
-    c.unrecognized += d.unrecognized.length;
+    if (!d.offDay) c.unrecognized += d.unrecognized.length;
   }
   // "Bữa đã đăng ký" = những bữa đáng lẽ phải ăn, đúng định nghĩa expected của agent.
   return { ...c, registered: c.ok + c.missing + c.pending + c.expired };
@@ -361,7 +361,7 @@ function TodayCard({
             <div className="flex flex-col gap-1.5 min-w-0">
               <StatusChip status={today.result.meals.lunch} size="lg" />
               <p className="text-body-md text-on-surface-variant">
-                Hôm nay không có suất ăn (thứ 7, Chủ nhật hoặc ngày nghỉ của trường).
+                Hôm nay không tính suất ăn tháng. Lượt chấm dưới đây chỉ để tham khảo, không tính vi phạm.
               </p>
               {/* Ngày nghỉ mà máy vẫn ghi nhận lượt chấm trong khung (vd. đi làm
                   bù): vẫn cho Thầy/Cô thấy, chỉ là không tính suất. */}
@@ -479,6 +479,7 @@ function DayRow({ day: { result: day, hold }, registration, isToday }: { day: Da
       <div className="@[20rem]:col-span-2 @xl:col-span-1 flex flex-wrap items-center gap-2 @xl:pt-1">
         <span className="text-label-lg text-on-surface tabular">{formatDayLabel(day.date)}</span>
         {isToday && <span className="px-2 py-0.5 rounded-full bg-primary text-on-primary text-label-sm">Hôm nay</span>}
+        {day.offDay && <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-label-sm">Tham khảo · không tính suất tháng</span>}
       </div>
       {MEALS.map(meal => {
         const status = day.meals[meal];
@@ -583,7 +584,7 @@ function HistoryCard({
       <div className="p-md md:p-lg border-b border-outline-variant flex flex-col @2xl:flex-row @2xl:items-center justify-between gap-md">
         <div>
           <h3 id="mm-history-title" className="text-headline-sm text-on-surface">Lịch sử chấm ăn</h3>
-          <p className="text-body-sm text-on-surface-variant mt-0.5">Các ngày có suất ăn trong tháng, mới nhất ở trên.</p>
+          <p className="text-body-sm text-on-surface-variant mt-0.5">Ngày ăn thường và ngày nghỉ có lượt chấm, mới nhất ở trên.</p>
         </div>
         <div role="group" aria-label="Chọn tháng" className="grid grid-cols-3 gap-1 p-1 bg-surface-container rounded-lg w-full @2xl:w-auto">
           {monthOptions.map(m => (
@@ -1394,8 +1395,7 @@ export default function MyMeals() {
     const monthData = sel
       ? {
           registration: sel.registration,
-          days: mealDaysOfMonth(month, base.offDays, month === currentMonth ? todayIso : undefined)
-            .reverse()
+          days: personalHistoryDates(month, base.offDays, sel.taps, todayIso)
             .map(d => viewDay(d, sel)),
           conflict: conflictOf(sel),
           closedFrom: base.closedFrom,

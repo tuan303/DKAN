@@ -96,6 +96,10 @@ Route được khai báo tại `src/App.tsx`: `/login`, `/register`, `/schedule`
 6. Quản trị đối soát đăng ký, báo hủy, ngày nghỉ và lượt chấm. Người dùng chỉ đọc lượt chấm của UID mình trên trang `/cham-an`.
 7. Excel HAC vẫn là nguồn nhập dự phòng trong tab đối soát; nhập Excel không thay thế công việc đồng bộ cá nhân của agent.
 
+### Tra cứu lượt chấm ngày nghỉ / ăn sự kiện
+
+Ngày nghỉ hoặc ngày ăn sự kiện khai trong `settings/mealOffDays` vẫn được đồng bộ từ máy để tra cứu. Trang **Chấm ăn của tôi** hiển thị thêm ngày nghỉ thực sự có lượt chấm với nhãn tham khảo; **Đối soát chấm ăn** có bảng riêng “Lượt chấm ngày nghỉ / ăn sự kiện”. Các lượt này không cộng vào tổng suất tháng hoặc danh sách vi phạm, không thay đổi quy tắc gửi cảnh báo. Quản trị có nút tải lại dữ liệu đồng bộ ngay trên trang.
+
 ### Email cảnh báo
 
 Sau đồng bộ, nếu chạy với `--send-alerts`, agent xác định người đã đăng ký nhưng thiếu lượt chấm. Agent kiểm tra giờ gửi, dữ liệu đủ máy, ngày có suất ăn, mã trùng/loại trừ, báo hủy và các ngưỡng bất thường trước khi gửi.

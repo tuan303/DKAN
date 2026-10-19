@@ -9,7 +9,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { evaluatePersonDay, mealDaysOfMonth } from '../agent/lib/meal-rules.mjs';
 
 const require = createRequire(import.meta.url);
-let MyMealsView;
+let MyMealsView, personalHistoryDates;
 
 test.before(async () => {
   const compiled = await build({
@@ -30,6 +30,13 @@ test.before(async () => {
   const module = { exports: {} };
   new Function('require', 'module', 'exports', compiled.outputFiles[0].text)(require, module, module.exports);
   ({ MyMealsView } = module.exports);
+  const history = await build({
+    entryPoints: [fileURLToPath(new URL('../src/lib/mealHistory.ts', import.meta.url))],
+    bundle: true, write: false, platform: 'node', format: 'cjs', logLevel: 'silent',
+  });
+  const historyModule = { exports: {} };
+  new Function('module', 'exports', history.outputFiles[0].text)(historyModule, historyModule.exports);
+  ({ personalHistoryDates } = historyModule.exports);
 });
 
 const todayIso = '2026-10-19';
@@ -73,4 +80,35 @@ test('lỗi lần tải đầu vẫn hiển thị lỗi và nút Thử lại', (
   assert.match(html, /Không kết nối được máy chủ/);
   assert.match(html, />Thử lại</);
   assert.doesNotMatch(html, /id="mm-today-title"/);
+});
+
+test('lịch sử bao gồm ngày nghỉ và cuối tuần có lượt chấm, không thêm ngày trống hoặc tương lai', () => {
+  const dates = personalHistoryDates('2026-10', ['2026-10-19', '2026-10-20'], {
+    '2026-10-19': ['12:23'], '2026-10-18': ['15:00'], '2026-10-17': [],
+    '2026-10-20': ['12:00'], '2026-09-30': ['12:00'], '2026-10-99': ['12:00'],
+    '2026-10-19bad': ['12:00'],
+  }, todayIso);
+  assert.equal(dates[0], todayIso);
+  assert.ok(dates.includes('2026-10-18'));
+  for (const invalid of ['2026-10-17', '2026-10-20', '2026-09-30', '2026-10-99', '2026-10-19bad']) assert.ok(!dates.includes(invalid));
+  assert.equal(dates.length, new Set(dates).size);
+  assert.ok(dates.includes('2026-10-16'), 'ngày ăn thường chưa có lượt chấm vẫn xuất hiện');
+});
+
+test('ngày ăn sự kiện hiện giờ chấm để tham khảo nhưng không tăng tổng suất tháng hoặc vi phạm', () => {
+  const reference = {
+    hold: null,
+    result: evaluatePersonDay({ date: todayIso, registration, offDays: [todayIso], times: ['12:23', '15:00'], now: new Date('2026-10-19T15:49:00+07:00') }),
+  };
+  const html = render({
+    today: { ...reference, registration },
+    monthData: { registration, days: [reference], conflict: null, closedFrom: null },
+  });
+  assert.match(html, /Thứ 2, 19\/10/);
+  assert.match(html, /12:23/);
+  assert.match(html, /Tham khảo · không tính suất tháng/);
+  assert.match(html, /không tính vi phạm/);
+  assert.match(html, /Tính trên <strong class="tabular">0<\/strong> bữa/);
+  assert.doesNotMatch(html, /<strong class="tabular">1<\/strong> lượt chấm ngoài khung giờ/);
+  assert.equal(reference.result.meals.lunch.code, 'off_day');
 });

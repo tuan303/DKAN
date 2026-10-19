@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as xlsx from 'xlsx';
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { filterReferenceCheckins, referenceCheckinDates, referenceCheckinRows } from '../lib/mealReference';
 // Quy tắc suất ăn (khung giờ, chuẩn hoá mã NV, ai đáng lẽ phải ăn, ngày nghỉ,
 // giờ Việt Nam) dùng chung với trang "Chấm ăn của tôi" và agent gửi email cảnh
 // báo. Không viết lại quy tắc ở file này: lệch một chỗ là quản trị thấy "đã
@@ -520,6 +521,104 @@ function pageList(current: number, total: number): (number | '…')[] {
   return out;
 }
 
+/** Lượt chấm thực tế của ngày nghỉ/ăn sự kiện: chỉ xem, không đối soát suất tháng. */
+export function OffDayCheckinsReference({ byDate, offDays, registrations, excludedIds, today = vnToday() }: {
+  byDate: ParsedFile['byDate'];
+  offDays: string[];
+  registrations: Registration[];
+  excludedIds: string[];
+  today?: string;
+}) {
+  const dates = useMemo(() => referenceCheckinDates(byDate, offDays, today), [byDate, offDays, today]);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const date = dates.includes(selectedDate) ? selectedDate : dates[0] || '';
+  const { rows, excludedCount } = useMemo(
+    () => referenceCheckinRows(byDate[date] || {}, registrations, excludedIds),
+    [byDate, date, registrations, excludedIds],
+  );
+  const visible = useMemo(() => filterReferenceCheckins(rows, search), [rows, search]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / 50));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * 50;
+  const pageRows = visible.slice(start, start + 50);
+  useEffect(() => { setPage(1); }, [date, search]);
+  if (!dates.length) return null;
+
+  return (
+    <section aria-labelledby="offday-reference-title" className="rounded-xl border border-primary/20 bg-surface-container-lowest overflow-hidden">
+      <div className="p-md bg-primary-container/30 border-b border-primary/15 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 id="offday-reference-title" className="text-headline-sm text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary" aria-hidden="true">event_available</span>
+            Lượt chấm ngày nghỉ / ăn sự kiện
+          </h3>
+          <p className="text-body-sm text-on-surface-variant mt-1">
+            Chỉ tham khảo, không tính vào suất ăn tháng hoặc vi phạm.
+          </p>
+        </div>
+        <label className="flex flex-col gap-1 text-label-sm text-on-surface-variant shrink-0">
+          Ngày có lượt chấm
+          <select aria-label="Ngày xem lượt chấm tham khảo" value={date} onChange={event => { setSelectedDate(event.target.value); setSearch(''); setPage(1); }}
+            className="min-h-11 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-body-md text-primary font-bold outline-none focus:ring-2 focus:ring-primary/30">
+            {dates.map(day => <option key={day} value={day}>{formatDayLabel(day)}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="p-md flex flex-col gap-3">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-body-sm text-on-surface-variant">
+          <span><strong className="text-on-surface tabular">{rows.length}</strong> người có giờ chấm</span>
+          <span>Sáng: <strong className="text-on-surface tabular">{rows.filter(row => row.breakfast).length}</strong> người</span>
+          <span>Trưa: <strong className="text-on-surface tabular">{rows.filter(row => row.lunch).length}</strong> người</span>
+        </div>
+        <p className="text-body-sm text-on-surface-variant">
+          Giờ chấm theo bữa: hiển thị lượt sớm nhất trong khung giờ sáng/trưa; các giờ ngoài khung được liệt kê riêng.
+          {' '}Đây là dữ liệu máy nhận diện, chưa phải kết quả đối soát đăng ký ăn sự kiện.
+        </p>
+        {excludedCount > 0 && <p className="text-body-sm text-on-surface-variant">Đã loại {excludedCount} mã theo quy tắc loại lượt chấm công Bếp Vina như đối soát suất tháng.</p>}
+        <label className="relative block sm:max-w-[360px]">
+          <span className="sr-only">Tìm người trong lượt chấm tham khảo</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-on-surface-variant" aria-hidden="true">search</span>
+          <input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Tìm mã NV hoặc họ tên..."
+            className="w-full min-h-11 rounded-lg border border-outline-variant bg-surface pl-10 pr-3 text-body-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+        </label>
+      </div>
+      <div className="hidden lg:grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-3 px-md py-2 bg-surface-container-low text-label-sm uppercase text-on-surface-variant" aria-hidden="true">
+        <span>Nhân sự</span><span>Bữa sáng</span><span>Bữa trưa</span><span>Ngoài khung giờ</span>
+      </div>
+      <ol className="divide-y divide-outline-variant max-h-[440px] overflow-y-auto">
+        {pageRows.map(row => (
+          <li key={row.employeeId} className="p-md grid grid-cols-2 lg:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-x-3 gap-y-2 text-body-sm hover:bg-surface-container-low">
+            <div className="col-span-2 lg:col-span-1 min-w-0">
+              <p className="font-bold text-on-surface break-words">{row.name || '(Không có tên trên máy)'}</p>
+              <p className="text-on-surface-variant"><span className="tabular">{row.employeeId}</span>{row.department && ` · ${row.department}`}</p>
+            </div>
+            {(['breakfast', 'lunch'] as const).map(meal => (
+              <div key={meal}>
+                <span className="block lg:sr-only text-label-sm text-on-surface-variant mb-1">{MEAL_LABEL[meal]}</span>
+                <span className={`inline-flex rounded-md px-2 py-1 tabular ${row[meal] ? 'bg-primary-container/50 text-on-primary-container font-bold' : 'text-on-surface-variant'}`}>{row[meal] || '—'}</span>
+              </div>
+            ))}
+            <div className="col-span-2 lg:col-span-1 text-on-surface-variant">
+              <span className="lg:sr-only">Ngoài khung giờ: </span><span className="tabular break-words">{row.unrecognized.join(', ') || '—'}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {visible.length === 0 && <p className="p-md text-body-sm text-on-surface-variant">{search.trim() ? 'Không tìm thấy người khớp với nội dung tìm kiếm.' : 'Không có lượt chấm sau khi áp dụng danh sách loại trừ.'}</p>}
+      <div className="border-t border-outline-variant p-sm flex flex-wrap items-center gap-2 text-body-sm text-on-surface-variant">
+        <span role="status">{visible.length ? `${start + 1}–${Math.min(start + 50, visible.length)} / ${visible.length} người` : '0 người'}</span>
+        {totalPages > 1 && <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={() => setPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} aria-label="Trang tham khảo trước" className="min-h-11 min-w-11 rounded-lg border border-outline-variant disabled:opacity-40 hover:bg-surface-container">‹</button>
+          <span className="tabular">{currentPage} / {totalPages}</span>
+          <button type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} aria-label="Trang tham khảo sau" className="min-h-11 min-w-11 rounded-lg border border-outline-variant disabled:opacity-40 hover:bg-surface-container">›</button>
+        </div>}
+      </div>
+    </section>
+  );
+}
+
 export function MealReconciliation({
   registrations,
   cancelations,
@@ -539,6 +638,8 @@ export function MealReconciliation({
   const [syncInfo, setSyncInfo] = useState<CheckinSync | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const loadedMonth = useRef<string | null>(null);
 
   const parsed = source === 'auto' ? autoData : fileData;
   const excludedIds = source === 'auto' ? savedExcludes : (fileData?.excludedIds || []);
@@ -630,14 +731,16 @@ export function MealReconciliation({
         };
         setAutoData({ ...built, fileName: syncedLabel ? `Đồng bộ tự động · ${syncedLabel}` : 'Đồng bộ tự động' });
         setAutoState('ready');
-        pickDefaultDates(built, off);
+        // Tải lại cùng tháng không thay ngày/khoảng ngày quản trị đang xem.
+        if (loadedMonth.current !== selectedMonth) pickDefaultDates(built, off);
+        loadedMonth.current = selectedMonth;
       } catch (err) {
         console.error('Không dựng được dữ liệu chấm ăn đã đồng bộ:', err);
         setAutoState('error');
       }
     })();
     return () => { cancelled = true; };
-  }, [selectedMonth]);
+  }, [selectedMonth, reloadVersion]);
   const [scope, setScope] = useState<'day' | 'range' | 'month'>('day');
   const [selectedDate, setSelectedDate] = useState('');
   const [rangeFrom, setRangeFrom] = useState('');
@@ -884,6 +987,7 @@ export function MealReconciliation({
         </div>
 
         <div className="p-md flex flex-col gap-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex rounded-lg border border-outline-variant overflow-hidden w-fit">
             {([['auto', 'Tự động từ máy chấm công', 'sync'], ['file', 'Tải file Excel', 'upload_file']] as const).map(([s, label, icon]) => (
               <button
@@ -897,6 +1001,12 @@ export function MealReconciliation({
                 {label}
               </button>
             ))}
+          </div>
+          {source === 'auto' && <button type="button" onClick={() => setReloadVersion(version => version + 1)} disabled={autoState === 'loading'} aria-busy={autoState === 'loading'}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-label-md text-primary hover:bg-primary-container/30 disabled:opacity-50">
+            <span className={`material-symbols-outlined text-[18px] ${autoState === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true">{autoState === 'loading' ? 'progress_activity' : 'refresh'}</span>
+            {autoState === 'loading' ? 'Đang tải dữ liệu...' : 'Tải lại dữ liệu'}
+          </button>}
           </div>
 
           {source === 'auto' && syncInfo && <SyncHealthStrip sync={syncInfo} offDays={offDays} />}
@@ -933,7 +1043,7 @@ export function MealReconciliation({
           {source === 'auto' && autoState === 'error' && (
             <div className="p-md rounded-lg bg-error-container text-on-error-container text-body-md flex items-start gap-2">
               <span className="material-symbols-outlined text-[20px] shrink-0">error</span>
-              <span>Không đọc được dữ liệu đã đồng bộ. Nếu vừa cập nhật Firestore Rules, hãy tải lại trang.</span>
+              <span>Chưa tải được dữ liệu mới. Dữ liệu đã tải (nếu có) vẫn đang hiển thị. Bấm Tải lại dữ liệu để thử lại.</span>
             </div>
           )}
 
@@ -1002,6 +1112,8 @@ export function MealReconciliation({
                   </span>
                 )}
               </div>
+
+              {!monthMismatch && <OffDayCheckinsReference byDate={parsed.byDate} offDays={offDays} registrations={registrations} excludedIds={excludedIds} />}
 
               {monthMismatch && (
                 <div className="p-sm rounded-lg bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
