@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as xlsx from 'xlsx';
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { ReconciliationMonthPicker } from './ReconciliationMonthPicker';
 import { filterReferenceCheckins, referenceCheckinDates, referenceCheckinRows } from '../lib/mealReference';
 // Quy tắc suất ăn (khung giờ, chuẩn hoá mã NV, ai đáng lẽ phải ăn, ngày nghỉ,
 // giờ Việt Nam) dùng chung với trang "Chấm ăn của tôi" và agent gửi email cảnh
@@ -623,10 +624,18 @@ export function MealReconciliation({
   registrations,
   cancelations,
   selectedMonth,
+  onMonthChange,
+  registrationDataReady,
+  registrationDataError,
+  onReloadRegistrations,
 }: {
   registrations: Registration[];
   cancelations: Cancelation[];
   selectedMonth: string;
+  onMonthChange: (month: string) => void;
+  registrationDataReady: boolean;
+  registrationDataError: string | null;
+  onReloadRegistrations: () => void;
 }) {
   const [source, setSource] = useState<'auto' | 'file'>('auto');
   const [fileData, setFileData] = useState<ParsedFile | null>(null);
@@ -641,7 +650,9 @@ export function MealReconciliation({
   const [reloadVersion, setReloadVersion] = useState(0);
   const loadedMonth = useRef<string | null>(null);
 
-  const parsed = source === 'auto' ? autoData : fileData;
+  // A previous month can remain in memory while its replacement is loading.
+  // Keep it out of the view, including error/empty states of the new month.
+  const parsed = source === 'auto' ? (autoData?.month === selectedMonth ? autoData : null) : fileData;
   const excludedIds = source === 'auto' ? savedExcludes : (fileData?.excludedIds || []);
 
   // Nhận danh sách ngày nghỉ qua tham số thay vì đọc state: lúc vừa tải xong,
@@ -815,17 +826,19 @@ export function MealReconciliation({
   );
 
   const monthMismatch = !!parsed && parsed.month !== selectedMonth;
+  const comparisonReady = registrationDataReady && !registrationDataError && !monthMismatch
+    && (source !== 'auto' || autoState !== 'loading');
 
   const activeDates = useMemo(() => {
     // Lệch tháng thì không đối soát: so lượt chấm tháng này với đăng ký tháng
     // khác chỉ ra số rác, thà không hiện gì còn hơn hiện số sai.
-    if (!parsed || monthMismatch) return [];
+    if (!parsed || !comparisonReady) return [];
     if (scope === 'month') return dates;
     if (scope === 'day') return selectedDate ? [selectedDate] : [];
     if (!rangeFrom || !rangeTo) return [];
     const [from, to] = rangeFrom <= rangeTo ? [rangeFrom, rangeTo] : [rangeTo, rangeFrom];
     return dates.filter(d => d >= from && d <= to);
-  }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo, monthMismatch]);
+  }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo, comparisonReady]);
 
   const result = useMemo(
     () => reconcile({
@@ -920,6 +933,7 @@ export function MealReconciliation({
   ];
 
   const handleExport = () => {
+    if (!parsed || !comparisonReady) return;
     const sheet = (rows: Row[], withTime: boolean, withNote = false) =>
       xlsx.utils.json_to_sheet(
         rows.map((r, i) => {
@@ -987,6 +1001,7 @@ export function MealReconciliation({
         </div>
 
         <div className="p-md flex flex-col gap-md">
+          <ReconciliationMonthPicker selectedMonth={selectedMonth} onMonthChange={onMonthChange} />
           <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex rounded-lg border border-outline-variant overflow-hidden w-fit">
             {([['auto', 'Tự động từ máy chấm công', 'sync'], ['file', 'Tải file Excel', 'upload_file']] as const).map(([s, label, icon]) => (
@@ -1002,11 +1017,11 @@ export function MealReconciliation({
               </button>
             ))}
           </div>
-          {source === 'auto' && <button type="button" onClick={() => setReloadVersion(version => version + 1)} disabled={autoState === 'loading'} aria-busy={autoState === 'loading'}
+          <button type="button" onClick={() => { setReloadVersion(version => version + 1); onReloadRegistrations(); }} disabled={autoState === 'loading'} aria-busy={autoState === 'loading'}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-label-md text-primary hover:bg-primary-container/30 disabled:opacity-50">
             <span className={`material-symbols-outlined text-[18px] ${autoState === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true">{autoState === 'loading' ? 'progress_activity' : 'refresh'}</span>
             {autoState === 'loading' ? 'Đang tải dữ liệu...' : 'Tải lại dữ liệu'}
-          </button>}
+          </button>
           </div>
 
           {source === 'auto' && syncInfo && <SyncHealthStrip sync={syncInfo} offDays={offDays} />}
@@ -1021,10 +1036,16 @@ export function MealReconciliation({
             </div>
           )}
 
-          {source === 'auto' && autoState === 'loading' && (
-            <div className="p-md rounded-lg bg-surface-container text-on-surface-variant text-body-md flex items-center gap-2">
+          {!registrationDataError && (!registrationDataReady || source === 'auto' && autoState === 'loading') && (
+            <div role="status" className="p-md rounded-lg bg-surface-container text-on-surface-variant text-body-md flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
-              Đang lấy dữ liệu chấm ăn đã đồng bộ...
+              Đang tải đăng ký, hủy ăn và lượt chấm tháng {selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}...
+            </div>
+          )}
+
+          {registrationDataError && (
+            <div role="alert" className="p-md rounded-lg bg-error-container text-on-error-container text-body-md">
+              {registrationDataError} Bấm Tải lại dữ liệu để thử lại. Kết quả đối soát và xuất Excel tạm dừng cho đến khi tải đủ dữ liệu cùng tháng.
             </div>
           )}
 
@@ -1113,7 +1134,7 @@ export function MealReconciliation({
                 )}
               </div>
 
-              {!monthMismatch && <OffDayCheckinsReference byDate={parsed.byDate} offDays={offDays} registrations={registrations} excludedIds={excludedIds} />}
+              {comparisonReady && <OffDayCheckinsReference byDate={parsed.byDate} offDays={offDays} registrations={registrations} excludedIds={excludedIds} />}
 
               {monthMismatch && (
                 <div className="p-sm rounded-lg bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
@@ -1121,12 +1142,13 @@ export function MealReconciliation({
                   <span>
                     Dữ liệu là tháng <strong>{parsed.month.slice(5)}/{parsed.month.slice(0, 4)}</strong> nhưng danh sách đăng ký
                     đang xem là tháng <strong>{selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}</strong>.
-                    <strong> Đã tạm dừng đối soát</strong> để không đưa ra con số sai — vui lòng đổi tháng ở tab
-                    ĐK ăn hàng tháng cho khớp.
+                    <strong> Đã tạm dừng đối soát</strong> để không đưa ra con số sai — vui lòng chọn lại
+                    <strong> Tháng đối soát</strong> ở phía trên cho khớp với file.
                   </span>
                 </div>
               )}
 
+              {comparisonReady && <>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex rounded-lg border border-outline-variant overflow-hidden">
                   {([['day', 'Theo ngày'], ['range', 'Khoảng ngày'], ['month', 'Cả tháng']] as const).map(([s, label]) => (
@@ -1272,12 +1294,13 @@ export function MealReconciliation({
                   );
                 })}
               </div>
+              </>}
             </>
           )}
         </div>
       </div>
 
-      {parsed && openedCard && (
+      {parsed && comparisonReady && openedCard && (
         <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
           <div className="p-md border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
             <span className="material-symbols-outlined text-on-surface-variant">{openedCard.icon}</span>

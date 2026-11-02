@@ -174,9 +174,15 @@ export default function Admin() {
 
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const currentDate = new Date();
-  const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthStr = vnToday().slice(0, 7);
   
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr); 
+  // Tag both registration inputs with their month. Checkins can load sooner
+  // than either snapshot when switching months; never compare mixed months.
+  const [monthlyDataStatus, setMonthlyDataStatus] = useState({
+    month: '', registrations: false, cancelations: false, error: null as string | null,
+  });
+  const [monthlyReloadVersion, setMonthlyReloadVersion] = useState(0);
   const [selectedDay, setSelectedDay] = useState(currentDate.getDate());
   const [selectedEventId, setSelectedEventId] = useState('');
   
@@ -304,14 +310,26 @@ export default function Admin() {
   }, [navigate]);
 
   useEffect(() => {
+    let cancelled = false;
     let cancelUnsubscribe: any = null;
     let registrationsUnsubscribe: any = null;
 
     const setupRealtimeListeners = async () => {
+      let subscriptionsStarted = false;
       setLoading(true);
+      setRegistrations([]);
+      setCancelations([]);
+      setMonthlyDataStatus({ month: selectedMonth, registrations: false, cancelations: false, error: null });
+      const failMonthLoad = () => {
+        if (cancelled) return;
+        setMonthlyDataStatus(status => status.month === selectedMonth
+          ? { ...status, error: 'Chưa tải được đăng ký hoặc danh sách hủy ăn của tháng đã chọn.' } : status);
+        setLoading(false);
+      };
       try {
         const q = query(collection(db, 'registrations'), where('month', '==', selectedMonth));
         registrationsUnsubscribe = onSnapshot(q, (querySnapshot) => {
+          if (cancelled) return;
           const regData: RegistrationData[] = [];
           querySnapshot.forEach((doc) => {
             const data = doc.data() as RegistrationData;
@@ -323,10 +341,12 @@ export default function Admin() {
             regData.push({ id: doc.id, ...data });
           });
           setRegistrations(regData);
-        });
+          setMonthlyDataStatus(status => status.month === selectedMonth ? { ...status, registrations: true } : status);
+        }, failMonthLoad);
 
         const cancelQ = query(collection(db, 'cancel_registrations'));
         cancelUnsubscribe = onSnapshot(cancelQ, (cancelSnapshot) => {
+          if (cancelled) return;
           const cancelData: any[] = [];
           
           const d1 = new Date();
@@ -355,24 +375,28 @@ export default function Admin() {
             }
           });
           setCancelations(cancelData);
+          setMonthlyDataStatus(status => status.month === selectedMonth ? { ...status, cancelations: true } : status);
           setGlobalCancelStats({
              todayStr: `${String(d1.getDate()).padStart(2,'0')}/${String(d1.getMonth()+1).padStart(2,'0')}/${d1.getFullYear()}`,
              todayCount: tC, todayBreakfast: tB, todayLunch: tL,
              tomorrowStr: `${String(d2.getDate()).padStart(2,'0')}/${String(d2.getMonth()+1).padStart(2,'0')}/${d2.getFullYear()}`,
              tomorrowCount: tmC, tomorrowBreakfast: tmB, tomorrowLunch: tmL
           });
-        });
+        }, failMonthLoad);
 
+        subscriptionsStarted = true;
         const adminsSnapshot = await getDocs(collection(db, 'admins'));
+        if (cancelled) return;
         const adminData: AdminData[] = [];
         adminsSnapshot.forEach((doc) => {
           adminData.push({ id: doc.id, ...doc.data() } as AdminData);
         });
         setAdmins(adminData);
       } catch (err) {
+        if (!subscriptionsStarted) failMonthLoad();
         console.error('Error fetching admin data:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -382,10 +406,11 @@ export default function Admin() {
     }
 
     return () => {
+      cancelled = true;
       if (cancelUnsubscribe) cancelUnsubscribe();
       if (registrationsUnsubscribe) registrationsUnsubscribe();
     };
-  }, [selectedMonth, isAdmin]);
+  }, [selectedMonth, isAdmin, monthlyReloadVersion]);
 
   const fetchBlockedEmails = async () => {
     try {
@@ -1115,12 +1140,12 @@ export default function Admin() {
       <main id="admin-content" tabIndex={-1} className="flex-1 max-w-[1440px] w-full min-w-0 mx-auto px-3 py-6 sm:px-6 lg:p-8 flex flex-col gap-5 md:gap-6 outline-none">
         <AdminWorkspace activeTab={activeTab} onTabChange={setActiveTab} account={account} />
 
-        {loading && <div role="status" className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
+        {loading && activeTab !== 'reconcile' && <div role="status" className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
           <span className="material-symbols-outlined animate-spin text-[24px] text-primary" aria-hidden="true">progress_activity</span>
           Đang tải dữ liệu tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}…
         </div>}
         {/* Keep tab instances mounted during month reloads, including an unsaved menu draft. */}
-        <div hidden={loading} inert={loading} aria-busy={loading} className="min-w-0">
+        <div hidden={loading && activeTab !== 'reconcile'} inert={loading && activeTab !== 'reconcile'} aria-busy={loading} className="min-w-0">
         {activeTab === 'overview' && <AdminOverview />}
 
         {activeTab === 'monthly' && (
@@ -1830,6 +1855,11 @@ export default function Admin() {
             registrations={registrations}
             cancelations={cancelations}
             selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            registrationDataReady={monthlyDataStatus.month === selectedMonth
+              && monthlyDataStatus.registrations && monthlyDataStatus.cancelations && !monthlyDataStatus.error}
+            registrationDataError={monthlyDataStatus.month === selectedMonth ? monthlyDataStatus.error : null}
+            onReloadRegistrations={() => setMonthlyReloadVersion(version => version + 1)}
           />
         )}
 
