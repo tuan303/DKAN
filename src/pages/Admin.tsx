@@ -9,6 +9,7 @@ import { Header } from '../components/Header';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
+import MealCheckinExemptions from '../components/MealCheckinExemptions';
 import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
 import { AdminWorkspace } from '../components/AdminWorkspace';
@@ -1599,6 +1600,7 @@ export default function Admin() {
               </div>
             )}
 
+
             {/* Event Registration List */}
             <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden flex flex-col px-md md:px-0 mx-md md:mx-0">
               <div className="p-lg md:p-xl border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest flex-col md:flex-row gap-4">
@@ -1861,6 +1863,19 @@ export default function Admin() {
             registrationDataError={monthlyDataStatus.month === selectedMonth ? monthlyDataStatus.error : null}
             onReloadRegistrations={() => setMonthlyReloadVersion(version => version + 1)}
           />
+        )}
+
+        {activeTab === 'exemptions' && (
+          <div className="px-md md:px-0">
+              {/* Đơn đăng ký tháng đang chọn đã tải sẵn ở trên: dùng để gợi ý khớp mã/email, không đọc thêm Firestore. */}
+              <MealCheckinExemptions
+                registrations={registrations}
+                selectedMonth={selectedMonth}
+                registrationsReady={monthlyDataStatus.month === selectedMonth && monthlyDataStatus.registrations}
+                registrationsError={monthlyDataStatus.month === selectedMonth ? monthlyDataStatus.error : null}
+                showToast={showToast}
+              />
+          </div>
         )}
 
         {activeTab === 'settings' && (

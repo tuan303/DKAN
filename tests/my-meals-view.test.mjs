@@ -53,6 +53,18 @@ const props = () => ({
 });
 const render = overrides => renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MyMealsView, { ...props(), ...overrides })));
 
+test('personal view labels lunch exemption and includes it in the registered meal total', () => {
+  const reg = { ...registration, employeeId: '100001', email: 'sample@hoangmaistarschool.edu.vn' };
+  const result = evaluatePersonDay({ date: todayIso, registration: reg, coverageAt: '2026-10-19T08:00:00Z',
+    now: new Date('2026-10-19T08:00:00Z'), checkinExemptions: [{ employeeId: '100001', email: reg.email,
+      fullName: 'Tài khoản kiểm thử', periods: [{ from: todayIso, to: null }] }] });
+  const value = { result, hold: null };
+  const html = render({ today: { ...value, registration: reg }, monthData: { registration: reg, days: [value], conflict: null, closedFrom: null } });
+  assert.match(html, /Miễn chấm ăn/);
+  assert.match(html, /Tính trên <strong class="tabular">2<\/strong> bữa/);
+  assert.equal(result.meals.breakfast.code, 'missing');
+});
+
 test('ngày 19/10 vẫn hiện ở Hôm nay và đầu lịch sử khi chưa có dữ liệu máy', () => {
   const html = render({});
   assert.match(html, /id="mm-today-title"/);

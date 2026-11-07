@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import * as xlsx from 'xlsx';
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ReconciliationMonthPicker } from './ReconciliationMonthPicker';
 import { filterReferenceCheckins, referenceCheckinDates, referenceCheckinRows } from '../lib/mealReference';
+import { agentSupports } from '../lib/agentFeatures';
+import {
+  exemptionQuarantine,
+  parseCheckinExemptionDocs,
+  type CheckinExemption,
+  type InvalidCheckinExemption,
+} from '../../agent/lib/checkin-exemptions.mjs';
 // Quy tắc suất ăn (khung giờ, chuẩn hoá mã NV, ai đáng lẽ phải ăn, ngày nghỉ,
 // giờ Việt Nam) dùng chung với trang "Chấm ăn của tôi" và agent gửi email cảnh
 // báo. Không viết lại quy tắc ở file này: lệch một chỗ là quản trị thấy "đã
@@ -98,20 +106,47 @@ interface DeviceHealth {
   lastOkAt?: string | null;
 }
 
-interface AlertDay {
+/**
+ * Kết quả gửi thư "chấm nhưng chưa đăng ký" của MỘT ngày ăn. Agent xử lý nhóm
+ * này ở lần chạy cảnh báo của NGÀY CÓ SUẤT ĂN KẾ TIẾP (cần dữ liệu cả ngày đã
+ * chốt), rồi ghi vào alerts[ngày đó].extra. Chỉ có số đếm, không có danh tính.
+ */
+export interface ExtraAlertDay {
+  status?: AlertStatus;
+  at?: string;
+  /** Số người đã xác định được tài khoản để gửi. */
+  candidates?: number;
+  sent?: number;
+  failed?: number;
+  /** Đã gọi gửi nhưng chưa xác nhận kết quả — không tự thử lại. */
+  uncertain?: number;
+  /** Mã có lượt chấm nhưng không gắn được với đúng một tài khoản — không gửi. */
+  unmapped?: number;
+  /** Có đăng ký ăn sự kiện ngày đó — không gửi. */
+  eventSkipped?: number;
+  reason?: string | null;
+}
+
+export interface AlertDay {
   status?: AlertStatus;
   at?: string;
   sent?: number;
   failed?: number;
+  /** Đếm cả suất được miễn chấm; người còn phải chấm = expected − exempt. */
   expected?: { breakfast?: number; lunch?: number };
   missing?: { breakfast?: number; lunch?: number };
+  /** Suất đã đăng ký được miễn chấm (agent có hỗ trợ miễn chấm mới ghi). */
+  exempt?: { breakfast?: number; lunch?: number };
   reason?: string | null;
   /** Chốt an toàn đã dừng gửi vì dữ liệu ngày này đáng ngờ — chưa được kết luận. */
   held?: boolean;
+  extra?: ExtraAlertDay;
 }
 
-interface CheckinSync {
+export interface CheckinSync {
   agentVersion?: string;
+  /** Tính năng agent đang chạy hỗ trợ, vd. ['checkinExemptions', 'extraAlerts']. */
+  agentFeatures?: unknown;
   lastRunAt?: string;
   lastRunComplete?: boolean;
   lastCompleteAt?: string | null;
@@ -297,6 +332,101 @@ async function loadSyncInfo(): Promise<CheckinSync | null> {
   }
 }
 
+// ------------------------------------------------------- danh sách miễn chấm
+
+/** Danh sách miễn chấm đã đọc: bản ghi hợp lệ, bản ghi lỗi (kèm lý do) và lúc đọc (ms). */
+export type ExemptionList = { policies: CheckinExemption[]; invalid: InvalidCheckinExemption[]; loadedAt: number };
+
+/** Trạng thái danh sách miễn chấm của tab. Không bao giờ chặn đối soát hay xuất Excel. */
+export type ExemptionLoad =
+  | { status: 'loading' }
+  | ({ status: 'ready' } & ExemptionList)
+  | { status: 'error'; code: string };
+
+// Danh sách miễn chấm ít khi đổi, mà tab này mở lại nhiều lần trong phiên (đổi
+// tháng, chuyển tab là component được dựng lại). Đọc lại cả collection mỗi lần
+// thì tốn lượt đọc của gói Spark miễn phí, nên giữ trong bộ nhớ ~10 phút; nút
+// "Tải lại dữ liệu" luôn đọc mới.
+const EXEMPTION_CACHE_MS = 10 * 60_000;
+type ExemptionCacheEntry = { at: number; promise: Promise<ExemptionList>; value: ExemptionList | null };
+let exemptionCache: ExemptionCacheEntry | null = null;
+
+/** Bỏ danh sách miễn chấm đang nhớ, để lần mở/tải sau đọc lại (vd. ngay sau khi quản trị sửa danh sách). */
+export function invalidateCheckinExemptionCache() {
+  exemptionCache = null;
+}
+
+// Hàm async: lỗi ném ngay (không qua promise) của SDK cũng thành promise bị từ chối.
+async function readCheckinExemptionList(): Promise<ExemptionList> {
+  const snap = await getDocs(collection(db, 'meal_checkin_exemptions'));
+  // Kiểm tra TỪNG bản ghi: một bản ghi hỏng không làm mất cả danh sách.
+  return { ...parseCheckinExemptionDocs(snap.docs.map(d => ({ id: d.id, data: d.data() }))), loadedAt: Date.now() };
+}
+
+/** Đọc cả danh sách miễn chấm (chỉ quản trị đọc được), dùng bản đã nhớ nếu còn hạn. */
+export function loadCheckinExemptionList(): Promise<ExemptionList> {
+  const now = Date.now();
+  if (exemptionCache && now - exemptionCache.at < EXEMPTION_CACHE_MS) return exemptionCache.promise;
+  const promise = readCheckinExemptionList();
+  const entry: ExemptionCacheEntry = { at: now, promise, value: null };
+  exemptionCache = entry;
+  promise.then(
+    value => { entry.value = value; },
+    // Lỗi thì không nhớ: lần mở hoặc bấm tải lại sau sẽ đọc lại.
+    () => { if (exemptionCache === entry) exemptionCache = null; },
+  );
+  return promise;
+}
+
+/** Bản đã đọc xong và còn hạn — để mở lại tab không phải chờ (và không nháy số). */
+function cachedExemptionLoad(): ExemptionLoad {
+  const entry = exemptionCache;
+  return entry?.value && Date.now() - entry.at < EXEMPTION_CACHE_MS ? { status: 'ready', ...entry.value } : { status: 'loading' };
+}
+
+const errorCodeOf = (err: unknown) => {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : '';
+};
+
+/** Ghi chú cho dòng "Đăng ký nhưng không chấm" của mã có bản ghi miễn chấm đang lỗi. */
+export const BROKEN_EXEMPTION_NOTE = 'Bản ghi miễn chấm của mã này đang lỗi — chưa kết luận';
+/** Có bản ghi lỗi không nêu được mã: chưa biết ai được miễn, nên mọi dòng thiếu chấm đều chưa kết luận. */
+export const UNIDENTIFIED_EXEMPTION_NOTE = 'Có bản ghi miễn chấm lỗi không rõ mã — chưa kết luận';
+/** Chưa tải được danh sách miễn chấm: dòng thiếu chấm có thể là người được miễn. */
+export const UNAVAILABLE_EXEMPTION_NOTE = 'Chưa tải được danh sách miễn chấm — kiểm tra lại trước khi xử lý';
+
+/**
+ * reconcile() với danh sách miễn chấm ở bất kỳ trạng thái nào: chưa tải xong hay
+ * tải lỗi thì đối soát như không ai được miễn (giao diện báo rõ), bản ghi lỗi thì
+ * chỉ áp dụng bản ghi hợp lệ và ghi chú các dòng thiếu chấm chưa kết luận được —
+ * của mã bị lỗi, hoặc của mọi người khi có bản ghi lỗi không rõ mã (agent cũng
+ * giữ thư thiếu chấm theo đúng hai trường hợp này).
+ */
+export function reconcileWithExemptions(
+  input: Omit<Parameters<typeof reconcile>[0], 'checkinExemptions'>,
+  exemptions: ExemptionLoad,
+): ReturnType<typeof reconcile> {
+  const ready = exemptions.status === 'ready' ? exemptions : null;
+  const result = reconcile({ ...input, checkinExemptions: ready?.policies ?? [] });
+  const { ids: held, unidentified } = exemptionQuarantine(ready?.invalid ?? []);
+  // Tệp Excel là thứ Bộ phận Dinh dưỡng dùng để xử lý vi phạm: khi chưa tải được
+  // danh sách miễn chấm, cảnh báo trên màn hình không đi theo tệp — ghi vào từng dòng.
+  const unavailable = exemptions.status === 'error';
+  if (!held.size && !unidentified && !unavailable) return result;
+  const noteOf = (employeeId: string) =>
+    held.has(employeeId) ? BROKEN_EXEMPTION_NOTE
+      : unidentified ? UNIDENTIFIED_EXEMPTION_NOTE
+        : unavailable ? UNAVAILABLE_EXEMPTION_NOTE : null;
+  return {
+    ...result,
+    missing: result.missing.map(row => {
+      const note = noteOf(row.employeeId);
+      return note ? { ...row, note: row.note ? `${row.note}; ${note}` : note } : row;
+    }),
+  };
+}
+
 const countOf = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 // Trạng thái mà agent đã thực sự đếm người đáng lẽ ăn / chưa chấm.
@@ -304,17 +434,48 @@ const COUNTED_STATUSES = new Set<AlertStatus>(['sent', 'partial', 'guarded', 'no
 
 // Lịch Task Scheduler của agent: pha cảnh báo chạy từ 13:45, lặp mỗi 15 phút
 // trong 1 giờ (xem agent/README.md).
+const ALERT_WINDOW_START = '13:45';
 const ALERT_WINDOW_END = '14:45';
 
+type AlertInfo = { tone: 'ok' | 'warn' | 'error' | 'neutral'; text: string };
+
 /**
- * Diễn giải trạng thái gửi email cảnh báo của một ngày.
+ * "Gửi được 30, lỗi 2 email: <lý do> — lần chạy sau sẽ gửi nốt." Thư lỗi là thư
+ * chắc chắn chưa đi nên lần chạy cảnh báo kế tiếp gửi nốt; chỉ hứa điều đó khi
+ * thật sự có thư lỗi và hôm nay còn lần chạy tự động (13:45 tới khoảng 14:45).
+ */
+/**
+ * Lý do agent ghi đã kèm "Lần chạy sau sẽ gửi nốt." và các câu đếm người bỏ qua;
+ * trang tự viết các phần đó từ số liệu (đúng theo giờ hiện tại), nên bỏ chúng
+ * khỏi lý do để không lặp hay mâu thuẫn. Phần còn lại (lỗi cụ thể) giữ nguyên.
+ */
+export function agentReasonText(reason: unknown): string {
+  if (typeof reason !== 'string') return '';
+  const cleaned = reason
+    .replace(/\s*Lần chạy sau sẽ gửi nốt\.?/g, '')
+    .replace(/\s*\d+ mã có lượt chấm chưa gắn được với đúng một tài khoản, không gửi\.?/g, '')
+    .replace(/\s*\d+ người có đăng ký suất ăn sự kiện gần ngày này, không gửi\.?/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return cleaned ? `: ${cleaned.replace(/\.$/, '')}` : '';
+}
+
+function partialText(sentLabel: string, failed: number, reason: string, retryOpen: boolean) {
+  if (failed <= 0) return `Gửi được ${sentLabel} email${reason}.`;
+  return `Gửi được ${sentLabel}, lỗi ${failed} email${reason} — ${
+    retryOpen ? 'lần chạy sau sẽ gửi nốt' : 'hôm nay không còn lần chạy tự động nào để gửi nốt'
+  }.`;
+}
+
+/**
+ * Diễn giải trạng thái gửi email cảnh báo thiếu chấm của hôm nay.
  * @param nowTime giờ Việt Nam hiện tại, HH:MM
  */
-function describeAlert(
+export function describeAlert(
   alert: AlertDay | undefined,
   mealDay: boolean,
   nowTime: string
-): { tone: 'ok' | 'warn' | 'error' | 'neutral'; text: string } {
+): AlertInfo {
   if (!alert || !alert.status) {
     if (!mealDay) return { tone: 'neutral', text: 'Hôm nay không có suất ăn, không gửi cảnh báo.' };
     // Agent chỉ ghi kết quả cảnh báo khi pha cảnh báo thật sự chạy VÀ
@@ -328,14 +489,14 @@ function describeAlert(
           text: 'Chưa có kết quả gửi cảnh báo hôm nay: agent chưa chạy pha cảnh báo, hoặc chức năng gửi cảnh báo đang tắt (alerts.enabled trong config.json của agent).',
         };
   }
-  const reason = alert.reason ? `: ${alert.reason}` : '';
+  const reason = agentReasonText(alert.reason);
   switch (alert.status) {
     case 'sent':
       return { tone: 'ok', text: `Đã gửi ${countOf(alert.sent)} email cảnh báo.` };
     case 'partial':
       return {
         tone: 'warn',
-        text: `Gửi được ${countOf(alert.sent)}, lỗi ${countOf(alert.failed)} email — lần chạy sau sẽ gửi nốt.`,
+        text: partialText(String(countOf(alert.sent)), countOf(alert.failed), reason, nowTime < ALERT_WINDOW_END),
       };
     case 'guarded':
       return { tone: 'warn', text: `Đã tạm dừng gửi theo chốt an toàn${reason}` };
@@ -362,6 +523,121 @@ function describeAlert(
   }
 }
 
+/**
+ * Diễn giải kết quả gửi thư "chấm nhưng chưa đăng ký" của một ngày ăn đã qua.
+ * Agent chỉ xử lý nhóm này ở lần chạy cảnh báo của ngày có suất ăn kế tiếp, nên
+ * chưa có kết quả chưa chắc là lỗi: chỉ báo "Đang chờ" khi agent có hỗ trợ và
+ * lần chạy đó thật sự còn ở phía trước.
+ */
+export function describeExtraAlert(
+  extra: ExtraAlertDay | undefined,
+  { supported, agentVersion, today, alertRunToday, nowTime }: {
+    /** Agent đang chạy có gửi loại thư này (agentSupports(sync, 'extraAlerts')). */
+    supported: boolean;
+    agentVersion: string;
+    /** Hôm nay theo giờ Việt Nam, YYYY-MM-DD. */
+    today: string;
+    /**
+     * Hôm nay có lần chạy cảnh báo theo lịch (DKAN 2 chạy thứ 2–6, kể cả ngày
+     * nghỉ giữa tuần: nhóm thư này nói về ngày ăn trước đó nên vẫn được gửi).
+     */
+    alertRunToday: boolean;
+    /** Giờ Việt Nam hiện tại, HH:MM. */
+    nowTime: string;
+  },
+): AlertInfo {
+  if (!extra || !extra.status) {
+    if (!supported) {
+      return { tone: 'neutral', text: `Agent trên máy HAC chưa hỗ trợ gửi loại thư này (bản đang chạy: ${agentVersion}).` };
+    }
+    if (!alertRunToday) return { tone: 'neutral', text: 'Đang chờ — gửi vào lần chạy cảnh báo của ngày làm việc kế tiếp (thứ 2–6, từ 13:45).' };
+    return nowTime < ALERT_WINDOW_END
+      ? { tone: 'neutral', text: `Đang chờ — gửi trong lần chạy cảnh báo hôm nay (từ ${ALERT_WINDOW_START} tới khoảng ${ALERT_WINDOW_END}).` }
+      : { tone: 'neutral', text: 'Chưa có kết quả: agent chưa chạy pha cảnh báo hôm nay, hoặc chức năng gửi cảnh báo đang tắt.' };
+  }
+  const reason = agentReasonText(extra.reason);
+  const sent = countOf(extra.sent);
+  const failed = countOf(extra.failed);
+  const uncertain = countOf(extra.uncertain);
+  const candidates = countOf(extra.candidates);
+  const sentLabel = candidates > 0 ? `${sent}/${candidates}` : String(sent);
+  // Chỉ còn gửi nốt được nếu kết quả là của hôm nay và hôm nay còn lần chạy tự động.
+  const retryOpen = alertRunToday && nowTime < ALERT_WINDOW_END && vnParts(extra.at ?? '')?.date === today;
+  let info: AlertInfo;
+  switch (extra.status) {
+    case 'sent':
+      // Còn người không nhận được thư (không có tài khoản trường đang hoạt động…):
+      // nói lý do, không để "3/4" màu xanh mà không giải thích.
+      info = sent < candidates || reason
+        ? { tone: 'warn', text: `Đã gửi ${sentLabel} email${reason}.` }
+        : { tone: 'ok', text: `Đã gửi ${sentLabel} email.` };
+      break;
+    case 'partial':
+      info = uncertain > 0
+        ? { tone: 'warn', text: `Gửi được ${sentLabel} email, ${uncertain} email chưa rõ đã gửi hay chưa${failed > 0 ? `, lỗi ${failed} email` : ''}${reason}. Không tự gửi lại email chưa rõ; cần kiểm tra hộp thư trước khi xử lý tiếp.` }
+        : { tone: 'warn', text: partialText(sentLabel, failed, reason, retryOpen) };
+      break;
+    case 'nothing':
+      info = { tone: 'ok', text: 'Không có ai cần cảnh báo.' };
+      break;
+    case 'guarded':
+      info = { tone: 'warn', text: `Đã tạm dừng gửi theo chốt an toàn${reason}` };
+      break;
+    case 'error':
+      info = sent > 0
+        ? { tone: 'error', text: `Đã gửi ${sentLabel} email${failed > 0 ? `, còn ${failed} email chưa gửi được` : ''}; lần chạy gần nhất chưa gửi tiếp được${reason}` }
+        : { tone: 'error', text: `Chưa gửi được${reason}` };
+      break;
+    case 'off_day':
+      info = { tone: 'neutral', text: 'Ngày nghỉ, không gửi cảnh báo.' };
+      break;
+    default:
+      info = { tone: 'neutral', text: `Trạng thái: ${String(extra.status)}${reason}` };
+  }
+  // Số người không gửi được vì chưa xác định được tài khoản cần quản trị đối chiếu tay.
+  const unmapped = countOf(extra.unmapped);
+  const eventSkipped = countOf(extra.eventSkipped);
+  const notes = [
+    unmapped > 0 ? `${unmapped} mã chưa gắn được với đúng một tài khoản, không gửi — cần đối chiếu` : '',
+    eventSkipped > 0 ? `${eventSkipped} người có đăng ký ăn sự kiện, không gửi` : '',
+  ].filter(Boolean);
+  if (!notes.length) return info;
+  return {
+    tone: unmapped > 0 && info.tone === 'ok' ? 'warn' : info.tone,
+    text: `${info.text.replace(/\.$/, '')} · ${notes.join(' · ')}.`,
+  };
+}
+
+/**
+ * "sáng 3/120, trưa 5/98 (miễn chấm 12)". Mẫu số là người còn phải chấm: agent
+ * đếm cả suất được miễn vào expected, nên trừ đi exempt (agent cũ không ghi = 0).
+ */
+export function missingCountsText(alert: Pick<AlertDay, 'expected' | 'missing' | 'exempt'>) {
+  return MEALS.map(meal => {
+    const exempt = countOf(alert.exempt?.[meal]);
+    const due = Math.max(0, countOf(alert.expected?.[meal]) - exempt);
+    return `${meal === 'breakfast' ? 'sáng' : 'trưa'} ${countOf(alert.missing?.[meal])}/${due}${exempt > 0 ? ` (miễn chấm ${exempt})` : ''}`;
+  }).join(', ');
+}
+
+/**
+ * Ngày có suất ăn gần nhất trước `today`, hoặc null. Tìm lùi tối đa 7 ngày —
+ * đúng như agent (PREVIOUS_MEAL_DAY_LOOKBACK trong agent/lib/alert-plan.mjs):
+ * sau kỳ nghỉ dài hơn, agent không xét lại ngày ăn trước kỳ nghỉ.
+ */
+function previousMealDay(today: string, offDays: string[]): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return null;
+  const [y, m, d] = today.split('-').map(Number);
+  for (let back = 1; back <= 7; back++) {
+    const iso = new Date(Date.UTC(y, m - 1, d - back)).toISOString().slice(0, 10);
+    if (isMealDay(iso, offDays)) return iso;
+  }
+  return null;
+}
+
+const agentVersionLabel = (sync: CheckinSync | null) =>
+  typeof sync?.agentVersion === 'string' && sync.agentVersion.trim() ? sync.agentVersion.trim().slice(0, 40) : 'không rõ';
+
 const TONE_CLASS = {
   ok: 'bg-tertiary-container text-on-tertiary-container',
   warn: 'bg-warning-container text-on-warning-container',
@@ -375,22 +651,37 @@ const TONE_CLASS = {
  * điều này trước khi tin con số đối soát — một máy lỗi là cả dãy người "đăng ký
  * nhưng không chấm" có thể chỉ do thiếu dữ liệu.
  */
-function SyncHealthStrip({ sync, offDays }: { sync: CheckinSync; offDays: string[] }) {
+export function SyncHealthStrip({ sync, offDays, now: at }: { sync: CheckinSync; offDays: string[]; now?: Date }) {
   const devices = Object.entries(sync.devices || {})
     .filter(([, d]) => d && typeof d === 'object')
     .sort(([a], [b]) => a.localeCompare(b, 'vi'));
   // Doc có mà chưa có gì để xem (ghi dở) thì thôi không hiện.
   if (!devices.length && !sync.lastRunAt && !sync.alerts) return null;
 
-  const now = vnParts();
+  const now = vnParts(at);
   const today = now?.date ?? vnToday();
+  const nowTime = now?.time ?? '00:00';
+  const todayMealDay = isMealDay(today, offDays);
   const alert = sync.alerts?.[today];
-  const alertInfo = describeAlert(alert, isMealDay(today, offDays), now?.time ?? '00:00');
+  const alertInfo = describeAlert(alert, todayMealDay, nowTime);
   const failed = devices.filter(([, d]) => !d.ok);
   // Chỉ những trạng thái có tính lại số liệu mới hiện "Chưa chấm x/y". Với
   // 'error' agent không tính gì (doc mang 0/0 hoặc số của lần chạy trước), hiện
   // ra sẽ đọc thành "không ai thiếu" trong khi thật ra chưa biết.
   const showCounts = !!alert && !!alert.status && COUNTED_STATUSES.has(alert.status) && !!alert.expected;
+  // Thư "chấm nhưng chưa đăng ký" của một ngày được gửi ở lần chạy cảnh báo của
+  // ngày ăn kế tiếp, nên dòng này nói về ngày ăn gần nhất trước hôm nay.
+  const extraDate = previousMealDay(today, offDays);
+  const extra = extraDate ? sync.alerts?.[extraDate]?.extra : undefined;
+  const extraInfo = extraDate
+    ? describeExtraAlert(extra, {
+        supported: agentSupports(sync, 'extraAlerts'),
+        agentVersion: agentVersionLabel(sync),
+        today,
+        alertRunToday: isWeekday(today),
+        nowTime,
+      })
+    : null;
 
   return (
     <div className="rounded-lg border border-outline-variant bg-surface-container-low p-sm flex flex-col gap-2 text-body-sm">
@@ -442,23 +733,140 @@ function SyncHealthStrip({ sync, offDays }: { sync: CheckinSync; offDays: string
       )}
 
       <div className="flex flex-wrap items-start gap-2">
-        <span className="text-on-surface-variant shrink-0 pt-0.5">Email cảnh báo hôm nay ({formatDayLabel(today)}):</span>
+        <span className="text-on-surface-variant min-w-0 pt-0.5">Cảnh báo thiếu chấm hôm nay ({formatDayLabel(today)}):</span>
         <span className={`inline-flex items-start gap-1.5 px-2.5 py-0.5 rounded-lg break-words min-w-0 ${TONE_CLASS[alertInfo.tone]}`}>
           {alertInfo.text}
           {alert?.at && <span className="opacity-80 tabular whitespace-nowrap"> · {formatVnDateTime(alert.at)}</span>}
         </span>
-        {showCounts && (
-          <span className="text-on-surface-variant pt-0.5 tabular">
-            Chưa chấm: sáng {countOf(alert?.missing?.breakfast)}/{countOf(alert?.expected?.breakfast)},
-            trưa {countOf(alert?.missing?.lunch)}/{countOf(alert?.expected?.lunch)}
-          </span>
+        {showCounts && alert && (
+          <span className="text-on-surface-variant pt-0.5 tabular">Chưa chấm: {missingCountsText(alert)}</span>
         )}
       </div>
+
+      {extraDate && extraInfo && (
+        <div className="flex flex-wrap items-start gap-2">
+          <span className="text-on-surface-variant min-w-0 pt-0.5">
+            Cảnh báo chấm chưa đăng ký ngày {formatDayLabel(extraDate)}:
+          </span>
+          <span className={`inline-flex items-start gap-1.5 px-2.5 py-0.5 rounded-lg break-words min-w-0 ${TONE_CLASS[extraInfo.tone]}`}>
+            {extraInfo.text}
+            {extra?.status && extra.at && <span className="opacity-80 tabular whitespace-nowrap"> · {formatVnDateTime(extra.at)}</span>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-type CardKey = 'registered' | 'tapped' | 'missing' | 'pending' | 'extra' | 'unrecognized' | 'invalidRegs';
+// Câu cảnh báo bản ghi miễn chấm lỗi chỉ kể vài mã; đủ danh sách (kèm lý do) ở phần mở rộng.
+const INVALID_CODES_SHOWN = 10;
+const INVALID_REASONS_SHOWN = 20;
+
+/**
+ * Cảnh báo về danh sách miễn chấm: đang tải, đọc lỗi (nói rõ nguyên nhân), có
+ * bản ghi lỗi, hoặc agent trên máy HAC chưa áp dụng được. Không chặn gì — đối
+ * soát và xuất Excel vẫn chạy, các dòng này nói số liệu đang được tính ra sao.
+ */
+export function ExemptionNotices({ exemptions, sync, today }: {
+  exemptions: ExemptionLoad;
+  sync: CheckinSync | null;
+  /** Hôm nay theo giờ Việt Nam, YYYY-MM-DD. */
+  today: string;
+}) {
+  if (exemptions.status === 'loading') {
+    return (
+      <div role="status" className="p-sm rounded-lg bg-surface-container text-on-surface-variant text-body-sm flex items-center gap-2">
+        <span className="material-symbols-outlined text-[18px] animate-spin shrink-0" aria-hidden="true">progress_activity</span>
+        Đang tải danh sách miễn chấm ăn...
+      </div>
+    );
+  }
+
+  if (exemptions.status === 'error') {
+    return (
+      <div role="alert" className="p-sm md:p-md rounded-lg border border-warning/40 bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
+        <span className="material-symbols-outlined text-[20px] shrink-0" aria-hidden="true">gpp_maybe</span>
+        <span>
+          <strong>
+            {exemptions.code === 'permission-denied'
+              ? 'Firestore Rules chưa cho phép đọc danh sách miễn chấm — dán bản firestore.rules mới rồi bấm Tải lại dữ liệu.'
+              : `Chưa tải được danh sách miễn chấm ăn${exemptions.code ? ` (mã lỗi: ${exemptions.code})` : ''} — bấm Tải lại dữ liệu để thử lại.`}
+          </strong>{' '}
+          Kết quả bên dưới đang tính như không ai được miễn chấm, nên người được miễn có thể nằm trong danh sách
+          “Đăng ký nhưng không chấm”.
+        </span>
+      </div>
+    );
+  }
+
+  const { invalid, policies } = exemptions;
+  // Cùng quy tắc với agent: mọi mã mà bản ghi lỗi nhắc tới (mã tài liệu và mã trong dữ liệu).
+  const quarantine = exemptionQuarantine(invalid);
+  const codes = [...quarantine.ids].sort();
+  const unknown = quarantine.unidentified;
+  const named = [
+    codes.length
+      ? `mã: ${codes.slice(0, INVALID_CODES_SHOWN).join(', ')}${codes.length > INVALID_CODES_SHOWN ? ` và ${codes.length - INVALID_CODES_SHOWN} mã khác` : ''}`
+      : '',
+    unknown ? `${unknown} bản ghi không rõ mã` : '',
+  ].filter(Boolean).join('; ');
+  // Còn hiệu lực = đang áp dụng hoặc sắp áp dụng: agent cũ sẽ gửi cảnh báo thiếu chấm cho những người này.
+  const current = policies.some(policy => policy.periods.some(period => period.to === null || period.to >= today));
+  const agentBehind = current && !!sync && !agentSupports(sync, 'checkinExemptions');
+  if (!invalid.length && !agentBehind) return null;
+
+  return (
+    <>
+      {invalid.length > 0 && (
+        <div role="alert" className="p-sm md:p-md rounded-lg border border-warning/40 bg-warning-container text-on-warning-container text-body-md flex items-start gap-2">
+          <span className="material-symbols-outlined text-[20px] shrink-0" aria-hidden="true">gpp_maybe</span>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p>
+              <strong>{invalid.length} bản ghi miễn chấm bị lỗi ({named}) chưa được áp dụng</strong> — sửa ở{' '}
+              <Link to="/quantri?tab=exemptions" className="font-semibold underline underline-offset-2">
+                Miễn chấm theo bữa
+              </Link>
+              .
+            </p>
+            {codes.length > 0 && (
+              <p className="text-body-sm">
+                Các dòng “Đăng ký nhưng không chấm” của {codes.length === 1 ? 'mã này' : 'những mã này'} có ghi chú “{BROKEN_EXEMPTION_NOTE}”.
+              </p>
+            )}
+            {unknown > 0 && (
+              <p className="text-body-sm">
+                Có bản ghi không xác định được mã nhân viên nên chưa biết ai đang được miễn: mọi dòng “Đăng ký nhưng không
+                chấm”{codes.length > 0 ? ' còn lại' : ''} được ghi chú “{UNIDENTIFIED_EXEMPTION_NOTE}”.
+              </p>
+            )}
+            <details className="text-body-sm">
+              <summary className="cursor-pointer font-semibold">Xem lý do từng bản ghi</summary>
+              <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                {invalid.slice(0, INVALID_REASONS_SHOWN).map((item, i) => (
+                  <li key={`${item.docId}-${i}`} className="break-words">
+                    <span className="tabular">{item.docId.slice(0, 60) || '(không có mã tài liệu)'}</span>: {item.reason}
+                  </li>
+                ))}
+              </ul>
+              {invalid.length > INVALID_REASONS_SHOWN && <p className="mt-1">… và {invalid.length - INVALID_REASONS_SHOWN} bản ghi khác.</p>}
+            </details>
+          </div>
+        </div>
+      )}
+      {agentBehind && (
+        <div className="p-sm rounded-lg border border-warning/40 bg-warning-container text-on-warning-container text-body-sm flex items-start gap-2">
+          <span className="material-symbols-outlined text-[18px] shrink-0" aria-hidden="true">update</span>
+          <span>
+            Agent trên máy HAC chưa hỗ trợ miễn chấm (bản đang chạy: {agentVersionLabel(sync)}): người trong danh sách vẫn có
+            thể nhận email cảnh báo thiếu chấm.
+          </span>
+        </div>
+      )}
+    </>
+  );
+}
+
+type CardKey = 'registered' | 'tapped' | 'missing' | 'pending' | 'exempt' | 'extra' | 'unrecognized' | 'invalidRegs';
 
 // Dải "số liệu tạm" chỉ liệt kê vài ngày đầu; xem cả tháng file Excel giữa
 // tháng thì có thể tới hơn chục ngày chưa tới.
@@ -505,6 +913,46 @@ function splitMissing(rows: Row[], unsettled: Unsettled[]) {
   const split = { missing: [] as Row[], pending: [] as Row[] };
   for (const r of rows) (open.has(`${r.date}|${r.meal}`) ? split.pending : split.missing).push(r);
   return split;
+}
+
+/**
+ * Sổ Excel đối soát của phạm vi đang xem. `missing`/`pending` là hai phần của
+ * result.missing đã tách theo bữa đã chốt / chưa chốt (splitMissing).
+ */
+export function buildReconciliationWorkbook({ result, missing, pending }: {
+  result: ReturnType<typeof reconcile>;
+  missing: Row[];
+  pending: Row[];
+}) {
+  const sheet = (rows: Row[], withTime: boolean, withNote = false, noteLabel = 'Lý do') =>
+    xlsx.utils.json_to_sheet(
+      rows.map((r, i) => {
+        const base: Record<string, string | number> = {
+          'STT': i + 1,
+          'Ngày': formatDate(r.date),
+          'Mã NV': r.employeeId,
+          'Họ và tên': r.fullName || '(không có trong file)',
+          'Bộ phận': r.department || '',
+          'Bữa': mealLabel(r.meal),
+        };
+        if (withTime) base['Giờ chấm'] = r.time || '';
+        if (withNote) base[noteLabel] = r.note || '';
+        return base;
+      })
+    );
+
+  const wb = xlsx.utils.book_new();
+  // 'DK khong cham' chỉ gồm bữa đã chốt dữ liệu; số tạm để sheet riêng cho
+  // khỏi bị đem đi xử lý vi phạm cùng. Luôn có cột Ghi chú: dòng có ghi chú về
+  // miễn chấm (email lệch, bản ghi lỗi) cần kiểm tra trước khi xử lý.
+  xlsx.utils.book_append_sheet(wb, sheet(missing, false, true, 'Ghi chú'), 'DK khong cham');
+  if (pending.length) xlsx.utils.book_append_sheet(wb, sheet(pending, false, true, 'Ghi chú'), 'Chua cham - so tam');
+  xlsx.utils.book_append_sheet(wb, sheet(result.extra, true, true), 'Cham khong DK');
+  xlsx.utils.book_append_sheet(wb, sheet(result.unrecognized, true), 'Cham ngoai gio');
+  xlsx.utils.book_append_sheet(wb, sheet(result.registered, false), 'Suat da dang ky');
+  xlsx.utils.book_append_sheet(wb, sheet(result.tapped, true), 'Luot cham hop le');
+  xlsx.utils.book_append_sheet(wb, sheet(result.exempt, false), 'Mien cham theo bua');
+  return wb;
 }
 
 const PAGE_SIZES = [50, 100, 500, 1000];
@@ -644,6 +1092,9 @@ export function MealReconciliation({
   const [savedExcludes, setSavedExcludes] = useState<string[]>([]);
   const [offDays, setOffDays] = useState<string[]>([]);
   const [offDaysError, setOffDaysError] = useState(false);
+  // Lấy ngay bản đã nhớ trong phiên (nếu còn hạn) để đổi tháng, chuyển tab
+  // không phải đọc lại cũng không nháy số.
+  const [exemptions, setExemptions] = useState<ExemptionLoad>(cachedExemptionLoad);
   const [syncInfo, setSyncInfo] = useState<CheckinSync | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -673,15 +1124,19 @@ export function MealReconciliation({
   // chặn) thì quản trị sẽ chuyển sang Tải file Excel — lúc đó vẫn phải có danh
   // sách ngày nghỉ, nếu không cột ngày lễ thành cả trường "đăng ký nhưng không
   // chấm" mà không có cảnh báo nào.
+  //
+  // Danh sách miễn chấm cũng vậy: đọc lỗi (rules dán tay có thể lên sau bản web)
+  // thì vẫn đối soát như không ai được miễn và báo rõ nguyên nhân, không chặn.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setAutoState('loading');
-      const [checkinsRes, excludesRes, offRes, syncRes] = await Promise.allSettled([
+      const [checkinsRes, excludesRes, offRes, syncRes, exemptionsRes] = await Promise.allSettled([
         getDocs(query(collection(db, 'checkins'), where('month', '==', selectedMonth))),
         getDoc(doc(db, 'settings', EXCLUDES_DOC)),
         loadOffDays(),
         loadSyncInfo(),
+        loadCheckinExemptionList(),
       ]);
       if (cancelled) return;
 
@@ -693,6 +1148,12 @@ export function MealReconciliation({
       setOffDays(off);
       setOffDaysError(offList === null);
       setSyncInfo(sync);
+      if (exemptionsRes.status === 'fulfilled') {
+        setExemptions({ status: 'ready', ...exemptionsRes.value });
+      } else {
+        console.error('Không đọc được danh sách miễn chấm ăn:', exemptionsRes.reason);
+        setExemptions({ status: 'error', code: errorCodeOf(exemptionsRes.reason) });
+      }
 
       if (checkinsRes.status === 'rejected' || excludesRes.status === 'rejected') {
         console.error(
@@ -765,6 +1226,16 @@ export function MealReconciliation({
   // thấy một trang trống vì bảng mới ít dòng hơn.
   const resetPaging = () => setPage(1);
 
+  // "Tải lại dữ liệu": đọc lại lượt chấm, cấu hình và danh sách miễn chấm (có thể
+  // vừa được sửa ở tab Cấu hình). Đăng ký và hủy ăn do trang quản trị nghe
+  // realtime nên vốn đã mới — chỉ đăng ký nghe lại khi đang lỗi, vì nghe lại là
+  // đọc lại toàn bộ lịch sử hủy ăn.
+  const reloadAll = () => {
+    invalidateCheckinExemptionCache();
+    setReloadVersion(version => version + 1);
+    if (registrationDataError) onReloadRegistrations();
+  };
+
   const handleFile = async (file?: File | null) => {
     if (!file) return;
     setIsParsing(true);
@@ -826,8 +1297,11 @@ export function MealReconciliation({
   );
 
   const monthMismatch = !!parsed && parsed.month !== selectedMonth;
+  // Danh sách miễn chấm cố ý không có mặt ở đây: chưa tải xong hay tải lỗi thì
+  // vẫn đối soát (như không ai được miễn) và ExemptionNotices nói rõ.
   const comparisonReady = registrationDataReady && !registrationDataError && !monthMismatch
     && (source !== 'auto' || autoState !== 'loading');
+  const mainLoading = !registrationDataError && (!registrationDataReady || (source === 'auto' && autoState === 'loading'));
 
   const activeDates = useMemo(() => {
     // Lệch tháng thì không đối soát: so lượt chấm tháng này với đăng ký tháng
@@ -840,16 +1314,14 @@ export function MealReconciliation({
     return dates.filter(d => d >= from && d <= to);
   }, [parsed, scope, dates, selectedDate, rangeFrom, rangeTo, comparisonReady]);
 
+  // Chính sách miễn chấm khớp theo mã NV + email trên đơn (đơn từ 05/2026 đều
+  // có email). Không đọc collection staff để bù email: hồ sơ do CBNV tự sửa.
   const result = useMemo(
-    () => reconcile({
-      byDate: parsed?.byDate || {},
-      dates: activeDates,
-      registrations,
-      cancelations,
-      excludedIds,
-      offDays,
-    }),
-    [parsed, activeDates, registrations, cancelations, excludedIds, offDays]
+    () => reconcileWithExemptions(
+      { byDate: parsed?.byDate || {}, dates: activeDates, registrations, cancelations, excludedIds, offDays },
+      exemptions,
+    ),
+    [parsed, activeDates, registrations, cancelations, excludedIds, offDays, exemptions]
   );
 
   // Những bữa trong phạm vi đang xem mà dữ liệu chưa chốt (bữa chưa kết thúc,
@@ -887,6 +1359,8 @@ export function MealReconciliation({
     active: string;
     withTime: boolean;
     withNote?: boolean;
+    /** Tên cột ghi chú (mặc định "Lý do"). */
+    noteLabel?: string;
     hint?: string;
   }[] = [
     {
@@ -900,9 +1374,24 @@ export function MealReconciliation({
       active: 'ring-2 ring-tertiary', withTime: true,
     },
     {
+      key: 'exempt', icon: 'verified_user', label: 'Suất được miễn chấm', rows: result.exempt,
+      tone: 'bg-primary-container/30 border-primary/20 text-on-primary-container',
+      active: 'ring-2 ring-primary', withTime: false,
+      hint: 'Các suất đã đăng ký thuộc bữa và thời hạn được miễn điểm danh. Lượt chấm thực tế được hiển thị ở danh sách lượt chấm.'
+        + (exemptions.status === 'ready'
+          ? ` Danh sách miễn chấm tải lúc ${formatVnDateTime(new Date(exemptions.loadedAt).toISOString())}; vừa sửa danh sách thì bấm Tải lại dữ liệu.`
+          : ''),
+    },
+    {
+      // Ghi chú (email trên đơn khác email trong danh sách miễn chấm, bản ghi
+      // miễn chấm đang lỗi) phải thấy được trước khi đem danh sách đi xử lý vi phạm.
       key: 'missing', icon: 'no_meals', label: 'Đăng ký nhưng không chấm', rows: missing,
       tone: 'bg-warning-container border-warning/30 text-on-warning-container',
       active: 'ring-2 ring-warning', withTime: false,
+      withNote: missing.some(r => r.note), noteLabel: 'Ghi chú',
+      hint: missing.some(r => r.note)
+        ? 'Dòng có ghi chú liên quan tới danh sách miễn chấm: kiểm tra lại ở menu Miễn chấm theo bữa trước khi xử lý vi phạm.'
+        : undefined,
     },
     // Chỉ hiện khi phạm vi đang xem có bữa chưa chốt dữ liệu.
     ...(pending.length
@@ -910,6 +1399,7 @@ export function MealReconciliation({
           key: 'pending' as const, icon: 'hourglass_top', label: 'Chưa chấm — số liệu tạm', rows: pending,
           tone: 'bg-surface-container border-outline-variant text-on-surface-variant',
           active: 'ring-2 ring-outline', withTime: false,
+          withNote: pending.some(r => r.note), noteLabel: 'Ghi chú',
           hint: 'Những người đã đăng ký nhưng chưa thấy lượt chấm, ở các bữa chưa chốt dữ liệu (lý do ghi ở dòng "Số liệu tạm" phía trên). Có thể họ chưa ăn, hoặc lượt chấm chưa về tới hệ thống. Không xử lý vi phạm theo danh sách này.',
         }]
       : []),
@@ -934,38 +1424,11 @@ export function MealReconciliation({
 
   const handleExport = () => {
     if (!parsed || !comparisonReady) return;
-    const sheet = (rows: Row[], withTime: boolean, withNote = false) =>
-      xlsx.utils.json_to_sheet(
-        rows.map((r, i) => {
-          const base: Record<string, string | number> = {
-            'STT': i + 1,
-            'Ngày': formatDate(r.date),
-            'Mã NV': r.employeeId,
-            'Họ và tên': r.fullName || '(không có trong file)',
-            'Bộ phận': r.department || '',
-            'Bữa': mealLabel(r.meal),
-          };
-          if (withTime) base['Giờ chấm'] = r.time || '';
-          if (withNote) base['Lý do'] = r.note || '';
-          return base;
-        })
-      );
-
-    const wb = xlsx.utils.book_new();
-    // 'DK khong cham' chỉ gồm bữa đã chốt dữ liệu; số tạm để sheet riêng cho
-    // khỏi bị đem đi xử lý vi phạm cùng.
-    xlsx.utils.book_append_sheet(wb, sheet(missing, false), 'DK khong cham');
-    if (pending.length) xlsx.utils.book_append_sheet(wb, sheet(pending, false), 'Chua cham - so tam');
-    xlsx.utils.book_append_sheet(wb, sheet(result.extra, true, true), 'Cham khong DK');
-    xlsx.utils.book_append_sheet(wb, sheet(result.unrecognized, true), 'Cham ngoai gio');
-    xlsx.utils.book_append_sheet(wb, sheet(result.registered, false), 'Suat da dang ky');
-    xlsx.utils.book_append_sheet(wb, sheet(result.tapped, true), 'Luot cham hop le');
-
     const suffix =
       scope === 'month' ? selectedMonth
         : scope === 'day' ? selectedDate
           : `${rangeFrom}_den_${rangeTo}`;
-    xlsx.writeFile(wb, `Doi_soat_cham_an_${suffix}.xlsx`);
+    xlsx.writeFile(buildReconciliationWorkbook({ result, missing, pending }), `Doi_soat_cham_an_${suffix}.xlsx`);
   };
 
   const openedCard = CARDS.find(c => c.key === openCard);
@@ -1017,7 +1480,7 @@ export function MealReconciliation({
               </button>
             ))}
           </div>
-          <button type="button" onClick={() => { setReloadVersion(version => version + 1); onReloadRegistrations(); }} disabled={autoState === 'loading'} aria-busy={autoState === 'loading'}
+          <button type="button" onClick={reloadAll} disabled={autoState === 'loading'} aria-busy={autoState === 'loading'}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-label-md text-primary hover:bg-primary-container/30 disabled:opacity-50">
             <span className={`material-symbols-outlined text-[18px] ${autoState === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true">{autoState === 'loading' ? 'progress_activity' : 'refresh'}</span>
             {autoState === 'loading' ? 'Đang tải dữ liệu...' : 'Tải lại dữ liệu'}
@@ -1025,6 +1488,11 @@ export function MealReconciliation({
           </div>
 
           {source === 'auto' && syncInfo && <SyncHealthStrip sync={syncInfo} offDays={offDays} />}
+
+          {/* Lúc cả tab đang tải thì dòng "đang tải" chung đã đủ. */}
+          {!(mainLoading && exemptions.status === 'loading') && (
+            <ExemptionNotices exemptions={exemptions} sync={syncInfo} today={vnToday()} />
+          )}
 
           {offDaysError && (
             <div className="p-sm rounded-lg bg-warning-container text-on-warning-container text-body-sm flex items-start gap-2">
@@ -1036,7 +1504,7 @@ export function MealReconciliation({
             </div>
           )}
 
-          {!registrationDataError && (!registrationDataReady || source === 'auto' && autoState === 'loading') && (
+          {mainLoading && (
             <div role="status" className="p-md rounded-lg bg-surface-container text-on-surface-variant text-body-md flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
               Đang tải đăng ký, hủy ăn và lượt chấm tháng {selectedMonth.slice(5)}/{selectedMonth.slice(0, 4)}...
@@ -1352,7 +1820,7 @@ export function MealReconciliation({
                     <th className="p-sm">Bộ phận</th>
                     <th className="p-sm">Bữa</th>
                     {openedCard.withTime && <th className="p-sm">Giờ chấm</th>}
-                    {openedCard.withNote && <th className="p-sm">Lý do</th>}
+                    {openedCard.withNote && <th className="p-sm">{openedCard.noteLabel ?? 'Lý do'}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
@@ -1369,8 +1837,11 @@ export function MealReconciliation({
                       {openedCard.withTime && <td className="p-sm tabular">{r.time}</td>}
                       {openedCard.withNote && (
                         <td className="p-sm">
+                          {/* Ghi chú dài (vd. về miễn chấm) xuống dòng thay vì kéo giãn cả bảng. */}
                           {r.note && (
-                            <span className="inline-block px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-label-sm whitespace-nowrap">
+                            <span className={`inline-block px-2 py-0.5 bg-error-container text-on-error-container text-label-sm ${
+                              r.note.length > 40 ? 'rounded-lg max-w-[22rem] whitespace-normal' : 'rounded-full whitespace-nowrap'
+                            }`}>
                               {r.note}
                             </span>
                           )}

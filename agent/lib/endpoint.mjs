@@ -55,6 +55,22 @@ export class EndpointError extends Error {
 }
 
 /**
+ * API email bản cũ (trước 2026-11-06.1) chưa biết loại thư 'staff-extra': nó từ
+ * chối CẢ LÔ bằng HTTP 400 "kind phải là 'staff-missing', 'admin-notice' hoặc
+ * 'survey-invite'." — chưa thư nào đi. Nhận ra trường hợp này để agent dừng loại
+ * thư đó trong lần chạy và báo cần triển khai bản web mới (web và agent được cập
+ * nhật riêng, thứ tự nào cũng có thể xảy ra), thay vì coi là lỗi của từng người.
+ * Bản mới không bao giờ trả lỗi về `kind` cho 'staff-extra'.
+ * @param {unknown} err lỗi postAlerts ném ra
+ */
+export function isOldApiKindRejection(err) {
+  const e = /** @type {any} */ (err);
+  if (e?.status !== 400) return false;
+  const message = String(e?.message ?? '');
+  return /\bkind\b/i.test(message) && !message.includes('staff-extra');
+}
+
+/**
  * Gửi một request tới endpoint. Trả về thân phản hồi (JSON) hoặc ném lỗi nếu
  * không phải 2xx. Không bao giờ in khoá bí mật — kể cả trong thông báo lỗi.
  *

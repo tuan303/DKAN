@@ -292,6 +292,7 @@ export function pruneDateKeys(map, today, keepDays = KEEP_DAYS) {
  *
  * @param {{
  *   agentVersion: string,
+ *   agentFeatures?: string[],       // tính năng bản agent này hỗ trợ (trang quản trị dựa vào để báo agent cũ)
  *   runEndAt: string,               // ISO, lúc xong việc với mọi máy
  *   complete: boolean,              // mọi máy trong config đều thành công
  *   existing?: Record<string, any> | null,   // document đang có
@@ -303,7 +304,7 @@ export function pruneDateKeys(map, today, keepDays = KEEP_DAYS) {
  *   keepDays?: number,
  * }} input
  */
-export function buildSyncSettings({ agentVersion, runEndAt, complete, existing, deviceResults, configDevices, coveredDates, today, del, keepDays = KEEP_DAYS }) {
+export function buildSyncSettings({ agentVersion, agentFeatures, runEndAt, complete, existing, deviceResults, configDevices, coveredDates, today, del, keepDays = KEEP_DAYS }) {
   const prev = existing || {};
 
   /** @type {Record<string, unknown>} */
@@ -328,6 +329,10 @@ export function buildSyncSettings({ agentVersion, runEndAt, complete, existing, 
   /** @type {Record<string, unknown>} */
   const out = {
     agentVersion,
+    // Web tự triển khai khi push, agent chép tay: trang quản trị đọc danh sách này
+    // (cạnh agentVersion) để biết agent đang chạy đã áp miễn chấm / gửi thư chấm
+    // chưa đăng ký chưa. Mảng được set merge ghi đè nguyên, không cộng dồn.
+    ...(Array.isArray(agentFeatures) ? { agentFeatures: [...agentFeatures] } : {}),
     lastRunAt: runEndAt,
     lastRunComplete: complete,
     lastCompleteAt: complete ? runEndAt : (prev.lastCompleteAt ?? null),

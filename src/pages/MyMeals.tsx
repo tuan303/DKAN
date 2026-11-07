@@ -8,6 +8,7 @@ import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import { SurveyBanner } from '../components/SurveyBanner';
 import { personalHistoryDates } from '../lib/mealHistory';
+import { exemptionQuarantine, parseCheckinExemptionDocs, type CheckinExemption } from '../../agent/lib/checkin-exemptions.mjs';
 import {
   MEALS,
   MEAL_LABEL,
@@ -71,9 +72,21 @@ export interface ViewError {
  *  - guarded: chốt an toàn của agent đã dừng gửi cảnh báo ngày này vì dữ liệu máy
  *    nhận diện bất thường (alerts[ngày].held) — chưa thể kết luận ai chưa chấm;
  *  - expired: ngày cũ hơn mốc đồng bộ còn lưu (coverage trong settings/checkinSync
- *    bị cắt bớt), không còn căn cứ để kết luận "chưa chấm".
+ *    bị cắt bớt), không còn căn cứ để kết luận "chưa chấm";
+ *  - exemption: bản ghi miễn chấm mang email của Thầy/Cô đang lỗi, chờ quản trị
+ *    sửa — chưa biết bữa nào được miễn nên không kết luận "chưa chấm".
  */
-export type DayHold = 'conflict' | 'expired' | 'guarded';
+export type DayHold = 'conflict' | 'expired' | 'guarded' | 'exemption';
+
+/**
+ * Thông báo về danh sách miễn chấm của chính Thầy/Cô (phần còn lại của trang
+ * vẫn hiện bình thường):
+ *  - unavailable: không đọc được (rules chưa cập nhật, mất mạng...) — tính như
+ *    không được miễn, nên bữa được miễn có thể tạm hiện "Chưa chấm";
+ *  - invalid: đọc được nhưng bản ghi đang lỗi — không áp dụng, và bữa chưa thấy
+ *    lượt chấm hiện "Chưa có dữ liệu" (hold 'exemption').
+ */
+export type ExemptionNotice = 'unavailable' | 'invalid';
 
 export interface DayView {
   result: DayResult;
@@ -107,6 +120,8 @@ export interface MyMealsViewProps {
   missedSyncAt: string | null;
   /** Trùng mã NV trong THÁNG HIỆN TẠI (ảnh hưởng cả thẻ Hôm nay). */
   conflict: ConflictInfo | null;
+  /** Danh sách miễn chấm của Thầy/Cô không đọc được hoặc đang lỗi; null nếu bình thường. */
+  exemptionNotice?: ExemptionNotice | null;
   month: string;
   monthOptions: string[];
   onMonthChange: (month: string) => void;
@@ -137,6 +152,11 @@ const STATUS: Record<MealCode, { icon: string; tone: string; text: (time: string
     icon: 'cancel',
     tone: 'bg-error-container text-on-error-container border-error/30',
     text: () => 'Chưa chấm',
+  },
+  exempt: {
+    icon: 'verified_user',
+    tone: 'bg-primary-container/50 text-on-primary-container border-primary/25',
+    text: () => 'Miễn chấm ăn',
   },
   pending: {
     icon: 'hourglass_empty',
@@ -194,7 +214,8 @@ const chipOf = (code: MealCode, hold: DayHold | null | undefined) =>
 const LEGEND: { code: MealCode; text: string }[] = [
   { code: 'ok', text: 'Đã đăng ký và máy có ghi nhận lượt chấm trong khung giờ.' },
   { code: 'missing', text: 'Đã đăng ký, máy đã đồng bộ đủ sau giờ ăn nhưng không có lượt chấm.' },
-  { code: 'pending', text: 'Bữa chưa kết thúc, máy chưa đồng bộ đủ, dữ liệu máy bất thường hoặc mã NV đang bị trùng — chưa kết luận.' },
+  { code: 'exempt', text: 'Đã đăng ký bữa này và thuộc thời gian được miễn chấm do quản trị thiết lập.' },
+  { code: 'pending', text: 'Bữa chưa kết thúc, máy chưa đồng bộ đủ, dữ liệu máy bất thường, mã NV đang bị trùng hoặc thông tin miễn chấm đang được kiểm tra — chưa kết luận.' },
   { code: 'extra', text: 'Có lượt chấm nhưng Thầy/Cô không đăng ký hoặc đã báo hủy bữa này.' },
   { code: 'not_registered', text: 'Không đăng ký bữa này và cũng không chấm.' },
 ];
@@ -247,21 +268,22 @@ function idMismatch(profile: MyMealsViewProps['profile'], registration: Registra
 }
 
 function summarize(days: DayView[]) {
-  const c = { ok: 0, missing: 0, pending: 0, conflictHeld: 0, expired: 0, extra: 0, unrecognized: 0 };
+  const c = { ok: 0, missing: 0, pending: 0, exempt: 0, conflictHeld: 0, exemptionHeld: 0, expired: 0, extra: 0, unrecognized: 0 };
   for (const { result: d, hold } of days) {
     for (const meal of MEALS) {
       const code = d.meals[meal].code;
       if (code === 'pending' && hold === 'expired') {
         c.expired++;
-      } else if (code === 'ok' || code === 'missing' || code === 'pending' || code === 'extra') {
+      } else if (code === 'ok' || code === 'missing' || code === 'pending' || code === 'extra' || code === 'exempt') {
         c[code]++;
         if (code === 'pending' && hold === 'conflict') c.conflictHeld++;
+        if (code === 'pending' && hold === 'exemption') c.exemptionHeld++;
       }
     }
     if (!d.offDay) c.unrecognized += d.unrecognized.length;
   }
   // "Bữa đã đăng ký" = những bữa đáng lẽ phải ăn, đúng định nghĩa expected của agent.
-  return { ...c, registered: c.ok + c.missing + c.pending + c.expired };
+  return { ...c, registered: c.ok + c.missing + c.pending + c.exempt + c.expired };
 }
 
 function StatusChip({
@@ -407,7 +429,9 @@ function TodayCard({
                           ? 'Chưa xác định được vì mã NV đang bị trùng — xem thông báo phía trên.'
                           : today.hold === 'guarded'
                             ? 'Dữ liệu máy nhận diện hôm nay bất thường nên hệ thống chưa kết luận và không gửi cảnh báo. Bộ phận Dinh dưỡng sẽ kiểm tra.'
-                            : 'Trạng thái được chốt sau giờ ăn, khi máy đã đồng bộ đủ.'}
+                            : today.hold === 'exemption'
+                              ? 'Thông tin miễn chấm của Thầy/Cô đang được kiểm tra nên hệ thống chưa kết luận bữa này — xem thông báo phía trên.'
+                              : 'Trạng thái được chốt sau giờ ăn, khi máy đã đồng bộ đủ.'}
                       </p>
                     )}
                     {/* Khiếu nại phải làm TRONG NGÀY, mà thẻ hướng dẫn nằm cuối trang
@@ -428,11 +452,14 @@ function TodayCard({
           </div>
         )}
         {/* Mỗi ô đã ghi "Không đăng ký" nhưng không nói vì sao (để khỏi lặp ở
-            từng ngày trong lịch sử); thẻ Hôm nay nói rõ một lần. */}
+            từng ngày trong lịch sử); thẻ Hôm nay nói rõ một lần. Agent chỉ tách
+            lượt chấm cho tài khoản có đơn tháng đó, nên tháng không đăng ký thì
+            trang không có lượt chấm nào để hiện — nói rõ để khỏi tưởng máy không
+            ghi nhận. */}
         {today && !today.result.offDay && !today.registration && (
           <p className="text-body-sm text-on-surface-variant flex items-start gap-1.5">
             <span className="material-symbols-outlined text-[16px] shrink-0" aria-hidden="true">info</span>
-            <span>Thầy/Cô không đăng ký suất ăn tháng này.</span>
+            <span>Thầy/Cô không đăng ký suất ăn tháng này nên trang không hiển thị lượt chấm (nếu có).</span>
           </p>
         )}
         {today && <UnrecognizedNote times={today.result.unrecognized} />}
@@ -511,6 +538,7 @@ function SummaryTiles({ days, isCurrentMonth, showTiles }: { days: DayView[]; is
   ];
   const extras = (
     <>
+      {s.exempt > 0 && <> Có <strong className="tabular">{s.exempt}</strong> bữa được miễn chấm.</>}
       {s.extra > 0 && <> Có <strong className="tabular">{s.extra}</strong> bữa có chấm nhưng không đăng ký.</>}
       {s.unrecognized > 0 && <> <strong className="tabular">{s.unrecognized}</strong> lượt chấm ngoài khung giờ không được tính.</>}
     </>
@@ -547,6 +575,11 @@ function SummaryTiles({ days, isCurrentMonth, showTiles }: { days: DayView[]; is
         {s.conflictHeld > 0 && (
           <>
             {' '}Trong đó <strong className="tabular">{s.conflictHeld}</strong> bữa chưa xác định được vì mã NV bị trùng.
+          </>
+        )}
+        {s.exemptionHeld > 0 && (
+          <>
+            {' '}<strong className="tabular">{s.exemptionHeld}</strong> bữa chưa kết luận vì thông tin miễn chấm đang được kiểm tra.
           </>
         )}
         {s.expired > 0 && (
@@ -627,10 +660,17 @@ function HistoryCard({
                 </span>
               </p>
             )}
+            {/* meal_taps chỉ được tách cho tài khoản có đơn (kèm mã NV) của tháng
+                đó: tháng không đăng ký thì lượt chấm không bao giờ về tới trang này. */}
             {!monthData.registration && (
               <Banner tone="info" icon="info">
                 <p>
-                  Thầy/Cô không đăng ký suất ăn {monthLabel(month).toLowerCase()}. Các ngày bên dưới chỉ hiển thị lượt chấm (nếu có).
+                  Thầy/Cô không đăng ký suất ăn {monthLabel(month).toLowerCase()}, nên trang này không hiển thị lượt chấm của
+                  tháng. Nếu Thầy/Cô nhận được email cảnh báo chấm ăn khi chưa đăng ký, vui lòng liên hệ{' '}
+                  <a href={`mailto:${NUTRITION_EMAIL}`} className="font-semibold underline underline-offset-2">
+                    Bộ phận Dinh dưỡng
+                  </a>{' '}
+                  để được đối chiếu.
                 </p>
               </Banner>
             )}
@@ -767,7 +807,7 @@ function LegendCard() {
 }
 
 export function MyMealsView(props: MyMealsViewProps) {
-  const { loading, error, refreshError, onRetry, profile, todayIso, sync, conflict, missedSyncAt } = props;
+  const { loading, error, refreshError, onRetry, profile, todayIso, sync, conflict, missedSyncAt, exemptionNotice } = props;
   const failedDevices = sync ? sync.devices.filter(d => !d.ok) : [];
   const syncBroken = !!sync && (sync.lastRunComplete === false || failedDevices.length > 0);
   const currentMonth = todayIso.slice(0, 7);
@@ -836,7 +876,7 @@ export function MyMealsView(props: MyMealsViewProps) {
               </p>
             </Banner>
           )}
-          {(showMissed || syncBroken || conflict || currentMismatch || !profile) && (
+          {(showMissed || syncBroken || conflict || currentMismatch || exemptionNotice || !profile) && (
             <div className="flex flex-col gap-sm">
               {/* Máy HAC tắt hoặc tác vụ hẹn giờ hỏng thì không có lần chạy nào
                   để báo lỗi: chỉ nhận ra được bằng cách so với lịch. */}
@@ -886,6 +926,29 @@ export function MyMealsView(props: MyMealsViewProps) {
                 </Banner>
               )}
               {currentMismatch && <IdMismatchBanner month={currentMonth} {...currentMismatch} />}
+              {exemptionNotice === 'invalid' && (
+                <Banner tone="warning" icon="verified_user">
+                  <p>
+                    Thông tin miễn chấm của Thầy/Cô đang được kiểm tra. Vui lòng liên hệ{' '}
+                    <a href={`mailto:${NUTRITION_EMAIL}`} className="font-semibold underline underline-offset-2">
+                      Bộ phận Dinh dưỡng
+                    </a>
+                    .
+                  </p>
+                  <p className="text-body-sm">
+                    Trong lúc này, bữa đã đăng ký mà chưa thấy lượt chấm hiển thị “Chưa có dữ liệu”, chưa bị tính là chưa chấm.
+                  </p>
+                </Banner>
+              )}
+              {/* Đọc lỗi thì cả trang vẫn hiện, chỉ là chưa áp dụng được miễn chấm. */}
+              {exemptionNotice === 'unavailable' && (
+                <Banner tone="info" icon="verified_user">
+                  <p className="text-body-sm">
+                    Chưa tải được thông tin miễn chấm ăn. Nếu Thầy/Cô thuộc diện miễn chấm, bữa được miễn có thể tạm hiển thị
+                    “Chưa chấm”.
+                  </p>
+                </Banner>
+              )}
               {!profile && (
                 <Banner tone="info" icon="badge">
                   <p>
@@ -1023,7 +1086,7 @@ function needsRefresh(l: LoadStamp, at: Date, trigger: 'visible' | 'tick') {
 // Phần tải dữ liệu
 // ====================================================================
 
-interface MonthData {
+export interface MonthData {
   registration: Registration | null;
   taps: Record<string, string[]>;
   conflict: boolean;
@@ -1039,7 +1102,10 @@ interface MonthData {
   hasTapsDoc: boolean;
 }
 
-interface BaseData {
+/** Kết quả đọc danh sách miễn chấm của chính Thầy/Cô ('ok' gồm cả "không có bản ghi nào"). */
+type OwnExemptionState = 'ok' | ExemptionNotice;
+
+export interface BaseData {
   profile: { fullName: string; employeeId: string } | null;
   cancels: Cancelation[];
   sync: SyncInfo | null;
@@ -1050,6 +1116,15 @@ interface BaseData {
   heldDates: Set<string>;
   offDays: string[];
   excludedIds: string[];
+  /** Email đăng nhập (chữ thường); '' nếu tài khoản không có email. */
+  email: string;
+  /** Chính sách miễn chấm áp dụng được (không gồm mã đang có bản ghi lỗi). */
+  checkinExemptions: CheckinExemption[];
+  exemptionState: OwnExemptionState;
+  /** Mã NV có bản ghi miễn chấm lỗi — chưa kết luận "Chưa chấm" cho tháng đăng ký bằng mã này. */
+  exemptionHeldIds: string[];
+  /** Có bản ghi lỗi không rõ mã: không kết luận "Chưa chấm" cho tháng nào. */
+  exemptionHeldAll: boolean;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1092,7 +1167,37 @@ function toViewError(e: unknown): ViewError {
   };
 }
 
-async function loadBase(uid: string): Promise<BaseData> {
+/**
+ * Bản ghi miễn chấm mang email đăng nhập của Thầy/Cô. Không bao giờ ném lỗi: trang
+ * vẫn phải hiện khi rules chưa cập nhật (rules dán tay, có thể lên sau bản web)
+ * hay mạng chập chờn — khi đó chỉ là chưa áp dụng được miễn chấm.
+ */
+export async function loadOwnExemptions(email: string): Promise<{
+  state: OwnExemptionState; policies: CheckinExemption[]; heldIds: string[]; heldAll: boolean;
+}> {
+  // Rules chỉ cho đọc bản ghi mang đúng email đăng nhập, và chính sách chỉ áp
+  // dụng khi email khớp: tài khoản không có email thì không có gì để đọc.
+  if (!email) return { state: 'ok', policies: [], heldIds: [], heldAll: false };
+  try {
+    const snap = await getDocs(query(collection(db, 'meal_checkin_exemptions'), where('email', '==', email)));
+    const { policies, invalid } = parseCheckinExemptionDocs(snap.docs.map(d => ({ id: d.id, data: d.data() })));
+    if (!invalid.length) return { state: 'ok', policies, heldIds: [], heldAll: false };
+    // Cùng quy tắc với agent và Mini App: chỉ mã NV mà bản ghi lỗi nhắc tới là
+    // chưa rõ có được miễn hay không (parseCheckinExemptionDocs đã giữ lại chính
+    // sách của các mã đó); bản ghi lỗi không rõ mã thì không mã nào chắc chắn.
+    const { ids, unidentified } = exemptionQuarantine(invalid);
+    return { state: 'invalid', policies, heldIds: [...ids], heldAll: unidentified > 0 };
+  } catch (e) {
+    console.error('Không đọc được thông tin miễn chấm ăn:', e);
+    return { state: 'unavailable', policies: [], heldIds: [], heldAll: false };
+  }
+}
+
+export async function loadBase(uid: string): Promise<BaseData> {
+  const user = auth.currentUser;
+  const email = user?.uid === uid && typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+  // Chạy song song nhưng nằm ngoài Promise.all: đọc lỗi không chặn cả trang.
+  const exemptions = loadOwnExemptions(email);
   const [staffSnap, cancelSnap, syncSnap, offSnap, exclSnap] = await Promise.all([
     step('data', getDoc(doc(db, 'staff', uid))),
     // Chỉ lọc theo userId: rules chỉ cho đọc đơn hủy của chính mình, và một
@@ -1102,6 +1207,7 @@ async function loadBase(uid: string): Promise<BaseData> {
     step('data', getDoc(doc(db, 'settings', 'mealOffDays'))),
     step('data', getDoc(doc(db, 'settings', 'reconcileExcludes'))),
   ]);
+  const { state: exemptionState, policies, heldIds, heldAll } = await exemptions;
 
   const staff = staffSnap.exists() ? staffSnap.data() : null;
   const s = syncSnap.exists() ? syncSnap.data() : null;
@@ -1137,6 +1243,11 @@ async function loadBase(uid: string): Promise<BaseData> {
     heldDates,
     offDays: strings(offSnap.exists() ? offSnap.data().dates : []),
     excludedIds: strings(exclSnap.exists() ? exclSnap.data().employeeIds : []),
+    email,
+    checkinExemptions: policies,
+    exemptionState,
+    exemptionHeldIds: heldIds,
+    exemptionHeldAll: heldAll,
   };
 }
 
@@ -1182,6 +1293,95 @@ function recentMonths(todayIso: string, count = 3) {
     }
   }
   return out;
+}
+
+/**
+ * Ghép dữ liệu đã tải thành trạng thái từng bữa cho phần trình bày. Thuần: không
+ * đọc Firestore, không gọi đồng hồ (nhận `now`), để kiểm thử được mọi trạng thái.
+ */
+export function buildMyMealsView({ base, months, month, todayIso, now }: {
+  base: BaseData;
+  months: Record<string, MonthData>;
+  month: string;
+  todayIso: string;
+  now: Date;
+}) {
+  const currentMonth = todayIso.slice(0, 7);
+
+  const holdOf = (date: string, md: MonthData): DayHold | null => {
+    // Mã bị trùng thì agent không gán lượt chấm cho ai cả: thiếu lượt chấm
+    // lúc đó là do chưa xác định được, không phải do Thầy/Cô không chấm. Chỉ
+    // từ ngày bắt đầu trùng — trước đó là dữ liệu đúng, có thể đã gửi email.
+    if (md.conflict && (!md.conflictFrom || date >= md.conflictFrom)) return 'conflict';
+    // Chốt an toàn đã dừng gửi cảnh báo ngày này vì dữ liệu máy bất thường:
+    // trang cũng không kết luận "Chưa chấm" — nếu không, chốt an toàn chỉ chặn
+    // được email còn vi phạm oan vẫn hiện ở đây.
+    if (base.heldDates.has(date)) return 'guarded';
+    // Ngày cũ hơn mốc đồng bộ còn lưu: không còn căn cứ để kết luận lại.
+    if (!base.coverage[date] && base.closedFrom && date < base.closedFrom) return 'expired';
+    // Bản ghi miễn chấm của Thầy/Cô đang lỗi và nhắc tới mã NV trên đơn tháng
+    // này (hoặc không rõ mã): không biết bữa nào được miễn, nên chưa kết luận
+    // "Chưa chấm" cho tới khi quản trị sửa xong — giống cách agent tạm giữ email.
+    if (base.exemptionState === 'invalid' && (base.exemptionHeldAll
+      || (md.registration && base.exemptionHeldIds.includes(normId(md.registration.employeeId))))) return 'exemption';
+    return null;
+  };
+
+  const viewDay = (date: string, md: MonthData): DayView => {
+    const hold = holdOf(date, md);
+    return {
+      hold,
+      result: evaluatePersonDay({
+        date,
+        registration: md.registration,
+        cancelations: base.cancels,
+        times: md.taps[date] || [],
+        offDays: base.offDays,
+        excludedIds: base.excludedIds,
+        checkinExemptions: base.checkinExemptions,
+        email: base.email,
+        // Bỏ mốc đồng bộ để bữa đó hiện "Chưa có dữ liệu" thay vì "Chưa chấm" oan.
+        coverageAt: hold === 'conflict' || hold === 'guarded' || hold === 'exemption' ? null : base.coverage[date] || null,
+        now,
+      }),
+    };
+  };
+
+  const conflictOf = (md: MonthData | undefined): ConflictInfo | null =>
+    md?.conflict
+      ? {
+          // conflict:true mà không kèm mã: vẫn phải báo, dùng mã trên hồ sơ cho dễ hiểu.
+          ids: md.conflictIds.length ? md.conflictIds : [base.profile?.employeeId || '(không rõ)'],
+          from: md.conflictFrom,
+        }
+      : null;
+
+  const cur = months[currentMonth];
+  const today = cur ? { ...viewDay(todayIso, cur), registration: cur.registration } : null;
+
+  const sel = months[month];
+  const monthData = sel
+    ? {
+        registration: sel.registration,
+        days: personalHistoryDates(month, base.offDays, sel.taps, todayIso)
+          .map(d => viewDay(d, sel)),
+        conflict: conflictOf(sel),
+        closedFrom: base.closedFrom,
+        noData: !sel.hasTapsDoc && !Object.keys(base.coverage).some(d => d.startsWith(month)),
+        heldDates: [...base.heldDates]
+          .filter(d => d.startsWith(month) && (month !== currentMonth || d <= todayIso))
+          .sort()
+          .reverse(),
+      }
+    : null;
+
+  return {
+    today,
+    monthData,
+    conflict: conflictOf(cur),
+    missedSyncAt: missedSyncRun(base.sync?.lastRunAt ?? null, now),
+    exemptionNotice: base.exemptionState === 'ok' ? null : base.exemptionState,
+  };
 }
 
 type LoadMode = 'initial' | 'manual' | 'auto';
@@ -1342,78 +1542,10 @@ export default function MyMeals() {
     };
   }, [uid, base, month, months]);
 
-  const currentMonth = todayIso.slice(0, 7);
-
-  const computed = useMemo(() => {
-    if (!base) return null;
-
-    const holdOf = (date: string, md: MonthData): DayHold | null => {
-      // Mã bị trùng thì agent không gán lượt chấm cho ai cả: thiếu lượt chấm
-      // lúc đó là do chưa xác định được, không phải do Thầy/Cô không chấm. Chỉ
-      // từ ngày bắt đầu trùng — trước đó là dữ liệu đúng, có thể đã gửi email.
-      if (md.conflict && (!md.conflictFrom || date >= md.conflictFrom)) return 'conflict';
-      // Chốt an toàn đã dừng gửi cảnh báo ngày này vì dữ liệu máy bất thường:
-      // trang cũng không kết luận "Chưa chấm" — nếu không, chốt an toàn chỉ chặn
-      // được email còn vi phạm oan vẫn hiện ở đây.
-      if (base.heldDates.has(date)) return 'guarded';
-      // Ngày cũ hơn mốc đồng bộ còn lưu: không còn căn cứ để kết luận lại.
-      if (!base.coverage[date] && base.closedFrom && date < base.closedFrom) return 'expired';
-      return null;
-    };
-
-    const viewDay = (date: string, md: MonthData): DayView => {
-      const hold = holdOf(date, md);
-      return {
-        hold,
-        result: evaluatePersonDay({
-          date,
-          registration: md.registration,
-          cancelations: base.cancels,
-          times: md.taps[date] || [],
-          offDays: base.offDays,
-          excludedIds: base.excludedIds,
-          // Bỏ mốc đồng bộ để bữa đó hiện "Chưa có dữ liệu" thay vì "Chưa chấm" oan.
-          coverageAt: hold === 'conflict' || hold === 'guarded' ? null : base.coverage[date] || null,
-          now,
-        }),
-      };
-    };
-
-    const conflictOf = (md: MonthData | undefined): ConflictInfo | null =>
-      md?.conflict
-        ? {
-            // conflict:true mà không kèm mã: vẫn phải báo, dùng mã trên hồ sơ cho dễ hiểu.
-            ids: md.conflictIds.length ? md.conflictIds : [base.profile?.employeeId || '(không rõ)'],
-            from: md.conflictFrom,
-          }
-        : null;
-
-    const cur = months[currentMonth];
-    const today = cur ? { ...viewDay(todayIso, cur), registration: cur.registration } : null;
-
-    const sel = months[month];
-    const monthData = sel
-      ? {
-          registration: sel.registration,
-          days: personalHistoryDates(month, base.offDays, sel.taps, todayIso)
-            .map(d => viewDay(d, sel)),
-          conflict: conflictOf(sel),
-          closedFrom: base.closedFrom,
-          noData: !sel.hasTapsDoc && !Object.keys(base.coverage).some(d => d.startsWith(month)),
-          heldDates: [...base.heldDates]
-            .filter(d => d.startsWith(month) && (month !== currentMonth || d <= todayIso))
-            .sort()
-            .reverse(),
-        }
-      : null;
-
-    return {
-      today,
-      monthData,
-      conflict: conflictOf(cur),
-      missedSyncAt: missedSyncRun(base.sync?.lastRunAt ?? null, now),
-    };
-  }, [base, months, month, currentMonth, todayIso, now]);
+  const computed = useMemo(
+    () => (base ? buildMyMealsView({ base, months, month, todayIso, now }) : null),
+    [base, months, month, todayIso, now],
+  );
 
   return (
     <div className="mobile-app-shell font-body-lg flex min-w-0 flex-col md:pl-64">
@@ -1435,6 +1567,7 @@ export default function MyMeals() {
         sync={base?.sync ?? null}
         missedSyncAt={computed?.missedSyncAt ?? null}
         conflict={computed?.conflict ?? null}
+        exemptionNotice={computed?.exemptionNotice ?? null}
         month={month}
         monthOptions={recentMonths(todayIso)}
         onMonthChange={setMonth}

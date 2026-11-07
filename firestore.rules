@@ -48,6 +48,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Danh sách miễn chấm ăn theo bữa do quản trị quản lý. CBNV chỉ đọc được
+    // bản ghi mang đúng email của mình; cả danh sách (mã NV, email) chỉ quản
+    // trị xem. Xét điều kiện chính chủ TRƯỚC để mỗi lần CBNV mở trang không tốn
+    // thêm 2 lượt đọc exists() của isAdmin().
+    match /meal_checkin_exemptions/{employeeId} {
+      allow read: if (isSignedIn() && resource.data.email == userEmail()) || isAdmin();
+      allow write: if isAdmin();
+    }
+
     match /blocked_users/{month} {
       allow read: if isSignedIn();
       allow write: if isAdmin();

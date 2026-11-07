@@ -8,7 +8,9 @@
  *   2. tách lượt chấm cho từng người vào `meal_taps/{uid}/months/{tháng}` để
  *      CBNV tự xem trên trang "Chấm ăn của tôi";
  *   3. ghi trạng thái đồng bộ vào `settings/checkinSync`;
- *   4. (khi có --send-alerts) gửi email cảnh báo "đăng ký mà không chấm ăn".
+ *   4. (khi có --send-alerts) gửi email cảnh báo, hai loại độc lập nhau:
+ *      "đăng ký mà không chấm ăn" cho HÔM NAY, và "chấm ăn nhưng chưa đăng ký"
+ *      cho NGÀY CÓ SUẤT ĂN TRƯỚC ĐÓ (xem lib/alert-plan.mjs alertDates).
  *
  * Cách chạy:
  *   node sync-checkins.mjs                  lấy N ngày gần nhất theo config
@@ -33,7 +35,7 @@ import { readFileSync, writeFileSync, statSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { vnParts, vnToday, formatVnDateTime, isWeekday, isMealFinal, MEALS, MEAL_LABEL } from './lib/meal-rules.mjs';
-import { addDays, datesFromTo, monthDates, chunk, redact, ISO_DATE_RE } from './lib/common.mjs';
+import { addDays, datesFromTo, monthDates, chunk, redact, oneLine, ISO_DATE_RE } from './lib/common.mjs';
 import { parseArgs, readAlertsConfig } from './lib/cli.mjs';
 import {
   groupByDateDevice, mergeDayDoc, findSuspectDevices, buildSyncSettings, pruneDateKeys,
@@ -41,13 +43,17 @@ import {
 } from './lib/sync-merge.mjs';
 import { normalizePeople, buildOwnerIndex, projectMonth, diffTapDoc, mappingChanged } from './lib/projection.mjs';
 import { cleanRegistrations, dropGhosts } from './lib/registrations.mjs';
+import { parseCheckinExemptionDocs, exemptionQuarantine } from './lib/checkin-exemptions.mjs';
 import {
-  alertGate, planAlerts, guardVerdict, uidsToLookup, selectRecipients, buildStaffBodies,
-  buildAdminNotice, alertEntry, finalAlertStatus, matchResults, dateLabelOf, deviceMealGaps,
+  alertGate, planAlerts, guardVerdict, uidsToLookup, selectRecipients, buildAdminNotice, alertEntry,
+  finalAlertStatus, dateLabelOf, deviceMealGaps, mealCounts, exemptionHold, exemptionAudit,
+  alertDates, extraGate, extraEntry, isTerminalExtraStatus, planExtraAlerts, lookbackMonths, relevantEventIds,
+  eventSkipUids, extraGuard, buildExtraAdminNotice, sentAlertsByKind, deliverAlerts, deliveryNotes,
+  OLD_API_EXTRA_REASON, EXTRA_REASON_LOG,
 } from './lib/alert-plan.mjs';
 import { readAcsPage, pagingProblem, MAX_PAGES } from './lib/isapi-paging.mjs';
 import { acquireLock } from './lib/run-lock.mjs';
-import { postAlerts } from './lib/endpoint.mjs';
+import { postAlerts, isOldApiKindRejection } from './lib/endpoint.mjs';
 // firebase-admin nạp muộn, ngay trước lúc cần Firestore: chế độ --dry-run
 // không cần tới nó, nhờ vậy kiểm tra kết nối thiết bị được ngay cả khi phần
 // Firebase chưa sẵn sàng. Test cũng không bao giờ phải nạp nó.
@@ -55,7 +61,11 @@ import { postAlerts } from './lib/endpoint.mjs';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ. Cũng được ghi vào settings/checkinSync.
-const AGENT_VERSION = '2026-10-09.1';
+const AGENT_VERSION = '2026-11-06.1';
+// Ghi cạnh agentVersion vào settings/checkinSync.agentFeatures: trang quản trị dựa
+// vào đây để biết agent đang chạy đã áp miễn chấm theo bữa và gửi thư chấm chưa
+// đăng ký chưa (web tự triển khai khi push, agent thì chép tay — hai bên có thể lệch).
+const AGENT_FEATURES = ['checkinExemptions', 'extraAlerts'];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -676,13 +686,13 @@ async function main() {
   // ---------------------------------------------- 4. tách lượt chấm cá nhân
 
   // Tài khoản Firebase Auth đã tra: uid -> { email } (có tài khoản) | null (không có).
-  /** @type {Map<string, { email: string } | null>} */
+  /** @type {Map<string, { email: string, disabled: boolean } | null>} */
   const authCache = new Map();
   const lookupUsers = async (/** @type {string[]} */ uids) => {
     const need = [...new Set(uids)].filter(u => !authCache.has(u));
     for (const group of chunk(need, 100)) {
       const res = await admin.auth().getUsers(group.map(uid => ({ uid })));
-      for (const u of res.users) authCache.set(u.uid, { email: u.email || '' });
+      for (const u of res.users) authCache.set(u.uid, { email: u.email || '', disabled: u.disabled === true });
       for (const uid of group) if (!authCache.has(uid)) authCache.set(uid, null);
     }
   };
@@ -728,13 +738,17 @@ async function main() {
   };
 
   // Mã bộ phận loại trừ (Bếp Vina): không gán lượt chấm của các mã này cho ai
-  // (xem buildOwnerIndex). Đọc một lần cho cả lần chạy.
+  // (xem buildOwnerIndex), không gửi cảnh báo nào cho các mã này. Đọc một lần cho
+  // cả lần chạy (bước tách cá nhân và cả hai loại thư cảnh báo dùng chung). Mã
+  // lưu dạng số (nhập tay) cũng được tính, như pha cảnh báo các bản trước.
   let excludedList = null;
   const excludedIdsList = async () => {
     if (!excludedList) {
       const snap = await db.collection('settings').doc('reconcileExcludes').get();
       const ids = snap.exists ? snap.get('employeeIds') : null;
-      excludedList = Array.isArray(ids) ? ids.filter(v => typeof v === 'string') : [];
+      excludedList = Array.isArray(ids)
+        ? ids.filter(v => typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))).map(String)
+        : [];
     }
     return excludedList;
   };
@@ -816,6 +830,7 @@ async function main() {
   if (!DRY_RUN) {
     await settingsRef.set(buildSyncSettings({
       agentVersion: AGENT_VERSION,
+      agentFeatures: AGENT_FEATURES,
       runEndAt,
       complete,
       existing: syncDoc,
@@ -842,24 +857,15 @@ async function main() {
       alertCode = await runAlerts({
         db, DEL, settingsRef, syncDoc, finalDocs, runEndAt, coveredDates, failedDevices, deviceResults,
         idleDevicesOn: date => okDevices.filter(d => !coversDate(spans[d], date)),
-        realRegistrationsOf, lookupUsers, authCache,
+        realRegistrationsOf, lookupUsers, authCache, excludedIdsList,
       });
     } catch (err) {
+      // Lỗi trước khi vào hai loại thư (vd. không đọc được ngày nghỉ). Lỗi bên
+      // trong từng loại do runAlerts tự ghi nhận, loại kia vẫn chạy.
       alertCode = 2;
       const message = redact(err.message, ALERTS?.cfg.secret);
       log(`\n  LỖI ở pha cảnh báo: ${message}`);
-      if (!DRY_RUN) {
-        try {
-          const date = TODAY;
-          const prev = syncDoc.alerts?.[date];
-          if (prev?.status !== 'sent' && prev?.status !== 'guarded') {
-            await settingsRef.set({ alerts: { [date]: alertEntry('error', new Date().toISOString(), {
-              sent: prev?.sent ?? 0,
-              reason: `Pha cảnh báo gặp lỗi: ${message}. Sẽ thử lại ở lần chạy sau.`,
-            }) } }, { merge: true });
-          }
-        } catch { /* đã in lỗi ở trên; không để lỗi phụ che lỗi chính */ }
-      }
+      await recordMissingCrash({ settingsRef, syncDoc, message });
     }
     if (code === 0) code = alertCode;
   }
@@ -895,18 +901,121 @@ async function commitWithRetry(db, ops) {
 /** Số ngày trước ngày xét được đọc để biết từng máy "thường" có bao nhiêu người chấm mỗi bữa. */
 const GAP_HISTORY_DAYS = 10;
 
-async function runAlerts({
-  db, DEL, settingsRef, syncDoc, finalDocs, runEndAt, coveredDates, failedDevices, deviceResults,
-  idleDevicesOn, realRegistrationsOf, lookupUsers, authCache,
-}) {
+/** Ghi biên nhận email vào meal_alerts (có thử lại): mỗi dòng { id, data } là meal_alerts/{id}. */
+const journalWriter = db => rows =>
+  commitWithRetry(db, rows.map(r => ({ ref: db.collection('meal_alerts').doc(r.id), data: r.data })));
+
+/**
+ * Giữ bản settings/checkinSync trong bộ nhớ khớp với những gì vừa ghi: lưới bắt
+ * lỗi cuối mỗi loại thư dựa vào nó để không ghi đè một trạng thái đã xong.
+ */
+const rememberAlert = (syncDoc, date, patch) => {
+  syncDoc.alerts = { ...(syncDoc.alerts || {}), [date]: { ...(syncDoc.alerts?.[date] || {}), ...patch } };
+};
+
+/** Danh sách mã NV cho log trên máy HAC — không bao giờ ghi lên hệ thống. */
+const codeList = (codes, max = 40) => {
+  const list = [...new Set(codes)].sort();
+  return list.slice(0, max).join(', ') + (list.length > max ? ` ... (+${list.length - max} mã)` : '');
+};
+
+/**
+ * Gửi email báo quản trị (loại 'admin-notice'). Ném lỗi nếu không địa chỉ nào
+ * nhận được — nơi gọi để trạng thái 'error' cho lần sau báo lại.
+ */
+async function sendAdminNotice(cfg, notice) {
+  const res = await postAlerts(cfg, notice);
+  const results = Array.isArray(res?.results) ? res.results : [];
+  if (!results.some(r => r?.ok === true)) {
+    throw new Error(results.map(r => r?.error).filter(Boolean)[0] || 'endpoint báo không gửi được');
+  }
+  // Máy chủ chỉ gửi tới địa chỉ có trong MEAL_ALERT_ADMINS trên Vercel; địa
+  // chỉ ngoài danh sách bị từ chối riêng lẻ. Liệt kê từng địa chỉ để người
+  // xem log biết ai thực sự đã nhận, thay vì in cả danh sách như đã gửi hết.
+  const delivered = results.filter(r => r?.ok === true).map(r => r.to);
+  log(`  Đã gửi email báo quản trị: ${delivered.join(', ')}`);
+  for (const r of results) {
+    if (r?.ok !== true) log(`  Không gửi được tới ${r?.to || '(không rõ)'}: ${redact(String(r?.error || 'lỗi không rõ'), cfg.secret)}`);
+  }
+}
+
+/**
+ * Danh sách "Miễn chấm ăn theo bữa" (meal_checkin_exemptions), kiểm tra TỪNG tài
+ * liệu: tài liệu hỏng chỉ giữ lại người nó nêu mã (hoặc cả loại thư thiếu chấm nếu
+ * không nêu được mã — xem exemptionHold), không làm hỏng cả danh sách. Mã tài liệu
+ * và lý do chỉ in ra log trên máy HAC, không bao giờ ghi lên hệ thống.
+ */
+async function loadCheckinExemptions(db) {
+  const snap = await db.collection('meal_checkin_exemptions').get();
+  const { policies, invalid } = parseCheckinExemptionDocs(snap.docs.map(d => ({ id: d.id, data: d.data() })));
+  if (invalid.length) {
+    log(`  Danh sách miễn chấm có ${invalid.length} tài liệu không hợp lệ — quản trị sửa ở trang Quản trị (mục Miễn chấm ăn theo bữa):`);
+    for (const item of invalid.slice(0, 20)) {
+      const who = item.employeeId ? ` (mã NV ${item.employeeId})` : ' (không xác định được mã NV)';
+      log(`      - meal_checkin_exemptions/${oneLine(item.docId, 80) || '(trống)'}${who}: ${item.reason}`);
+    }
+    if (invalid.length > 20) log(`      ... và ${invalid.length - 20} tài liệu khác.`);
+  }
+  return { policies, invalid, quarantine: exemptionQuarantine(invalid) };
+}
+
+/**
+ * Thư thiếu chấm gặp lỗi giữa chừng: ghi 'error' cho hôm nay để lần sau thử lại —
+ * trừ khi hôm nay đã 'sent' (xong) hoặc 'guarded' (đã báo quản trị). Giữ cờ held
+ * và số liệu của lần ghi trước: lần chạy lỗi không làm dữ liệu đáng tin hơn.
+ */
+async function recordMissingCrash({ settingsRef, syncDoc, message }) {
+  if (DRY_RUN) return;
+  try {
+    const prev = syncDoc.alerts?.[TODAY];
+    if (prev?.status === 'sent' || prev?.status === 'guarded') return;
+    await settingsRef.set({ alerts: { [TODAY]: alertEntry('error', new Date().toISOString(), {
+      sent: prev?.sent ?? 0,
+      failed: prev?.failed ?? 0,
+      stats: prev?.expected && prev?.missing ? { expected: prev.expected, missing: prev.missing } : null,
+      reason: `Pha cảnh báo gặp lỗi: ${message}. Sẽ thử lại ở lần chạy sau.`,
+      held: prev?.held === true,
+    }) } }, { merge: true });
+  } catch { /* đã in lỗi ở trên; không để lỗi phụ che lỗi chính */ }
+}
+
+/** Thư chấm chưa đăng ký của ngày `date` gặp lỗi giữa chừng: ghi 'error' để lần sau thử lại (trừ khi ngày đó đã xong). */
+async function recordExtraCrash({ settingsRef, syncDoc, date, message }) {
+  if (DRY_RUN || !date) return;
+  try {
+    const prev = syncDoc.alerts?.[date]?.extra;
+    if (isTerminalExtraStatus(prev?.status)) return;
+    await settingsRef.set({ alerts: { [date]: { extra: extraEntry('error', new Date().toISOString(), {
+      candidates: prev?.candidates ?? 0,
+      sent: prev?.sent ?? 0,
+      failed: prev?.failed ?? 0,
+      unmapped: prev?.unmapped ?? 0,
+      eventSkipped: prev?.eventSkipped ?? 0,
+      reason: `Pha cảnh báo chấm chưa đăng ký gặp lỗi: ${message}. Sẽ thử lại ở lần chạy sau.`,
+    }) } } }, { merge: true });
+  } catch { /* như trên */ }
+}
+
+/**
+ * Pha cảnh báo. Hai loại thư chạy ĐỘC LẬP — trạng thái hay lỗi của loại này
+ * không chặn loại kia:
+ *   [1] đăng ký mà không chấm ăn — HÔM NAY (như các bản trước, nay không tính
+ *       người được miễn chấm theo danh sách "Miễn chấm ăn theo bữa");
+ *   [2] chấm ăn nhưng chưa đăng ký — NGÀY CÓ SUẤT ĂN TRƯỚC hôm nay: ăn trước rồi
+ *       nộp đơn trong cùng ngày vẫn được tính là đã đăng ký, nên phải hết ngày
+ *       mới biết chắc. Lần chạy 13:45 của ngày có suất ăn kế tiếp xử lý.
+ * Mã trả về: 2 nếu một trong hai loại còn việc phải làm lại ở lần chạy sau.
+ */
+async function runAlerts(ctx) {
+  const { db, settingsRef, syncDoc } = ctx;
   const { cfg, secretOk, secretProblem, errors, warnings } = ALERTS;
   log('');
-  log('  CẢNH BÁO "ĐĂNG KÝ MÀ KHÔNG CHẤM ĂN"');
+  log('  CẢNH BÁO CHẤM ĂN');
   log('  ' + '─'.repeat(50));
   for (const w of warnings) log(`  Lưu ý: ${w}`);
 
-  // Bước 1: chỉ chạy khi được bật. Xem thử thì vẫn cho chạy để kiểm tra trước
-  // khi bật — không gửi gì cả.
+  // Bước 1 (chung cho hai loại thư): chỉ chạy khi được bật. Xem thử thì vẫn cho
+  // chạy để kiểm tra trước khi bật — không gửi gì cả.
   if (!cfg.enabled) {
     if (!DRY_RUN) {
       log('  alerts.enabled đang tắt trong config.json — bỏ qua, không gửi gì.');
@@ -920,12 +1029,46 @@ async function runAlerts({
     for (const p of configProblems) log(`  ${DRY_RUN ? 'Lưu ý' : 'LỖI'}: ${p}`);
   }
 
-  const date = args.alertsDate || TODAY;
   const now = new Date();
   const nowVn = vnParts(now);
-
   const offSnap = await db.collection('settings').doc('mealOffDays').get();
   const offDays = Array.isArray(offSnap.data()?.dates) ? offSnap.data().dates : [];
+  const dates = alertDates({ today: TODAY, alertsDate: args.alertsDate, offDays });
+  const shared = { ...ctx, cfg, configProblems, now, nowVn, offDays };
+
+  let code = 0;
+  log('');
+  log(`  [1] ĐĂNG KÝ NHƯNG CHƯA CHẤM — ${dateLabelOf(dates.missing)}`);
+  try {
+    code = await runMissingAlerts({ ...shared, date: dates.missing });
+  } catch (err) {
+    code = 2;
+    const message = redact(err?.message ?? err, cfg.secret);
+    log(`  LỖI ở thư thiếu chấm: ${message}`);
+    await recordMissingCrash({ settingsRef, syncDoc, message });
+  }
+
+  log('');
+  log(`  [2] CHẤM NHƯNG CHƯA ĐĂNG KÝ — ${dates.extra
+    ? `${dateLabelOf(dates.extra)}${args.alertsDate ? '' : ' (ngày có suất ăn trước hôm nay)'}`
+    : 'không có ngày nào để xét'}`);
+  try {
+    code = Math.max(code, await runExtraAlerts({ ...shared, date: dates.extra }));
+  } catch (err) {
+    code = 2;
+    const message = redact(err?.message ?? err, cfg.secret);
+    log(`  LỖI ở thư chấm chưa đăng ký: ${message}`);
+    await recordExtraCrash({ settingsRef, syncDoc, date: dates.extra, message });
+  }
+  return code;
+}
+
+/** [1] Đăng ký mà không chấm ăn — ngày `date` (hôm nay; ngày --alerts-date khi xem thử). */
+async function runMissingAlerts({
+  db, DEL, settingsRef, syncDoc, finalDocs, runEndAt, coveredDates, failedDevices, deviceResults,
+  idleDevicesOn, realRegistrationsOf, lookupUsers, authCache, excludedIdsList,
+  cfg, configProblems, now, nowVn, offDays, date,
+}) {
   const existing = syncDoc.alerts?.[date] || null;
 
   // Mốc chốt dữ liệu: lần chạy này nếu MỌI máy đều trả dữ liệu cho ngày đó.
@@ -943,12 +1086,19 @@ async function runAlerts({
     /** @type {Record<string, unknown>} */
     const alerts = { [date]: entry };
     for (const k of pruneDateKeys(syncDoc.alerts, TODAY)) if (k !== date) alerts[k] = DEL;
+    // set merge chỉ ghi các trường của mục thư thiếu chấm: phần `extra` (thư chấm
+    // chưa đăng ký của chính ngày đó, ghi ở lần chạy của ngày có suất ăn kế tiếp)
+    // giữ nguyên. Mục quá 100 ngày bị xoá cả cụm, gồm cả `extra`.
     await settingsRef.set({ alerts }, { merge: true });
+    rememberAlert(syncDoc, date, entry);
   };
 
   // Bước 2–5. Cấu hình sai được chặn ngay sau bước "ngày nghỉ", trước kiểm tra
   // giờ (xem alertGate). Chạy thử thì cho đi tiếp dù chưa điền khoá — để xem
   // trước danh sách khi còn đang chuẩn bị.
+  // Một ngày đã 'sent' là XONG với loại thư này, như các bản trước: các lần chạy
+  // sau dừng ngay ở đây — không tính lại, không ghi đè, không báo quản trị, không
+  // bật cờ held. (Thư chấm chưa đăng ký có trạng thái riêng, không phụ thuộc.)
   const gate = alertGate({
     date, now, nowVn, offDays,
     notBefore: cfg.notBefore,
@@ -975,12 +1125,19 @@ async function runAlerts({
   const planCoverageAt = forcedStop ? runEndAt : coverageAt;
 
   // Bước 6: đọc dữ liệu. Đơn của tài khoản không tồn tại bị bỏ (xem
-  // lib/registrations.mjs) — tra Auth lỗi thì dừng pha này, lần sau thử lại.
-  const registrations = await realRegistrationsOf(date.slice(0, 7), { strict: true });
+  // lib/registrations.mjs) — tra Auth lỗi thì dừng loại thư này, lần sau thử lại.
+  // Email tài khoản (Firebase Auth) đi kèm đơn để khớp danh sách miễn chấm: chính
+  // sách chỉ áp khi khớp CẢ mã NV lẫn email.
+  const registrations = (await realRegistrationsOf(date.slice(0, 7), { strict: true }))
+    .map(reg => ({ ...reg, email: authCache.get(reg.uid)?.email || '' }));
   const cancelations = (await db.collection('cancel_registrations').where('cancelDate', '==', date).get()).docs.map(d => d.data());
-  const excludedIds = (await db.collection('settings').doc('reconcileExcludes').get()).data()?.employeeIds || [];
+  const excludedIds = await excludedIdsList();
+  const exemptions = await loadCheckinExemptions(db);
+  const invalidExemptions = exemptions.invalid.length;
   const sentSnap = await db.collection('meal_alerts').where('date', '==', date).get();
-  const alreadySent = new Set(sentSnap.docs.map(d => d.get('uid')).filter(Boolean));
+  // Chỉ biên nhận thư thiếu chấm (khoá cũ {ngày}_{uid}). Biên nhận thư chấm chưa
+  // đăng ký của cùng ngày là việc của loại thư kia.
+  const alreadySent = sentAlertsByKind(sentSnap.docs.map(d => d.data())).missing;
 
   // Bước 7: lượt chấm của ngày SAU khi gộp lần này
   let dayDoc;
@@ -997,8 +1154,10 @@ async function runAlerts({
     date,
     registrations,
     cancelations,
-    excludedIds: Array.isArray(excludedIds) ? excludedIds : [],
+    excludedIds,
     offDays,
+    checkinExemptions: exemptions.policies,
+    quarantinedIds: exemptions.quarantine.ids,
     people,
     coverageAt: planCoverageAt,
     now,
@@ -1008,13 +1167,26 @@ async function runAlerts({
   log(`  Ngày       : ${dateLabelOf(date)}`);
   log(`  Dữ liệu chốt lúc: ${coverageAt ? formatVnDateTime(coverageAt) : forcedStop ? 'CHƯA CHỐT — có máy không trả dữ liệu ngày này (số liệu dưới đây chỉ để báo quản trị)' : 'CHƯA CÓ lần đồng bộ đủ máy — mọi bữa đang "chưa có dữ liệu", không ai bị coi là chưa chấm'}`);
   for (const m of MEALS) {
-    log(`  ${MEAL_LABEL[m].padEnd(9)}: ${stats.expected[m]} người đáng lẽ ăn, ${stats.missing[m]} người chưa có lượt chấm`);
+    // Mẫu số không tính người được miễn chấm (cùng cách tính với chốt an toàn).
+    const c = mealCounts(stats, m);
+    log(`  ${MEAL_LABEL[m].padEnd(9)}: ${c.expected} người đáng lẽ ăn, ${c.missing} người chưa có lượt chấm${c.note}`);
   }
   log(`  Có lượt chấm trong khung giờ ăn: ${plan.tappers} người`);
   if (plan.skipped.unusable.length) log(`  Bỏ qua ${plan.skipped.unusable.length} đơn thiếu mã NV (không đối soát được).`);
   if (plan.skipped.excluded.length) log(`  Bỏ qua ${plan.skipped.excluded.length} đơn thuộc danh sách loại trừ.`);
   if (plan.skipped.duplicate.length) {
     log(`  Bỏ qua ${plan.skipped.duplicate.length} mã NV trùng giữa nhiều đơn: ${plan.skipped.duplicate.join(', ')} — quản trị cần sửa tay.`);
+  }
+  if (plan.skipped.quarantined.length) {
+    log(`  Bỏ qua ${plan.skipped.quarantined.length} mã NV có tài liệu miễn chấm hỏng (chờ quản trị sửa): ${codeList(plan.skipped.quarantined)}.`);
+  }
+  log(`  Đã nạp ${exemptions.policies.length} chính sách miễn chấm; ${args.alertsDate ? `ngày ${dateLabelOf(date)}` : 'hôm nay'} miễn ${stats.exempt.breakfast} bữa sáng, ${stats.exempt.lunch} bữa trưa.`);
+  const audit = exemptionAudit({ date, policies: exemptions.policies, registrations });
+  if (audit.unmatched.length) {
+    log(`  ${audit.unmatched.length} chính sách miễn chấm đang có hiệu lực nhưng mã NV không có trên đơn đăng ký nào tháng ${date.slice(5, 7)}/${date.slice(0, 4)}: ${codeList(audit.unmatched)}.`);
+  }
+  if (audit.emailMismatch.length) {
+    log(`  ${audit.emailMismatch.length} chính sách miễn chấm có email khác email tài khoản trên đơn nên CHƯA được áp dụng (quản trị sửa email trong danh sách): ${codeList(audit.emailMismatch)}.`);
   }
 
   // Bước 10a: từng máy có lượt chấm của mọi bữa đã chốt không — so với chính
@@ -1060,27 +1232,14 @@ async function runAlerts({
       return 0;
     }
     const at = new Date().toISOString();
-    let entry = alertEntry('guarded', at, { stats, sent: alreadySent.size, reason: guard.reason, held: true });
+    let entry = alertEntry('guarded', at, { stats, sent: alreadySent.size, reason: guard.reason, held: true, invalidExemptions });
     let code = 0;
     if (noticeNeeded && cfg.adminEmails.length) {
       try {
-        const notice = buildAdminNotice({
+        await sendAdminNotice(cfg, buildAdminNotice({
           date, adminEmails: cfg.adminEmails, reason: guard.reason, stats, tappers: plan.tappers,
           devices: deviceResults, agentVersion: AGENT_VERSION,
-        });
-        const res = await postAlerts(cfg, notice);
-        const results = Array.isArray(res?.results) ? res.results : [];
-        if (!results.some(r => r?.ok === true)) {
-          throw new Error(results.map(r => r?.error).filter(Boolean)[0] || 'endpoint báo không gửi được');
-        }
-        // Máy chủ chỉ gửi tới địa chỉ có trong MEAL_ALERT_ADMINS trên Vercel; địa
-        // chỉ ngoài danh sách bị từ chối riêng lẻ. Liệt kê từng địa chỉ để người
-        // xem log biết ai thực sự đã nhận, thay vì in cả danh sách như đã gửi hết.
-        const delivered = results.filter(r => r?.ok === true).map(r => r.to);
-        log(`  Đã gửi email báo quản trị: ${delivered.join(', ')}`);
-        for (const r of results) {
-          if (r?.ok !== true) log(`  Không gửi được tới ${r?.to || '(không rõ)'}: ${redact(String(r?.error || 'lỗi không rõ'), cfg.secret)}`);
-        }
+        }));
       } catch (err) {
         // Chưa báo được thì để 'error' (không phải 'guarded') để lần sau thử
         // báo lại — 'guarded' nghĩa là quản trị ĐÃ được báo.
@@ -1090,6 +1249,7 @@ async function runAlerts({
           sent: alreadySent.size,
           reason: `${guard.reason} Gửi email báo quản trị thất bại: ${message}. Sẽ thử lại ở lần chạy sau.`,
           held: true,
+          invalidExemptions,
         });
         log(`  LỖI: không gửi được email báo quản trị — ${message}`);
         code = 2;
@@ -1101,6 +1261,27 @@ async function runAlerts({
     }
     await writeStatus(entry);
     return code;
+  }
+
+  // Bước 10b: danh sách miễn chấm có tài liệu hỏng không nêu được mã NV — không
+  // biết ai đang được miễn, giữ lại cả loại thư này tới khi quản trị sửa.
+  const holdReason = exemptionHold(exemptions.quarantine);
+  if (holdReason) {
+    log('');
+    log(`  TẠM DỪNG thư thiếu chấm: ${holdReason}`);
+    const holdStatus = existing?.status === 'guarded' ? 'guarded' : 'error';
+    if (DRY_RUN) {
+      log(`  (Chạy thử: lần chạy thật sẽ ghi trạng thái "${holdStatus}" và không gửi thư thiếu chấm nào cho ngày này.)`);
+      return 0;
+    }
+    // Lần này chốt an toàn đã qua (dữ liệu máy bình thường), nên bỏ cờ held cũ:
+    // để nguyên thì ngày này bị coi là "dữ liệu máy bất thường" mãi, và nhóm thư
+    // "chấm chưa đăng ký" của ngày này (xét vào ngày ăn kế tiếp) bị chặn theo.
+    // Giữ 'guarded' nếu hôm nay đã báo quản trị — đó là dấu để không báo lại.
+    await writeStatus(alertEntry(holdStatus, new Date().toISOString(), {
+      stats, sent: alreadySent.size, reason: holdReason, held: false, invalidExemptions,
+    }));
+    return 2;
   }
 
   // Bước 11: người nhận — email lấy từ Firebase Auth (đã tra cùng lúc lọc đơn
@@ -1129,65 +1310,256 @@ async function runAlerts({
     return 0;
   }
 
-  // Bước 12: gửi
-  let sentNow = 0;
-  let failed = 0;
-  const errorsSeen = [];
-  /** Lỗi ghi nhật ký meal_alerts (null = chưa lỗi). */
-  let journalError = null;
-  for (const { group, body } of buildStaffBodies({ date, recipients })) {
-    if (journalError) {
-      // Không ghi được nhật ký thì KHÔNG gửi thêm: email đã gửi mà không được
-      // ghi nhớ sẽ bị gửi lại ở mỗi lần lặp 15 phút sau đó. Dừng ở đây thì chỉ
-      // lô vừa rồi có thể bị gửi trùng; người còn lại chờ lần chạy sau.
-      failed += group.length;
-      continue;
-    }
-    let results;
-    try {
-      results = matchResults(group, await postAlerts(cfg, body));
-    } catch (err) {
-      results = group.map(() => ({ ok: false, error: redact(err.message, cfg.secret) }));
-    }
-    const okOnes = group.filter((_, i) => results[i].ok);
-    if (okOnes.length) {
-      // Ghi nhật ký ngay sau mỗi lô: lô sau có hỏng giữa chừng thì những người
-      // đã nhận email vẫn được nhớ, lần chạy sau không gửi trùng.
-      const sentAt = new Date().toISOString();
-      try {
-        await commitWithRetry(db, okOnes.map(r => ({
-          ref: db.collection('meal_alerts').doc(`${date}_${r.uid}`),
-          data: { uid: r.uid, date, to: r.to, employeeId: r.employeeId, meals: r.meals, sentAt },
-        })));
-      } catch (err) {
-        journalError = String(err?.message || err);
-        log(`  LỖI: đã gửi ${okOnes.length} email nhưng không ghi được nhật ký — DỪNG gửi tiếp; lần sau những người này có thể nhận trùng. ${journalError}`);
-      }
-    }
-    sentNow += okOnes.length;
-    failed += group.length - okOnes.length;
-    for (const r of results) {
-      if (!r.ok && r.error && errorsSeen.length < 3 && !errorsSeen.includes(r.error)) errorsSeen.push(r.error);
-    }
-  }
-  if (journalError) errorsSeen.unshift('không ghi được nhật ký meal_alerts, đã dừng gửi');
-
-  const status = finalAlertStatus({ missingCount: plan.candidates.length, failed });
-  const notes = [];
-  if (failed) notes.push(`${failed} email chưa gửi được (${errorsSeen.join('; ')}). Lần chạy sau sẽ gửi nốt.`);
-  if (journalError) notes.push(`Lỗi ghi nhật ký: ${journalError}.`);
-  if (unreachable) notes.push(`${unreachable} người không có email của trường trong tài khoản, không gửi được.`);
+  // Bước 12: gửi từng lô, ghi nhật ký meal_alerts/{ngày}_{uid} ngay sau mỗi lô.
+  const delivery = await deliverAlerts({
+    date, kind: 'missing', recipients,
+    post: body => postAlerts(cfg, body),
+    writeJournal: journalWriter(db),
+    cleanError: err => redact(err?.message ?? err, cfg.secret),
+    log,
+  });
+  const status = finalAlertStatus({ missingCount: plan.candidates.length, failed: delivery.failed });
+  const notes = deliveryNotes({ ...delivery, unreachable, kind: 'missing' });
   if (plan.skipped.duplicate.length) notes.push(`${plan.skipped.duplicate.length} mã NV trùng giữa nhiều đơn, bỏ qua.`);
+  if (plan.skipped.quarantined.length) notes.push(`${plan.skipped.quarantined.length} mã NV có tài liệu miễn chấm hỏng, tạm chưa gửi cho các mã này.`);
 
   await writeStatus(alertEntry(status, new Date().toISOString(), {
-    sent: alreadySent.size + sentNow,
-    failed,
+    sent: alreadySent.size + delivery.sent,
+    failed: delivery.failed,
     stats,
     reason: notes.join(' ') || null,
+    invalidExemptions,
   }));
 
-  log(`  Đã gửi ${sentNow} email${failed ? `, ${failed} lỗi: ${errorsSeen.join('; ')}` : ''}. Trạng thái: ${status}.`);
-  return failed ? 2 : 0;
+  log(`  Đã gửi ${delivery.sent} email${delivery.failed ? `, ${delivery.failed} lỗi: ${delivery.errorsSeen.join('; ')}` : ''}. Trạng thái: ${status}.`);
+  return delivery.failed ? 2 : 0;
+}
+
+/**
+ * [2] Chấm ăn nhưng chưa đăng ký — ngày `date` (ngày có suất ăn trước hôm nay;
+ * ngày --alerts-date khi xem thử). Trạng thái ghi riêng ở alerts[ngày].extra
+ * (chỉ số đếm). 'sent', 'nothing', 'guarded', 'off_day' là xong hẳn: các lần chạy
+ * sau dừng ngay ở cửa chặn, không đọc thêm gì.
+ */
+async function runExtraAlerts({
+  db, settingsRef, syncDoc, finalDocs, runEndAt, coveredDates, realRegistrationsOf, lookupUsers, authCache, excludedIdsList,
+  cfg, configProblems, now, nowVn, offDays, date,
+}) {
+  if (!date) {
+    log('  7 ngày trước hôm nay đều không có suất ăn — không có gì để xét.');
+    return 0;
+  }
+  const existing = syncDoc.alerts?.[date]?.extra || null;
+  // Mốc chốt mới nhất của ngày xét: lần chạy này nếu nó phủ đủ mọi máy ngày đó
+  // (vd. chạy 7 ngày), không thì mốc đã ghi từ các lần chạy trước.
+  const coverageAt = coveredDates.includes(date) ? runEndAt : (syncDoc.coverage?.[date] ?? null);
+
+  const writeExtra = async entry => {
+    if (DRY_RUN) return;
+    // Chỉ ghi `alerts[ngày].extra` (set merge): mục thư thiếu chấm của ngày đó giữ nguyên.
+    await settingsRef.set({ alerts: { [date]: { extra: entry } } }, { merge: true });
+    rememberAlert(syncDoc, date, { extra: entry });
+  };
+
+  const gate = extraGate({
+    date, now, nowVn, offDays,
+    notBefore: cfg.notBefore,
+    coverageAt,
+    configProblems: DRY_RUN ? [] : configProblems,
+    existing,
+    // Chốt an toàn của thư thiếu chấm đã treo ngày đó (dữ liệu máy bất thường):
+    // trang cá nhân và tab Đối soát không kết luận ngày đó, thư này cũng không.
+    held: syncDoc.alerts?.[date]?.held === true,
+    ignoreTime: !!args.alertsDate,
+  });
+  if (gate.write) await writeExtra(gate.write);
+  if (!gate.proceed) {
+    log(`  ${gate.message}`);
+    if (gate.code === 'bad_config') return 2;
+    if (!(DRY_RUN && gate.code === 'done' && gate.meals.length)) return 0;
+    log('  (Chạy thử: vẫn tính danh sách để Thầy/Cô xem.)');
+  }
+  const { meals } = gate;
+
+  // Lần trước API email trên web còn là bản cũ (thường do agent được chép trước
+  // khi web triển khai xong): hỏi lại bằng một yêu cầu rỗng trước khi tốn vài
+  // trăm lượt đọc. Yêu cầu rỗng không bao giờ thành thư — API kiểm tra dữ liệu
+  // trước khi gọi Microsoft Graph; bản mới trả 400 vì danh sách rỗng (không nhắc
+  // tới `kind`), bản cũ trả 400 về `kind`. Lỗi khác thì cứ làm tiếp như thường.
+  if (!DRY_RUN && existing?.status === 'error' && existing?.reason === OLD_API_EXTRA_REASON) {
+    try {
+      await postAlerts(cfg, { kind: 'staff-extra', date, dateLabel: dateLabelOf(date), alerts: [] });
+    } catch (err) {
+      if (isOldApiKindRejection(err)) {
+        log(`  ${OLD_API_EXTRA_REASON} Web vẫn là bản cũ — bỏ qua lần này, không đọc thêm dữ liệu; lần chạy sau thử lại.`);
+        return 2;
+      }
+    }
+  }
+
+  // Dữ liệu của ngày xét: lượt chấm (bản vừa gộp nếu ngày đó nằm trong khoảng
+  // vừa lấy, không thì đọc một document), đơn tháng của ngày đó, báo hủy.
+  let dayDoc;
+  if (RANGE_DATES.includes(date)) {
+    dayDoc = finalDocs[date] || null;
+  } else {
+    const s = await db.collection('checkins').doc(date).get();
+    dayDoc = s.exists ? s.data() : null;
+  }
+  const registrations = await realRegistrationsOf(date.slice(0, 7), { strict: true });
+  const cancelations = (await db.collection('cancel_registrations').where('cancelDate', '==', date).get()).docs.map(d => d.data());
+  const excludedIds = await excludedIdsList();
+  const input = { date, registrations, cancelations, excludedIds, offDays, people: dayDoc?.people ?? null, coverageAt, now };
+  let plan = planExtraAlerts({ ...input, lookback: null });
+  if (plan.needsLookback) {
+    // Có mã chấm mà không đứng trên đơn nào của tháng: đọc đơn 3 tháng trước để
+    // gắn mã với tài khoản (chỉ khi cần; mỗi tháng được nhớ trong lần chạy).
+    const lookback = [];
+    for (const month of lookbackMonths(date.slice(0, 7))) {
+      for (const reg of await realRegistrationsOf(month, { strict: true })) lookback.push({ ...reg, month });
+    }
+    plan = planExtraAlerts({ ...input, lookback });
+  }
+
+  let { candidates } = plan;
+  const notMapped = [...plan.skipped.duplicate, ...plan.skipped.unmapped];
+  const unmapped = notMapped.length;
+  log(`  Ngày       : ${dateLabelOf(date)}`);
+  log(`  Dữ liệu chốt lúc: ${formatVnDateTime(coverageAt)}${meals.length < MEALS.length ? ` — mới chốt ${meals.map(m => MEAL_LABEL[m]).join(', ')}, chỉ xét bữa đó` : ''}`);
+  log(`  Mã NV của trường có lượt chấm trong khung giờ ăn: ${plan.tappers}`);
+  if (unmapped) {
+    log(`  Bỏ qua ${unmapped} mã có lượt chấm nhưng chưa gắn được với đúng một tài khoản qua đơn đăng ký (không gửi; quản trị đối chiếu ở tab Đối soát): ${codeList(notMapped)}.`);
+  }
+
+  // Suất ăn sự kiện ngày thường: người đã chọn "Có ăn" ở một sự kiện có thể rơi
+  // vào ngày này thì lượt chấm có thể là suất sự kiện — không gửi. Chỉ đọc khi
+  // có người cần báo.
+  let eventSkipped = 0;
+  if (candidates.length) {
+    const eventsSnap = await db.collection('events').get();
+    const eventIds = relevantEventIds({ date, events: eventsSnap.docs.map(d => ({ ...d.data(), id: d.id })) });
+    if (eventIds.length) {
+      const eventRegistrations = [];
+      for (const group of chunk(eventIds, 30)) {
+        const snap = await db.collection('event_registrations').where('eventId', 'in', group).get();
+        eventRegistrations.push(...snap.docs.map(d => d.data()));
+      }
+      const skip = eventSkipUids({ eventIds, registrations: eventRegistrations, uids: candidates.map(c => c.uid) });
+      eventSkipped = candidates.filter(c => skip.has(c.uid)).length;
+      candidates = candidates.filter(c => !skip.has(c.uid));
+    }
+    if (eventSkipped) log(`  Bỏ qua ${eventSkipped} người đã chọn "Có ăn" ở suất ăn sự kiện gần ngày này.`);
+  }
+
+  const sentSnap = await db.collection('meal_alerts').where('date', '==', date).get();
+  // Cả biên nhận đã gửi và chưa rõ đều chặn tự gửi lại. Thống kê riêng để không
+  // biến thư chưa rõ thành "đã gửi" ở lần chạy sau.
+  const sentRows = sentSnap.docs.map(d => d.data());
+  const alreadySent = sentAlertsByKind(sentRows).extra;
+  const priorUncertain = sentAlertsByKind(sentRows.filter(row => row.delivery === 'uncertain')).extra.size;
+  const confirmedSent = alreadySent.size - priorUncertain;
+  const counts = { candidates: candidates.length, unmapped, eventSkipped };
+
+  // Chốt an toàn: nhiều người cùng "chưa đăng ký" một lúc thường là do dữ liệu.
+  const guard = extraGuard({ date, candidates: candidates.length, tappers: plan.tappers });
+  if (guard.stop) {
+    log('');
+    log(`  CHỐT AN TOÀN — DỪNG, không gửi thư chấm chưa đăng ký cho CBNV: ${guard.reason}`);
+    if (DRY_RUN) {
+      log(`  Lần chạy thật sẽ báo quản trị (một lần cho ngày này): ${cfg.adminEmails.join(', ') || '(chưa khai adminEmails)'}`);
+      return 0;
+    }
+    const at = new Date().toISOString();
+    let entry = extraEntry('guarded', at, { ...counts, sent: confirmedSent, uncertain: priorUncertain, reason: guard.reason });
+    let code = 0;
+    if (cfg.adminEmails.length) {
+      try {
+        await sendAdminNotice(cfg, buildExtraAdminNotice({
+          date, adminEmails: cfg.adminEmails, reason: guard.reason, candidates: candidates.length,
+          tappers: plan.tappers, limit: guard.limit, unmapped, eventSkipped, agentVersion: AGENT_VERSION,
+        }));
+      } catch (err) {
+        // Chưa báo được thì để 'error' để lần sau tính lại và báo lại — 'guarded'
+        // nghĩa là quản trị ĐÃ được báo (và ngày đó không xét nữa).
+        const message = redact(err.message, cfg.secret);
+        entry = extraEntry('error', at, {
+          ...counts,
+          sent: confirmedSent,
+          uncertain: priorUncertain,
+          reason: `${guard.reason} Gửi email báo quản trị thất bại: ${message}. Sẽ thử lại ở lần chạy sau.`,
+        });
+        log(`  LỖI: không gửi được email báo quản trị — ${message}`);
+        code = 2;
+      }
+    } else {
+      log('  Chưa khai alerts.adminEmails nên không báo được cho ai.');
+    }
+    await writeExtra(entry);
+    return code;
+  }
+
+  // Người nhận: chỉ tài khoản còn tồn tại, đang hoạt động, email của trường —
+  // email lấy từ Firebase Auth.
+  await lookupUsers(uidsToLookup(candidates, alreadySent));
+  const emails = new Map(candidates.map(c => {
+    const account = authCache.get(c.uid);
+    return [c.uid, account && !account.disabled ? account.email : undefined];
+  }));
+  const { recipients, skipped } = selectRecipients({ candidates, alreadySent, emails });
+  const unreachable = skipped.noEmail.length + skipped.outsideDomain.length;
+  log('');
+  log(`  Cần cảnh báo: ${candidates.length} người — đã xử lý trước đó ${skipped.alreadySent.length}${priorUncertain ? ` (có ${priorUncertain} email chưa rõ đã gửi hay chưa, không tự gửi lại)` : ''}, sẽ gửi ${recipients.length}`);
+  if (unreachable) log(`  Không gửi được cho ${unreachable} người: không có tài khoản đang hoạt động với email @hoangmaistarschool.edu.vn.`);
+  if (skipped.duplicateEmail.length) log(`  Bỏ ${skipped.duplicateEmail.length} người dùng chung địa chỉ email với người khác trong danh sách (chỉ gửi một lần).`);
+
+  if (DRY_RUN) {
+    if (recipients.length) {
+      log('');
+      log('  Danh sách sẽ nhận email (chạy thử, KHÔNG gửi):');
+      for (const r of recipients) {
+        const what = r.meals
+          .map(m => `${MEAL_LABEL[m]} lúc ${r.tapTimes?.[m]} (${EXTRA_REASON_LOG[r.reasons?.[m]] || r.reasons?.[m]})`)
+          .join(' + ');
+        log(`    - ${r.fullName || '(không tên)'} (Mã NV ${r.employeeId}) <${r.to}>: ${what}${r.anchor === 'lookback' ? ' | gắn theo đơn các tháng trước' : ''}`);
+      }
+    }
+    log(`  Kết luận: lần chạy thật sẽ ghi trạng thái "${priorUncertain ? 'partial' : finalAlertStatus({ missingCount: candidates.length, failed: 0 })}".`);
+    return 0;
+  }
+
+  // Thư chưa rõ đã gửi hay chưa được ghi riêng vào meal_alerts/{ngày}:extra:{uid}
+  // và không tự gửi lại. Chỉ lỗi chắc chắn chưa gửi mới được thử lại ở lần sau.
+  const delivery = await deliverAlerts({
+    date, kind: 'extra', recipients,
+    post: body => postAlerts(cfg, body),
+    writeJournal: journalWriter(db),
+    cleanError: err => redact(err?.message ?? err, cfg.secret),
+    log,
+  });
+  let status;
+  let reason;
+  const uncertain = priorUncertain + delivery.uncertain;
+  if (delivery.unsupported) {
+    status = 'error';
+    reason = OLD_API_EXTRA_REASON;
+    log(`  LỖI: ${OLD_API_EXTRA_REASON} Đã dừng loại thư này trong lần chạy; lần chạy sau thử lại.`);
+  } else {
+    status = uncertain || delivery.journalError ? 'partial' : finalAlertStatus({ missingCount: candidates.length, failed: delivery.failed });
+    const notes = deliveryNotes({ ...delivery, uncertain, unreachable, kind: 'extra' });
+    if (unmapped) notes.push(`${unmapped} mã có lượt chấm chưa gắn được với đúng một tài khoản, không gửi.`);
+    if (eventSkipped) notes.push(`${eventSkipped} người có đăng ký suất ăn sự kiện gần ngày này, không gửi.`);
+    if (meals.length < MEALS.length) notes.push(`Ngày này mới chốt dữ liệu ${meals.map(m => MEAL_LABEL[m].toLowerCase()).join(', ')} nên chỉ xét bữa đó.`);
+    reason = notes.join(' ') || null;
+  }
+  await writeExtra(extraEntry(status, new Date().toISOString(), {
+    ...counts,
+    sent: confirmedSent + delivery.sent,
+    failed: delivery.failed,
+    uncertain,
+    reason,
+  }));
+  log(`  Đã gửi ${delivery.sent} email${delivery.failed ? `, ${delivery.failed} chưa gửi được${delivery.errorsSeen.length ? `: ${delivery.errorsSeen.join('; ')}` : ''}` : ''}${uncertain ? `, ${uncertain} email chưa rõ đã gửi hay chưa — không tự gửi lại, cần kiểm tra hộp thư` : ''}. Trạng thái: ${status}.`);
+  return delivery.failed || uncertain || delivery.journalError ? 2 : 0;
 }
 
 // --------------------------------------------------------------------------

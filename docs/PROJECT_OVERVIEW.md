@@ -102,9 +102,12 @@ Ngày nghỉ hoặc ngày ăn sự kiện khai trong `settings/mealOffDays` vẫ
 
 ### Email cảnh báo
 
-Sau đồng bộ, nếu chạy với `--send-alerts`, agent xác định người đã đăng ký nhưng thiếu lượt chấm. Agent kiểm tra giờ gửi, dữ liệu đủ máy, ngày có suất ăn, mã trùng/loại trừ, báo hủy và các ngưỡng bất thường trước khi gửi.
+Sau đồng bộ, nếu chạy với `--send-alerts`, agent xử lý hai loại thư độc lập (bản agent `2026-11-06.1`):
 
-Email lấy địa chỉ từ tài khoản Firebase Authentication. Nhật ký `meal_alerts/{date}_{uid}` ngăn gửi lại cho người đã gửi trong ngày; khóa file ngăn hai lần đồng bộ chạy đồng thời trên cùng máy. Cảnh báo nên vận hành trên một máy agent, vì khóa này không phối hợp giữa nhiều máy.
+- **Thiếu chấm** (`staff-missing`) cho **hôm nay**: người đã đăng ký nhưng thiếu lượt chấm. Agent kiểm tra giờ gửi, dữ liệu đủ máy, ngày có suất ăn, mã trùng/loại trừ, báo hủy, danh sách **Miễn chấm ăn theo bữa** (`meal_checkin_exemptions`, chỉ áp khi khớp cả mã NV lẫn email tài khoản; mặc định miễn bữa trưa) và các ngưỡng bất thường trước khi gửi. Mẫu số của ngưỡng không tính người được miễn. Tài liệu miễn chấm hỏng nêu được mã thì chỉ giữ người đó; không nêu được mã thì giữ cả loại thư này của ngày (trạng thái `error`). Ngày đã `sent` không bị xét lại.
+- **Chấm chưa đăng ký** (`staff-extra`) cho **ngày có suất ăn trước hôm nay**: có lượt chấm trong khung một bữa đã chốt nhưng không có đăng ký phù hợp (gồm đã báo hủy, chưa tới ngày bắt đầu). Xét ngày trước vì ăn trước rồi nộp đơn trong ngày vẫn tính là đã đăng ký. Mã chỉ được gắn với tài khoản qua **đơn đăng ký** (đúng một tài khoản trong tháng; không có đơn tháng thì đúng một tài khoản trong 3 tháng trước, tài khoản đó chưa có đơn tháng này và không mang mã khác) — không bao giờ qua hồ sơ `staff`. Bỏ người chọn "Có ăn" ở sự kiện có thể rơi vào ngày đó; quá max(30, 25% người có lượt chấm) thì dừng cả ngày và báo quản trị; ngày bị chốt an toàn treo (`alerts[ngày].held`) thì không gửi. Không bị chặn bởi danh sách miễn chấm.
+
+Email lấy địa chỉ từ tài khoản Firebase Authentication. Nhật ký `meal_alerts` tách theo loại thư/người/ngày. Thư chấm chưa đăng ký có kết quả chưa rõ được ghi `delivery: 'uncertain'`, `attemptedAt` (không có `sentAt`), không tự gửi lại và yêu cầu kiểm tra hộp thư; chỉ lỗi chắc chắn chưa gửi mới thử lại. Thư thiếu chấm giữ cách thử lại hiện có. Khóa file ngăn hai lần đồng bộ chạy đồng thời trên cùng máy; nên chỉ vận hành một Agent gửi cảnh báo vì khóa này không phối hợp giữa nhiều máy. Nếu gửi được nhưng không ghi được nhật ký, Agent dừng lô tiếp theo; vẫn còn khả năng lặp lô vừa gửi. Agent ghi `agentVersion` và `agentFeatures` vào `settings/checkinSync` để trang quản trị biết Agent đang chạy đã hỗ trợ miễn chấm / thư chấm chưa đăng ký chưa.
 
 ### Khảo sát hằng tuần
 
@@ -163,7 +166,9 @@ Khi đổi câu hỏi/mã đáp án khảo sát, cập nhật `survey.mjs`, tăn
 | `settings/{id}` | Cấu hình nghiệp vụ, đồng bộ và loại trừ | Người đăng nhập đọc; quản trị ghi |
 | `checkins/{date}` | Lượt chấm toàn trường, gộp và riêng từng máy | Quản trị đọc; client không ghi |
 | `meal_taps/{uid}/months/{month}` | Giờ chấm riêng của tài khoản | Chính chủ/quản trị đọc; client không ghi |
-| `meal_alerts/{date}_{uid}` | Nhật ký cảnh báo | Quản trị đọc; client không ghi |
+| `meal_checkin_exemptions/{employeeId}` | Miễn chấm ăn theo bữa: `employeeId` (6 chữ số, trùng mã tài liệu), `email` (email trường, viết thường), `fullName`, `periods[]` gồm `from`, `to` (null = chưa kết thúc), `meals` (`breakfast`/`lunch`, thiếu = `['lunch']`) | Chính chủ (theo email) / quản trị đọc; quản trị ghi. Agent chỉ đọc |
+| `meal_alerts/{date}_{uid}` | Biên nhận thư **thiếu chấm** (khóa cũ): `uid`, `date`, `to`, `employeeId`, `meals`, `sentAt` (bản mới thêm `kind: 'missing'`) | Quản trị đọc; client không ghi |
+| `meal_alerts/{date}:extra:{uid}` | Biên nhận thư **chấm chưa đăng ký** của ngày `date`: `uid`, `date`, `kind: 'extra'`, `to`, `employeeId`, `meals`, `sentAt` | Quản trị đọc; client không ghi |
 | `weekly_menus/{weekId}` | Thực đơn 7 mục × 5 ngày, ghi chú và metadata | Người đăng nhập đọc; quản trị ghi theo cấu trúc được rules kiểm tra |
 | `login_logs/{id}` | Tài khoản, kết quả, thời gian, thiết bị | Người dùng tạo log UID mình; quản trị đọc/xóa |
 | `meal_surveys/{weekId}` | Lịch nhận trả lời, trạng thái gửi lời mời | Người đăng nhập đọc; quản trị ghi |
@@ -171,6 +176,8 @@ Khi đổi câu hỏi/mã đáp án khảo sát, cập nhật `survey.mjs`, tăn
 | `meal_surveys/{weekId}/private/{id}` | Danh sách mời, trạng thái từng email, khóa gửi | Quản trị đọc; client không ghi |
 
 Các document cấu hình thường dùng: `monthlyConfig`, `monthlyExpiry`, `cancelConfig`, `mealOffDays`, `reconcileExcludes`, `checkinSync`. Hai cấu hình tháng đầu dùng khóa `MM`; đơn đăng ký và danh sách chặn dùng `YYYY-MM`.
+
+`settings/checkinSync` (mọi người đăng nhập đọc được, nên chỉ có số đếm, không có mã NV, tên hay email): `agentVersion`, `agentFeatures` (`['checkinExemptions', 'extraAlerts']` từ bản `2026-11-06.1`), tình trạng máy, `coverage[ngày]`, và `alerts[ngày]` — trạng thái thư thiếu chấm (`status`, `at`, `sent`, `failed`, `expected`, `missing`, `exempt`, `invalidExemptions`, `reason`, `held`; `expected` gồm cả người được miễn) cùng `alerts[ngày].extra` — trạng thái thư chấm chưa đăng ký của ngày đó (`status`: `sent`/`nothing`/`partial`/`guarded`/`error`/`off_day`, `at`, `candidates`, `sent`, `failed`, `unmapped`, `eventSkipped`, `reason`), ghi ở lần chạy của ngày có suất ăn kế tiếp.
 
 Agent dùng Firebase Admin SDK và không chịu các giới hạn client trong `firestore.rules`. Khi sửa dữ liệu do agent tạo, cần kiểm tra bộ lọc và phép ánh xạ trong agent ngoài rules của web.
 
@@ -201,7 +208,7 @@ Lịch dưới đây được mô tả trong `agent/README.md`; chưa kiểm tra
 | Công việc | Lịch giờ Việt Nam | Tham số |
 |---|---|---|
 | Đồng bộ sáng | Thứ 2–6, 08:15 | `--quiet --days 1` |
-| Đồng bộ trưa và cảnh báo | Thứ 2–6, 13:45; lặp 15 phút trong 1 giờ | `--quiet --days 1 --send-alerts` |
+| Đồng bộ trưa và cảnh báo (thiếu chấm của hôm nay; chấm chưa đăng ký của ngày có suất ăn trước) | Thứ 2–6, 13:45; lặp 15 phút trong 1 giờ | `--quiet --days 1 --send-alerts` |
 | Đồng bộ bù | Hằng ngày, 22:00 | `--quiet` |
 | Mời khảo sát | Thứ 6, 15:00; các trigger gửi bù buổi sáng và khi khởi động máy | `khao-sat-bua-an.bat --quiet` |
 

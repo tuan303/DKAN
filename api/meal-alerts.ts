@@ -1,9 +1,13 @@
 /**
  * POST /api/meal-alerts — email cảnh báo chấm ăn và thư mời khảo sát suất ăn.
  *
- * Chỉ agent trên máy HAC gọi vào, có khoá bí mật MEAL_ALERT_SECRET. Ba loại thư:
+ * Chỉ agent trên máy HAC gọi vào, có khoá bí mật MEAL_ALERT_SECRET. Bốn loại thư:
  *   - 'staff-missing': mỗi CBNV đã đăng ký mà không có lượt chấm nhận 1 thư riêng
  *                      (agent đồng bộ, sau giờ ăn trưa).
+ *   - 'staff-extra'  : mỗi CBNV có lượt chấm trong khung giờ ăn nhưng chưa có
+ *                      đăng ký phù hợp cho bữa đó nhận 1 thư riêng (agent gửi cho
+ *                      ngày có suất ăn TRƯỚC đó, sau giờ ăn trưa). Như
+ *                      'staff-missing': thư lỗi thì agent gửi lại ở lần chạy sau.
  *   - 'admin-notice' : báo quản trị khi agent tự dừng gửi vì số liệu bất thường.
  *   - 'survey-invite': mời CBGV-NV có đăng ký ăn làm khảo sát chất lượng suất ăn
  *                      của tuần (agent/survey-invite.mjs, 15:00 thứ 6). MỘT thư
@@ -31,7 +35,7 @@
  * Chạy được cả trên Vercel (req.body đã được parse) lẫn Express trong server.ts.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { formatDate } from '../agent/lib/meal-rules.mjs';
+import { formatDate, classifyTime, MEAL_LABEL, MEAL_WINDOWS } from '../agent/lib/meal-rules.mjs';
 import { normalizeWeeklyMenu, hasMenuContent, renderWeeklyMenuEmail } from '../agent/lib/weekly-menu.mjs';
 // Đuôi .js là bắt buộc: package.json đặt "type": "module" nên trên Vercel file
 // này chạy dạng ESM, mà ESM của Node không tự thêm đuôi cho đường dẫn tương đối.
@@ -109,6 +113,11 @@ interface StaffAlert {
   outOfWindow: string[];
 }
 
+type ExtraMealReason = 'no_registration' | 'meal_not_registered' | 'before_start' | 'registered_late' | 'canceled';
+interface StaffExtraAlert extends Omit<StaffAlert, 'meals'> {
+  meals: { meal: Meal; label: string; window: string; time: string; reason: ExtraMealReason }[];
+}
+
 interface SurveyInvite {
   kind: 'survey-invite';
   /** Ngày thứ 2 của tuần khảo sát, YYYY-MM-DD. */
@@ -126,6 +135,7 @@ interface SurveyInvite {
 
 type ParsedRequest =
   | { kind: 'staff-missing'; date: string; dateLabel: string; alerts: StaffAlert[] }
+  | { kind: 'staff-extra'; date: string; dateLabel: string; alerts: StaffExtraAlert[] }
   | { kind: 'admin-notice'; date: string; dateLabel: string; to: string[]; reason: string; lines: string[] }
   | SurveyInvite;
 
@@ -143,10 +153,16 @@ interface ApiResponse {
   setHeader?(name: string, value: string): unknown;
 }
 
+/**
+ * Kết quả từng thư cảnh báo / thư báo quản trị. Thư chấm chưa đăng ký có thêm
+ * maybeSent khi Graph có thể đã nhận thư trước lúc lỗi: agent phải kiểm tra thủ
+ * công, không tự gửi lại. Thư thiếu chấm / báo quản trị giữ hợp đồng cũ.
+ */
 interface SendResult {
   to: string;
   ok: boolean;
   error?: string;
+  maybeSent?: true;
 }
 
 /**
@@ -301,6 +317,36 @@ function parseStaffAlert(v: unknown, i: number): StaffAlert {
   return { to, fullName, employeeId, meals, outOfWindow };
 }
 
+// Câu cố định cho từng mã lý do agent gửi (notExpectedReason trong
+// agent/lib/meal-rules.mjs). Bên gọi chỉ gửi MÃ, không gửi chữ; "{month}" là
+// tháng của ngày chấm, máy chủ tự điền từ `date` đã kiểm tra.
+const EXTRA_REASONS: Record<ExtraMealReason, string> = {
+  no_registration: 'Chưa có đăng ký suất ăn tháng {month}.',
+  meal_not_registered: 'Đơn đăng ký suất ăn của tháng không gồm bữa này.',
+  before_start: 'Ngày này trước ngày bắt đầu ăn ghi trên đơn đăng ký.',
+  registered_late: 'Đơn đăng ký được nộp sau khi bữa ăn này đã kết thúc.',
+  canceled: 'Đã báo hủy bữa này nhưng vẫn có lượt chấm.',
+};
+
+const extraReasonText = (reason: ExtraMealReason, date: string) =>
+  EXTRA_REASONS[reason].replace('{month}', `${date.slice(5, 7)}/${date.slice(0, 4)}`);
+
+function parseStaffExtraAlert(v: unknown, i: number): StaffExtraAlert {
+  const base = parseStaffAlert(v, i);
+  const raw = v as { meals: Record<string, unknown>[] };
+  const meals = base.meals.map((meal, index) => {
+    const input = raw.meals[index];
+    if (typeof input.reason !== 'string' || !Object.hasOwn(EXTRA_REASONS, input.reason))
+      fail(`alerts[${i}].meals[${index}].reason không hợp lệ.`);
+    const time = clock(input.time, `alerts[${i}].meals[${index}].time`);
+    const window = `${MEAL_WINDOWS[meal.meal].from}–${MEAL_WINDOWS[meal.meal].to}`;
+    if (classifyTime(time) !== meal.meal || meal.window !== window)
+      fail(`alerts[${i}].meals[${index}].time hoặc window nằm ngoài khung giờ ăn.`);
+    return { ...meal, label: MEAL_LABEL[meal.meal], window, time, reason: input.reason as ExtraMealReason };
+  });
+  return { ...base, meals };
+}
+
 /**
  * Thư mời khảo sát: nhận mã tuần, hạn trả lời (closesAt, không bắt buộc), danh
  * sách người nhận và thực đơn (menu, không bắt buộc để tương thích agent cũ).
@@ -380,8 +426,8 @@ function parseRequest(raw: unknown): ParsedRequest {
   if (!isObject(body)) fail('Nội dung yêu cầu phải là một JSON object.');
   // Thư mời khảo sát không có date/dateLabel như hai loại thư cảnh báo.
   if (body.kind === 'survey-invite') return parseSurveyInvite(body);
-  if (body.kind !== 'staff-missing' && body.kind !== 'admin-notice') {
-    fail("kind phải là 'staff-missing', 'admin-notice' hoặc 'survey-invite'.");
+  if (body.kind !== 'staff-missing' && body.kind !== 'staff-extra' && body.kind !== 'admin-notice') {
+    fail("kind phải là 'staff-missing', 'staff-extra', 'admin-notice' hoặc 'survey-invite'.");
   }
   const date = isoDate(body.date, 'date');
   const dateLabel = text(body.dateLabel, 'dateLabel', LIMITS.dateLabel);
@@ -390,6 +436,11 @@ function parseRequest(raw: unknown): ParsedRequest {
     const alerts = list(body.alerts, 'alerts', 1, MAX_ALERTS).map(parseStaffAlert);
     assertUniqueEmails(alerts.map(a => a.to), 'alerts');
     return { kind: 'staff-missing', date, dateLabel, alerts };
+  }
+  if (body.kind === 'staff-extra') {
+    const alerts = list(body.alerts, 'alerts', 1, MAX_ALERTS).map(parseStaffExtraAlert);
+    assertUniqueEmails(alerts.map(a => a.to), 'alerts');
+    return { kind: 'staff-extra', date, dateLabel, alerts };
   }
 
   const to = list(body.to, 'to', 1, MAX_ADMIN_TO).map((e, i) => schoolEmail(e, `to[${i}]`));
@@ -614,6 +665,45 @@ function renderStaffEmail(a: StaffAlert, date: string, dateLabel: string, appUrl
     title: subject,
     preheader: `Thầy/Cô đã đăng ký suất ăn ngày ${dateLabel} nhưng máy nhận diện chưa ghi nhận lượt chấm.`,
     heading: 'Chưa ghi nhận chấm ăn',
+    subheading: dateLabel,
+    rows,
+  });
+  return { subject, html };
+}
+
+/**
+ * Thư "chấm ăn chưa đăng ký": chỉ nêu sự việc — bữa, giờ chấm, lý do không có suất
+ * — không nêu hình thức xử lý nào. Lý do là câu cố định theo mã (EXTRA_REASONS).
+ */
+function renderExtraStaffEmail(a: StaffExtraAlert, date: string, dateLabel: string, appUrl: string): { subject: string; html: string } {
+  const subject = `[DKAN] Cảnh báo: chấm ăn chưa đăng ký ngày ${formatDate(date)}`;
+  const registrationUrl = `${appUrl}/schedule`;
+  // Dữ liệu cũ có thể thiếu họ tên: khi đó chỉ chào "Thầy/Cô", không để lại thẻ <strong> rỗng.
+  const greetingName = a.fullName ? ` <strong>${txt(a.fullName)}</strong>` : '';
+
+  const mealRows = a.meals
+    .map(
+      (m, i) => `<tr><td style="padding:${i ? '8px' : '0'} 0 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="border-left:4px solid ${RED};background-color:#fdf2f4;padding:10px 14px;font-family:${FONT};font-size:15px;line-height:22px;color:${NAVY};"><strong>${txt(m.label)}</strong> &nbsp;·&nbsp; chấm lúc <strong>${txt(m.time)}</strong><br><span style="font-size:14px;color:${INK};">${esc(extraReasonText(m.reason, date))}</span></td>
+</tr></table></td></tr>`,
+    )
+    .join('');
+
+  const rows = [
+    row(para(`Kính gửi Thầy/Cô${greetingName} (Mã NV ${txt(a.employeeId)}),`)),
+    row(para(`Máy nhận diện ghi nhận lượt chấm ăn của Thầy/Cô ngày <strong>${txt(dateLabel)}</strong> nhưng hệ thống chưa có đăng ký suất ăn phù hợp cho:`), '0 28px 12px'),
+    row(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${mealRows}</table>`),
+    row(para('Thầy/Cô vui lòng kiểm tra lại đăng ký suất ăn và các lần báo hủy trên hệ thống.')),
+    row(para('Lượt chấm của tháng chưa có đăng ký suất ăn không hiển thị trên trang “Chấm ăn của tôi”; nếu thông tin trên chưa đúng, Thầy/Cô vui lòng trả lời email này hoặc liên hệ Bộ phận Dinh dưỡng để được kiểm tra.')),
+    row(button(registrationUrl, 'Kiểm tra đăng ký suất ăn'), '4px 28px 10px'),
+    row(fallbackLink(registrationUrl)),
+    row(para('Trân trọng.'), '0 28px 24px'),
+  ];
+
+  const html = layout({
+    title: subject,
+    preheader: `Máy nhận diện ghi nhận lượt chấm ăn ngày ${dateLabel} nhưng chưa có đăng ký suất ăn phù hợp.`,
+    heading: 'Cảnh báo chấm ăn chưa đăng ký',
     subheading: dateLabel,
     rows,
   });
@@ -885,9 +975,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   let jobs: Job[];
   try {
     const { cc, replyTo, appUrl } = mailSettings(graph.sender);
-    if (request.kind === 'staff-missing') {
-      jobs = request.alerts.map(a => {
-        const { subject, html } = renderStaffEmail(a, request.date, request.dateLabel, appUrl);
+    if (request.kind === 'staff-missing' || request.kind === 'staff-extra') {
+      const selected = request;
+      jobs = selected.alerts.map(a => {
+        const { subject, html } = selected.kind === 'staff-extra'
+          ? renderExtraStaffEmail(a as StaffExtraAlert, selected.date, selected.dateLabel, appUrl)
+          : renderStaffEmail(a, selected.date, selected.dateLabel, appUrl);
         // Mỗi người một thư riêng: không để CBNV thấy địa chỉ của nhau.
         return { to: a.to, mail: { to: [a.to], cc, replyTo, subject, html, saveToSentItems: false } };
       });
@@ -935,7 +1028,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     } catch (e) {
       const error = errorMessage(e);
       console.error(`[meal-alerts] Gửi tới ${job.to} lỗi: ${error}`);
-      return { to: job.to, ok: false, error };
+      return { to: job.to, ok: false, error,
+        ...(request.kind === 'staff-extra' && !mailCertainlyNotSent(e) ? { maybeSent: true as const } : {}) };
     }
   });
 
