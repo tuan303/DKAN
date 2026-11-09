@@ -210,6 +210,11 @@ function button(tree, label) {
   assert.ok(found.length, `không thấy nút ${label}`);
   return found[0];
 }
+/** Mở menu "⋯" (Thao tác) của một người rồi trả về mục menu cần bấm. */
+async function menuItem(root, getItem, label) {
+  await act(root, button(getItem(), /^Thao tác với /).props.onClick);
+  return button(getItem(), label);
+}
 const input = (tree, match) => findAll(tree, node => node.type === 'input' && match(node.props))[0];
 const recordItem = (root, name) =>
   findAll(root.tree, node => node.component && node.type === 'ExemptionRecordItem' && node.props.record.fullName === name)[0];
@@ -327,13 +332,31 @@ test('stopping keeps today once the meal window has opened and ends yesterday be
     setClock('2026-11-06', time);
     const fake = createFake({ docs: { 100001: person('100001', 'Người A', [period('2026-11-01')]) } });
     const root = await mount(fake);
-    await act(root, button(recordItem(root, 'Người A'), /^Ngừng miễn trưa$/).props.onClick);
+    await act(root, (await menuItem(root, () => recordItem(root, 'Người A'), /^Ngừng miễn trưa$/)).props.onClick);
     assert.equal(fake.confirms.at(-1), ['Ngừng miễn chấm bữa trưa cho Người A?', `Từ ngày ${effective}, nhân viên phải chấm bữa trưa.`,
       ...keepsToday ? ['Bữa trưa hôm nay đã bắt đầu nên hôm nay vẫn được miễn.'] : [],
       'Các ngày đã miễn trước đó vẫn được giữ.'].join('\n'), time);
     assert.deepEqual(writes(fake), [['set', '100001', person('100001', 'Người A', [period('2026-11-01', last)])]], time);
     assert.equal(notice(root.tree), `Đã ngừng miễn chấm bữa trưa cho Người A. Từ ngày ${effective}, nhân viên phải chấm bữa trưa.`);
   }
+});
+
+test('row actions live in a "⋯" menu: hidden until opened, closed again after choosing', async () => {
+  setClock('2026-11-06', '09:00');
+  const fake = createFake({ docs: { 100001: person('100001', 'Người A', [period('2026-11-01')]) } });
+  const root = await mount(fake);
+  const item = () => recordItem(root, 'Người A');
+  const menu = () => findAll(item(), node => node.props?.role === 'menu')[0];
+  const trigger = () => button(item(), /^Thao tác với Người A$/);
+  assert.equal(menu(), undefined);
+  assert.equal(trigger().props['aria-expanded'], false);
+  await act(root, trigger().props.onClick);
+  assert.equal(trigger().props['aria-expanded'], true);
+  assert.deepEqual(findAll(menu(), node => node.props?.role === 'menuitem').map(text),
+    ['Ngừng miễn trưa', 'Đặt ngày kết thúc', 'Sửa email', 'Xóa khỏi danh sách']);
+  await act(root, button(item(), /^Sửa email$/).props.onClick);
+  assert.equal(menu(), undefined, 'chọn xong thì menu đóng');
+  assert.ok(findAll(item(), node => node.type === 'form').length, 'form sửa email mở ngay dưới dòng');
 });
 
 test('stopping an exemption that has not started cancels it; a stale button writes nothing', async () => {
@@ -345,7 +368,7 @@ test('stopping an exemption that has not started cancels it; a stale button writ
     100008: person('100008', 'Đã Ngừng', [period('2026-11-01')]),
   } });
   const root = await mount(fake);
-  const stop = async name => act(root, button(recordItem(root, name), /^Ngừng miễn trưa$/).props.onClick);
+  const stop = async name => act(root, (await menuItem(root, () => recordItem(root, name), /^Ngừng miễn trưa$/)).props.onClick);
 
   await stop('Tương Lai');
   assert.equal(fake.confirms.at(-1), 'Hủy khoảng miễn bữa trưa từ 01/12/2026 của Tương Lai?\n'
@@ -383,7 +406,7 @@ test('end date and email edits write the record; invalid input is reported insid
   const formAlerts = () => findAll(form(), node => node.props?.role === 'alert').map(text);
   const submit = () => act(root, form().props.onSubmit, { preventDefault() {} });
 
-  await act(root, button(item(), /^Đặt ngày kết thúc$/).props.onClick);
+  await act(root, (await menuItem(root, item, /^Đặt ngày kết thúc$/)).props.onClick);
   const date = () => input(item(), props => props.type === 'date');
   assert.equal(date().props.min, '2026-11-06');
   await act(root, date().props.onChange, { target: { value: '2026-11-05' } });
@@ -402,7 +425,7 @@ test('end date and email edits write the record; invalid input is reported insid
   assert.equal(form(), undefined, 'lưu xong thì đóng form');
 
   fake.transactions.length = 0;
-  await act(root, button(item(), /^Sửa email$/).props.onClick);
+  await act(root, (await menuItem(root, item, /^Sửa email$/)).props.onClick);
   const email = () => input(item(), props => props.type === 'email');
   await act(root, email().props.onChange, { target: { value: 'someone@gmail.com' } });
   await submit();
@@ -418,7 +441,7 @@ test('end date and email edits write the record; invalid input is reported insid
   assert.deepEqual(writes(fake), [['set', '100007', person('100007', 'Đang Mở', [period('2026-10-01', '2026-11-20')], mail('canhan'))]]);
   assert.equal(form(), undefined);
 
-  await act(root, button(item(), /^Sửa email$/).props.onClick);
+  await act(root, (await menuItem(root, item, /^Sửa email$/)).props.onClick);
   await submit();
   assert.equal(fake.attempts, 2, 'email không đổi thì không ghi');
   assert.equal(notice(root.tree), 'Email không thay đổi.');
@@ -429,7 +452,7 @@ test('a failed save of an inline form is shown inside that form', async () => {
   const fake = createFake({ docs: { 100007: person('100007', 'Đang Mở', [period('2026-10-01')]) } });
   const root = await mount(fake);
   const item = () => recordItem(root, 'Đang Mở');
-  await act(root, button(item(), /^Sửa email$/).props.onClick);
+  await act(root, (await menuItem(root, item, /^Sửa email$/)).props.onClick);
   await act(root, input(item(), props => props.type === 'email').props.onChange, { target: { value: mail('moi') } });
   fake.user = null;
   await act(root, findAll(item(), node => node.type === 'form')[0].props.onSubmit, { preventDefault() {} });
@@ -444,7 +467,7 @@ test('removing a person deletes the document only after confirming the consequen
   setClock('2026-11-06', '11:00');
   const fake = createFake({ docs: { 100001: person('100001', 'Người A', [period('2026-11-01')]) } });
   const root = await mount(fake);
-  const remove = () => act(root, button(recordItem(root, 'Người A'), /^Xóa khỏi danh sách$/).props.onClick);
+  const remove = async () => act(root, (await menuItem(root, () => recordItem(root, 'Người A'), /^Xóa khỏi danh sách$/)).props.onClick);
   fake.answer = false;
   await remove();
   assert.equal(fake.attempts, 0, 'bấm Hủy ở hộp hỏi lại thì không ghi gì');
@@ -568,7 +591,7 @@ test('every snapshot and every successful write drops the reconciliation tab cac
   fake.notify(); // người khác vừa sửa danh sách
   await root.settle();
   assert.equal(fake.invalidations, 2);
-  await act(root, button(recordItem(root, 'Người B'), /^Xóa khỏi danh sách$/).props.onClick);
+  await act(root, (await menuItem(root, () => recordItem(root, 'Người B'), /^Xóa khỏi danh sách$/)).props.onClick);
   assert.equal(fake.invalidations, 4, 'sau khi ghi và khi danh sách mới về');
 });
 

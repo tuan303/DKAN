@@ -172,12 +172,18 @@ test('a saved record shows its state, account hints and per-meal actions timed t
   const props = { record, clock, held: false, hints, monthLabel: '11/2026', disabled: false,
     onStop() {}, onSetEnd: async () => true, onChangeEmail: async () => true, onRemove() {} };
   const html = render(ui.ExemptionRecordItem, props);
-  for (const text of ['Đang miễn chấm', 'Email khác đơn', 'Ngừng miễn sáng', 'Ngừng miễn trưa', 'Đặt ngày kết thúc', 'Sửa email',
-    'Xóa khỏi danh sách', 'Bữa sáng và bữa trưa · Từ 01/11/2026 · Chưa có ngày kết thúc',
+  for (const text of ['Đang miễn chấm', 'Email khác đơn', 'Bữa sáng và bữa trưa · Từ 01/11/2026 · Chưa có ngày kết thúc',
     'Đơn đăng ký của mã này dùng email khác: khac@hoangmaistarschool.edu.vn']) {
     assert.ok(html.includes(text), text);
   }
   assert.doesNotMatch(html, /Chưa xác định|tạm ngưng/);
+  // Các thao tác gom trong menu "⋯", chỉ hiện khi bấm mở.
+  assert.match(html, /aria-haspopup="menu" aria-expanded="false"/);
+  assert.ok(html.includes('Thao tác với Người A'));
+  assert.doesNotMatch(html, /Ngừng miễn|Đặt ngày kết thúc|Sửa email|Xóa khỏi danh sách/);
+  const labels = (r, c = clock) => ui.exemptionRecordActions(r, c).map(action => action.label);
+  assert.deepEqual(labels(record), ['Ngừng miễn sáng', 'Ngừng miễn trưa', 'Đặt ngày kết thúc', 'Sửa email', 'Xóa khỏi danh sách']);
+  assert.deepEqual(ui.exemptionRecordActions(record, clock).filter(action => action.danger).map(action => action.key), ['remove']);
   const held = render(ui.ExemptionRecordItem, { ...props, held: true, hints: null });
   assert.ok(held.includes('Chưa xác định · cần kiểm tra'));
   assert.doesNotMatch(held, /Đang miễn chấm/, 'mã đang bị giữ thì không hiện trạng thái miễn bình thường');
@@ -185,9 +191,7 @@ test('a saved record shows its state, account hints and per-meal actions timed t
   assert.doesNotMatch(held, /Email khác đơn/);
 
   const endsToday = lib.exemptionDraft('100001', mail('a'), 'Người A', '2026-11-01', today);
-  const finished = render(ui.ExemptionRecordItem, { ...props, record: endsToday, hints: null });
-  assert.doesNotMatch(finished, /Ngừng miễn trưa/, 'bữa trưa đã mở và khoảng miễn hết hôm nay: không còn gì để ngừng');
-  assert.doesNotMatch(finished, /Đặt ngày kết thúc/);
-  const morning = render(ui.ExemptionRecordItem, { ...props, record: endsToday, hints: null, clock: { today, now: '09:00' } });
-  assert.match(morning, /Ngừng miễn trưa/);
+  assert.deepEqual(labels(endsToday), ['Sửa email', 'Xóa khỏi danh sách'],
+    'bữa trưa đã mở và khoảng miễn hết hôm nay: không còn gì để ngừng, không còn khoảng mở');
+  assert.deepEqual(labels(endsToday, { today, now: '09:00' }), ['Ngừng miễn trưa', 'Sửa email', 'Xóa khỏi danh sách']);
 });

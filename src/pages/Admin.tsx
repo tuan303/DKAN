@@ -11,6 +11,7 @@ import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import MealCheckinExemptions from '../components/MealCheckinExemptions';
 import { KitchenStaffList } from '../components/KitchenStaffList';
+import { ResignationCancelDialog } from '../components/ResignationCancelDialog';
 import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
 import { AdminWorkspace } from '../components/AdminWorkspace';
@@ -194,6 +195,8 @@ export default function Admin() {
   const [deptFilter, setDeptFilter] = useState('');
   const [cancelDateFilter, setCancelDateFilter] = useState('');
   const [cancelMealFilter, setCancelMealFilter] = useState<'all'|'breakfast'|'lunch'>('all');
+  // Hộp thoại "Hủy ăn người nghỉ việc" (tab Hủy ăn).
+  const [resignCancelOpen, setResignCancelOpen] = useState(false);
 
 
   const [dailyFilterByMeal, setDailyFilterByMeal] = useState<'all'|'breakfast'|'lunch'>('all');
@@ -1415,14 +1418,32 @@ export default function Admin() {
                        </select>
                     </div>
                   </div>
-                  <button 
-                    onClick={handleExportCancelationsExcel}
-                    className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">download</span>
-                    <span className="font-bold tracking-wide">Xuất Excel</span>
-                  </button>
+                  <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setResignCancelOpen(true)}
+                      disabled={!monthlyDataStatus.registrations || monthlyDataStatus.month !== selectedMonth}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-error/40 px-5 py-2.5 font-label-md text-error transition-colors hover:bg-error-container/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[20px]" aria-hidden="true">person_remove</span>
+                      <span className="font-bold tracking-wide">Hủy ăn người nghỉ việc</span>
+                    </button>
+                    <button
+                      onClick={handleExportCancelationsExcel}
+                      className="flex items-center gap-2 bg-gradient-to-r from-tertiary to-tertiary-dark hover:from-tertiary hover:to-tertiary-dark shadow-md text-white px-5 py-2.5 rounded-xl font-label-md transition-all w-full md:w-auto justify-center transform hover:-translate-y-0.5"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">download</span>
+                      <span className="font-bold tracking-wide">Xuất Excel</span>
+                    </button>
+                  </div>
                 </div>
+                <ResignationCancelDialog
+                  open={resignCancelOpen}
+                  onClose={() => setResignCancelOpen(false)}
+                  registrations={registrations}
+                  selectedMonth={selectedMonth}
+                  showToast={showToast}
+                />
 
                 <div className="p-lg bg-surface-container-lowest grid grid-cols-1 md:grid-cols-5 gap-lg border-b border-outline-variant focus:outline-none">
                    <div className="flex flex-col gap-1.5">

@@ -6,6 +6,7 @@ import { formatDate, vnParts, vnToday } from '../../agent/lib/meal-rules.mjs';
 import { exemptionCovers, exemptionQuarantine, validateStoredCheckinExemption } from '../../agent/lib/checkin-exemptions.mjs';
 import { agentSupports, EXEMPTION_AGENT_VERSION } from '../lib/agentFeatures';
 import { invalidateCheckinExemptionCache } from './MealReconciliation';
+import { ActionMenu, type ActionMenuItem } from './ActionMenu';
 import {
   changeExemptionEmail, createExemptionHints, createExemptionTemplate, describeExemptionPeriod, describeIgnoredRows,
   describeIssueRemoval, endDateMinimum, EXEMPTION_MEAL_NAME, EXEMPTION_MEALS, exemptionDraft, exemptionErrorMessage,
@@ -412,6 +413,24 @@ function endDateNote(record: ExemptionRecord, meal: ExemptionMeal, minimum: stri
   return record.periods.some(period => period.to === null && period.from === minimum) ? ' (ngày bắt đầu của khoảng miễn)' : '';
 }
 
+export type ExemptionRecordAction = 'stop-breakfast' | 'stop-lunch' | 'end' | 'email' | 'remove';
+
+/**
+ * Các mục trong menu "⋯" của một người, theo giờ bữa ăn: chỉ bữa còn ngừng được mới
+ * có "Ngừng miễn", chỉ khi còn khoảng chưa có ngày kết thúc mới có "Đặt ngày kết thúc".
+ */
+export function exemptionRecordActions(record: ExemptionRecord, clock: ExemptionClock) {
+  const actions: { key: ExemptionRecordAction; label: string; icon: string; danger?: boolean }[] = [
+    ...stoppableMeals(record, clock.today, clock.now).map(meal => ({
+      key: `stop-${meal}` as ExemptionRecordAction, label: `Ngừng miễn ${SHORT_MEAL[meal]}`, icon: 'do_not_disturb_on',
+    })),
+    ...(openEndedMeals(record).length ? [{ key: 'end' as const, label: 'Đặt ngày kết thúc', icon: 'event' }] : []),
+    { key: 'email', label: 'Sửa email', icon: 'alternate_email' },
+    { key: 'remove', label: 'Xóa khỏi danh sách', icon: 'delete', danger: true },
+  ];
+  return actions;
+}
+
 /** Một người trong danh sách đã lưu, kèm các thao tác sửa. */
 export function ExemptionRecordItem({ record, clock, held, hints, monthLabel, disabled, onStop, onSetEnd, onChangeEmail, onRemove }: {
   record: ExemptionRecord;
@@ -441,15 +460,22 @@ export function ExemptionRecordItem({ record, clock, held, hints, monthLabel, di
     <p role="alert" className="rounded-lg bg-error-container/60 px-3 py-2 text-body-sm text-error break-words">{formError}</p>
   );
   const state = exemptionState(record, clock.today);
-  const stoppable = stoppableMeals(record, clock.today, clock.now);
   const openMeals = openEndedMeals(record);
   const endMeal = openMeals.includes(endMealChoice) ? endMealChoice : openMeals[0];
   const minimum = endMeal ? endDateMinimum(record, endMeal, clock.today, clock.now) : null;
   const registrationEmails = hints?.find(hint => hint.kind === 'registrationEmail')?.emails ?? [];
   const id = `exemption-${record.employeeId}`;
+  const run: Record<ExemptionRecordAction, () => void> = {
+    'stop-breakfast': () => onStop(record, 'breakfast'),
+    'stop-lunch': () => onStop(record, 'lunch'),
+    end: () => toggle('end'),
+    email: () => { setEmailDraft(record.email); toggle('email'); },
+    remove: () => onRemove(record),
+  };
+  const actions: ActionMenuItem[] = exemptionRecordActions(record, clock).map(action => ({ ...action, onSelect: run[action.key] }));
   return (
     <li className="p-md">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <strong className="text-body-md text-on-surface">{displayName(record)}</strong>
@@ -472,24 +498,7 @@ export function ExemptionRecordItem({ record, clock, held, hints, monthLabel, di
           )}
           {hints && <HintDetails hints={hints} />}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 sm:max-w-xs sm:justify-end">
-          {stoppable.map(meal => (
-            <button key={meal} type="button" disabled={disabled} onClick={() => onStop(record, meal)} className={BUTTON}>
-              Ngừng miễn {SHORT_MEAL[meal]}
-            </button>
-          ))}
-          {openMeals.length > 0 && (
-            <button type="button" disabled={disabled} aria-expanded={editing === 'end'} aria-controls={`${id}-end`}
-              onClick={() => toggle('end')} className={BUTTON}>
-              Đặt ngày kết thúc
-            </button>
-          )}
-          <button type="button" disabled={disabled} aria-expanded={editing === 'email'} aria-controls={`${id}-email`}
-            onClick={() => { setEmailDraft(record.email); toggle('email'); }} className={BUTTON}>
-            Sửa email
-          </button>
-          <button type="button" disabled={disabled} onClick={() => onRemove(record)} className={DANGER}>Xóa khỏi danh sách</button>
-        </div>
+        <ActionMenu label={`Thao tác với ${displayName(record)}`} disabled={disabled} items={actions} />
       </div>
       {editing === 'end' && endMeal && (
         <form id={`${id}-end`} className="mt-3 rounded-xl border border-outline-variant bg-surface-container-low/50 p-md space-y-3"
