@@ -200,11 +200,15 @@ export function undoOperations(writes: ResignationWrite[]) {
   return writes.map(w => (w.previous ? { op: 'set' as const, id: w.id, data: w.previous } : { op: 'delete' as const, id: w.id }));
 }
 
-/** "06/11 – 30/11/2026 · 17 ngày" để hiện trong bản xem trước. */
-export function describeRange(dates: string[]): string {
-  if (!dates.length) return 'không có ngày nào';
+/** "06/11 – 30/11/2026" (hoặc một ngày "30/11/2026"). */
+export function formatRange(dates: string[]): string {
+  if (!dates.length) return '';
   const first = dates[0];
   const last = dates[dates.length - 1];
-  const range = first === last ? formatDate(first) : `${first.slice(8, 10)}/${first.slice(5, 7)} – ${formatDate(last)}`;
-  return `${range} · ${dates.length} ngày`;
+  return first === last ? formatDate(first) : `${first.slice(8, 10)}/${first.slice(5, 7)} – ${formatDate(last)}`;
+}
+
+/** "06/11 – 30/11/2026 · 17 ngày". */
+export function describeRange(dates: string[]): string {
+  return dates.length ? `${formatRange(dates)} · ${dates.length} ngày` : 'không có ngày nào';
 }

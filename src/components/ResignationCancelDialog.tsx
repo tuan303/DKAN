@@ -3,7 +3,7 @@ import { collection, doc, getDoc, getDocs, query, where, writeBatch } from 'fire
 import { auth, db } from '../lib/firebase';
 import { formatDate, vnToday } from '../../agent/lib/meal-rules.mjs';
 import {
-  CANTEENS, MEAL_NAMES, RESIGNATION_REASON, defaultCancelFrom, describeRange, firstCancelableDate, monthEnd,
+  CANTEENS, MEAL_NAMES, RESIGNATION_REASON, defaultCancelFrom, firstCancelableDate, formatRange, monthEnd,
   planResignationCancel, registeredMeals, resignationCancelDoc, undoOperations, validateResignationInput,
   type Canteen, type ExistingCancel, type ResignationRegistration, type ResignationWrite,
 } from '../lib/resignationCancel';
@@ -173,7 +173,7 @@ export function ResignationCancelDialog({ open, onClose, registrations, selected
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
       onClick={event => { if (event.target === event.currentTarget && !saving) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="resign-cancel-title"
-        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-surface-container-lowest shadow-xl sm:rounded-2xl">
+        className="flex max-h-[92dvh] w-full max-w-[36rem] flex-col overflow-hidden rounded-t-2xl bg-surface-container-lowest shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-outline-variant px-5 py-4">
           <div className="min-w-0">
             <h2 id="resign-cancel-title" className="text-title-md font-semibold text-on-surface">Hủy ăn người nghỉ việc</h2>
@@ -193,7 +193,7 @@ export function ResignationCancelDialog({ open, onClose, registrations, selected
               {done.undone
                 ? <>Đã hoàn tác. Suất ăn của <strong>{name(done.registration)}</strong> trở lại như trước khi hủy.</>
                 : <>Đã hủy <strong>{done.writes.length} ngày</strong> ăn của <strong>{name(done.registration)}</strong>
-                  {' '}({describeRange(done.writes.map(w => w.date))}). Agent không gửi cảnh báo thiếu chấm cho các ngày này;
+                  {' '}({formatRange(done.writes.map(w => w.date))}). Agent không gửi cảnh báo thiếu chấm cho các ngày này;
                   tab Đối soát và trang Chấm ăn của tôi ghi là đã hủy.</>}
             </div>
           ) : (
@@ -232,7 +232,7 @@ export function ResignationCancelDialog({ open, onClose, registrations, selected
                       {' '}· từ {formatDate(firstCancelableDate(selected))}
                     </p>
                   </div>
-                  <button type="button" className={BUTTON} disabled={saving} onClick={() => { setSelectedUid(null); setLoaded({ status: 'idle' }); }}>
+                  <button type="button" className={`${BUTTON} shrink-0 whitespace-nowrap`} disabled={saving} onClick={() => { setSelectedUid(null); setLoaded({ status: 'idle' }); }}>
                     Đổi người
                   </button>
                 </div>
@@ -270,8 +270,8 @@ export function ResignationCancelDialog({ open, onClose, registrations, selected
                     <div className="space-y-2 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-body-sm text-on-surface">
                       {plan.writes.length ? (
                         <p>
-                          Sẽ hủy <strong>{MEAL_NAMES[plan.cancelMeal]}</strong> của <strong>{plan.writes.length} ngày</strong>:
-                          {' '}{describeRange(writeDates)} (chỉ ngày có suất ăn).
+                          Sẽ hủy <strong>{MEAL_NAMES[plan.cancelMeal]}</strong> của <strong>{plan.writes.length} ngày</strong> có
+                          {' '}suất ăn, {formatRange(writeDates)}:
                         </p>
                       ) : <p>Không còn ngày nào cần hủy từ {formatDate(plan.start)} tới hết tháng.</p>}
                       {plan.writes.length > 0 && (

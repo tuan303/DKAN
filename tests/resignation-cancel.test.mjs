@@ -129,6 +129,12 @@ test('hộp thoại dựng được mà không đọc/ghi gì: đóng thì khôn
   assert.ok(html.includes('Hủy ăn người nghỉ việc'));
   assert.ok(html.includes('Nhân viên có đơn tháng 11/2026'));
   assert.match(html, /<button[^>]*disabled=""[^>]*>.*Hủy ăn<\/button>/s, 'chưa chọn người thì chưa bấm hủy được');
+  // Dự án đặt tên khoảng cách xs/sm/md/lg/xl (--spacing-xl: 32px), nên max-w-xl, w-lg... của
+  // Tailwind thành vài chục pixel: hộp thoại từng bị co thành một cột hẹp.
+  for (const source of ['../src/components/ResignationCancelDialog.tsx', '../src/components/ActionMenu.tsx']) {
+    assert.doesNotMatch(readFileSync(new URL(source, import.meta.url), 'utf8'),
+      /\b(max-w|min-w|w|h|max-h|min-h)-(xs|sm|md|lg|xl|gutter|margin|unit)\b/, source);
+  }
 });
 
 test('tab Hủy ăn có nút mở hộp thoại; hộp thoại ghi theo lô và cho hoàn tác', () => {
