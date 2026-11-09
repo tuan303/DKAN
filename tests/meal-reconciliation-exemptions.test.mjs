@@ -43,6 +43,7 @@ test.before(async () => {
           return { docs: (f.collections[ref.path] || []).map(row => ({ id: row.id, data: () => row.data })) };
         }
         export async function setDoc() { throw new Error('tests never write'); }
+        export async function runTransaction() { throw new Error('tests never write'); }
       ` }));
     } }],
   });

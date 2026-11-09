@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as xlsx from 'xlsx';
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, runTransaction, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { readKitchenExcludes, sameKitchenExcludes, withFileKitchenIds, type KitchenExcludes } from '../lib/kitchenExcludes';
 import { ReconciliationMonthPicker } from './ReconciliationMonthPicker';
 import { filterReferenceCheckins, referenceCheckinDates, referenceCheckinRows } from '../lib/mealReference';
 import { agentSupports } from '../lib/agentFeatures';
@@ -1089,7 +1090,7 @@ export function MealReconciliation({
   const [fileData, setFileData] = useState<ParsedFile | null>(null);
   const [autoData, setAutoData] = useState<ParsedFile | null>(null);
   const [autoState, setAutoState] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
-  const [savedExcludes, setSavedExcludes] = useState<string[]>([]);
+  const [savedExcludes, setSavedExcludes] = useState<KitchenExcludes>(() => readKitchenExcludes(null));
   const [offDays, setOffDays] = useState<string[]>([]);
   const [offDaysError, setOffDaysError] = useState(false);
   // Lấy ngay bản đã nhớ trong phiên (nếu còn hạn) để đổi tháng, chuyển tab
@@ -1104,7 +1105,14 @@ export function MealReconciliation({
   // A previous month can remain in memory while its replacement is loading.
   // Keep it out of the view, including error/empty states of the new month.
   const parsed = source === 'auto' ? (autoData?.month === selectedMonth ? autoData : null) : fileData;
-  const excludedIds = source === 'auto' ? savedExcludes : (fileData?.excludedIds || []);
+  // Mã Bếp Vina quản trị thêm tay (tab Cấu hình) áp dụng cho cả chế độ file:
+  // file HAC chỉ biết người nằm trong bộ phận Bếp Vina trên phần mềm HAC.
+  const excludedIds = useMemo(
+    () => (source === 'auto'
+      ? savedExcludes.employeeIds
+      : [...new Set([...(fileData?.excludedIds || []), ...savedExcludes.manualIds])]),
+    [source, savedExcludes, fileData],
+  );
 
   // Nhận danh sách ngày nghỉ qua tham số thay vì đọc state: lúc vừa tải xong,
   // state offDays của lần render này vẫn là giá trị cũ.
@@ -1168,7 +1176,7 @@ export function MealReconciliation({
       try {
         const snap = checkinsRes.value;
         const excludeSnap = excludesRes.value;
-        setSavedExcludes(excludeSnap.exists() ? (excludeSnap.data().employeeIds || []) : []);
+        setSavedExcludes(readKitchenExcludes(excludeSnap.exists() ? excludeSnap.data() : null));
 
         const docs = snap.docs
           .map(d => d.data() as { date: string; people: Record<string, any>; syncedAt?: string; complete?: boolean });
@@ -1247,15 +1255,21 @@ export function MealReconciliation({
       pickDefaultDates(result, offDays);
 
       // File Excel là nguồn duy nhất biết ai thuộc bộ phận nào, nên nhân dịp
-      // này ghi lại danh sách cần loại để chế độ tự động dùng được.
+      // này ghi lại danh sách cần loại để chế độ tự động dùng được. Đọc rồi ghi
+      // trong transaction để giữ nguyên các mã quản trị thêm tay ở tab Cấu hình.
       if (result.excludedIds.length) {
         try {
-          await setDoc(doc(db, 'settings', EXCLUDES_DOC), {
-            employeeIds: result.excludedIds,
-            departments: EXCLUDED_DEPARTMENTS,
-            updatedAt: new Date().toISOString(),
+          const ref = doc(db, 'settings', EXCLUDES_DOC);
+          const next = await runTransaction(db, async (tx) => {
+            const snap = await tx.get(ref);
+            const before = readKitchenExcludes(snap.exists() ? snap.data() : null);
+            const after = withFileKitchenIds(before, result.excludedIds);
+            if (!snap.exists() || !sameKitchenExcludes(before, after) || !Array.isArray(snap.data()?.fileIds)) {
+              tx.set(ref, { ...after, departments: EXCLUDED_DEPARTMENTS, updatedAt: new Date().toISOString() });
+            }
+            return after;
           });
-          setSavedExcludes(result.excludedIds);
+          setSavedExcludes(next);
         } catch (err) {
           console.error('Không lưu được danh sách bộ phận loại trừ:', err);
         }
@@ -1536,7 +1550,7 @@ export function MealReconciliation({
             </div>
           )}
 
-          {source === 'auto' && autoState === 'ready' && savedExcludes.length === 0 && (
+          {source === 'auto' && autoState === 'ready' && savedExcludes.employeeIds.length === 0 && (
             <div className="p-sm rounded-lg bg-surface-container text-on-surface-variant text-body-sm flex items-start gap-2">
               <span className="material-symbols-outlined text-[18px] shrink-0">filter_alt_off</span>
               <span>
@@ -1585,10 +1599,10 @@ export function MealReconciliation({
                 {excludedIds.length > 0 && (
                   <span
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant"
-                    title={`Bộ phận không đưa vào đối soát: ${EXCLUDED_DEPARTMENTS.join(', ')}`}
+                    title={`Bộ phận không đưa vào đối soát: ${EXCLUDED_DEPARTMENTS.join(', ')}, kèm các mã thêm tay ở tab Cấu hình`}
                   >
                     <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-                    Đã loại {excludedIds.length} người thuộc {EXCLUDED_DEPARTMENTS.join(', ')}
+                    Đã loại {excludedIds.length} mã thuộc Bếp Vina
                   </span>
                 )}
                 {offDaysInMonth.length > 0 && (

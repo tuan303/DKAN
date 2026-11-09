@@ -10,6 +10,7 @@ import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
 import { MealReconciliation } from '../components/MealReconciliation';
 import MealCheckinExemptions from '../components/MealCheckinExemptions';
+import { KitchenStaffList } from '../components/KitchenStaffList';
 import { SurveyResults } from '../components/SurveyResults';
 import { WeeklyMenuManager } from '../components/WeeklyMenuManager';
 import { AdminWorkspace } from '../components/AdminWorkspace';
@@ -2222,6 +2223,8 @@ export default function Admin() {
                 </div>
               );
             })()}
+
+            <KitchenStaffList registrations={registrations} selectedMonth={selectedMonth} showToast={showToast} />
           </div>
         )}
 
