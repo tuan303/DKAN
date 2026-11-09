@@ -30,8 +30,19 @@ test('chấm chưa đăng ký: chỉ lượt chấm trong khung của bữa đã
   // Đơn nộp từ hôm sau, bắt đầu ăn từ hôm sau: ngày xét chưa có suất.
   plan = planExtraAlerts({ ...base, registrations: [reg('a', '100001', { firstMealDate: '2026-11-09', timestamp: '2026-11-09T01:00:00Z' })] });
   assert.deepEqual(plan.candidates[0].reasons, { breakfast: 'before_start', lunch: 'before_start' });
-  // Ăn trước rồi nộp đơn chiều cùng ngày (hay gặp đầu tháng): tính là đã đăng ký.
+  // Ăn trước rồi mới nộp đơn trong ngày (14:30): không được bổ sung đơn sau khi đã chấm
+  // — cả hai bữa là chấm chưa đăng ký.
   plan = planExtraAlerts({ ...base, registrations: [reg('a', '100001', { firstMealDate: P, timestamp: '2026-11-06T07:30:00Z' })] });
+  assert.deepEqual(plan.candidates.map(c => [c.meals, c.reasons]),
+    [[['breakfast', 'lunch'], { breakfast: 'registered_late', lunch: 'registered_late' }]]);
+  // Nộp đơn 09:00, lúc bữa trưa chưa ăn: bữa sáng (đã chấm 07:10) là chấm chưa đăng ký, bữa trưa (11:45) bình thường.
+  plan = planExtraAlerts({ ...base, registrations: [reg('a', '100001', { firstMealDate: P, timestamp: '2026-11-06T02:00:00Z' })] });
+  assert.deepEqual(plan.candidates.map(c => [c.meals, c.reasons]), [[['breakfast'], { breakfast: 'registered_late' }]]);
+  // Nộp đơn 11:50, bữa trưa còn mở nhưng đã chấm 11:45: bữa trưa cũng là chấm chưa đăng ký.
+  plan = planExtraAlerts({ ...base, registrations: [reg('a', '100001', { firstMealDate: P, timestamp: '2026-11-06T04:50:00Z' })] });
+  assert.deepEqual(plan.candidates.map(c => c.meals), [['breakfast', 'lunch']]);
+  // Nộp đơn 06:50 sáng, trước khi chấm: cả hai bữa đã đăng ký.
+  plan = planExtraAlerts({ ...base, registrations: [reg('a', '100001', { firstMealDate: P, timestamp: '2026-11-05T23:50:00Z' })] });
   assert.deepEqual(plan.candidates, []);
   // Đã đăng ký đủ: không phải chấm chưa đăng ký.
   assert.deepEqual(planExtraAlerts({ ...base, registrations: [reg('a', '100001')] }).candidates, []);

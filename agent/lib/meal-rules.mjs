@@ -389,6 +389,23 @@ function registeredAfterMeal(reg, date, meal) {
 }
 
 /**
+ * Đơn nộp SAU lượt chấm của bữa đó (ăn trước rồi mới đăng ký). Quy định của
+ * trường: không bổ sung đơn sau khi đã chấm ăn, nên bữa đó không tính là đã
+ * đăng ký — kể cả khi đơn nộp lúc bữa còn đang mở. So theo phút: nộp cùng phút
+ * với lượt chấm thì chưa kết luận là nộp sau.
+ *
+ * @param {Registration} reg
+ * @param {string} date
+ * @param {string | null | undefined} tapTime HH:MM, lượt chấm của bữa đó
+ */
+function registeredAfterTap(reg, date, tapTime) {
+  if (!tapTime) return false;
+  const at = reg.timestamp ? vnParts(reg.timestamp) : null;
+  if (!at) return false;
+  return at.date > date || (at.date === date && at.time > tapTime);
+}
+
+/**
  * Lý do một người KHÔNG nằm trong danh sách đáng lẽ ăn bữa này. Trả về null
  * nghĩa là họ đáng lẽ phải ăn.
  *
@@ -396,9 +413,10 @@ function registeredAfterMeal(reg, date, meal) {
  * @param {Set<string>} cancelSet
  * @param {string} date
  * @param {Meal} meal
+ * @param {string | null} [tapTime] lượt chấm của bữa này (HH:MM) nếu có: đơn nộp sau lượt chấm cũng là 'registered_late'
  * @returns {null | 'no_registration' | 'meal_not_registered' | 'before_start' | 'registered_late' | 'canceled'}
  */
-export function notExpectedReason(reg, cancelSet, date, meal) {
+export function notExpectedReason(reg, cancelSet, date, meal, tapTime = null) {
   // Thứ tự kiểm tra quyết định lý do hiển thị khi nhiều điều kiện cùng đúng;
   // giữ đúng thứ tự cũ của tab Đối soát để ghi chú không đổi với dữ liệu cũ.
   if (!reg) return 'no_registration';
@@ -407,28 +425,26 @@ export function notExpectedReason(reg, cancelSet, date, meal) {
   if (reg.firstMealDate && date < reg.firstMealDate) return 'before_start';
   const count = meal === 'breakfast' ? reg.breakfastCount : reg.lunchCount;
   if (!count) return 'meal_not_registered';
-  if (registeredAfterMeal(reg, date, meal)) return 'registered_late';
+  if (registeredAfterMeal(reg, date, meal) || registeredAfterTap(reg, date, tapTime)) return 'registered_late';
   return null;
 }
 
 /**
- * Bữa này có tính là "đã đăng ký" không, khi đã biết người đó có chấm hay không.
+ * Bữa này có tính là "đã đăng ký" không, khi đã biết lượt chấm của người đó.
  *
- * Giống notExpectedReason() === null, thêm một ngoại lệ: ăn TRƯỚC rồi mới nộp
- * đơn trong cùng ngày (hay gặp đầu tháng). Form đăng ký tính luôn ngày nộp vào
- * số suất, nên bữa đó nằm trong đơn và người đó đã ăn — coi như đã đăng ký và
- * đã ăn, không xếp vào "chấm nhưng không đăng ký". Nếu KHÔNG chấm thì vẫn không
- * tính là phải ăn: không ai bị cảnh báo vì bữa đã kết thúc trước khi nộp đơn.
+ * Không còn ngoại lệ "ăn trước rồi mới nộp đơn trong ngày": theo quy định của
+ * trường, đơn nộp sau lượt chấm (hay sau khi bữa đã kết thúc) thì lượt chấm đó
+ * là "chấm chưa đăng ký". Nếu KHÔNG chấm thì bữa đã kết thúc trước khi nộp đơn
+ * vẫn không tính là phải ăn — không ai bị cảnh báo thiếu chấm vì bữa đó.
  *
  * @param {Registration | null | undefined} reg đã qua normalizeRegistration
  * @param {Set<string>} cancelSet
  * @param {string} date
  * @param {Meal} meal
- * @param {boolean} tapped có lượt chấm trong khung giờ của bữa này
+ * @param {string | null | undefined} tapTime lượt chấm trong khung giờ của bữa này (HH:MM), không có thì null
  */
-export function countsAsRegistered(reg, cancelSet, date, meal, tapped) {
-  const why = notExpectedReason(reg, cancelSet, date, meal);
-  return why === null || (why === 'registered_late' && tapped);
+export function countsAsRegistered(reg, cancelSet, date, meal, tapTime) {
+  return notExpectedReason(reg, cancelSet, date, meal, tapTime || null) === null;
 }
 
 /**
@@ -446,7 +462,7 @@ export function describeNotExpected(reason, reg, meal) {
       return `Đăng ký từ ngày ${f.slice(8, 10)}/${f.slice(5, 7)}`;
     }
     case 'canceled': return 'Đã báo hủy bữa này';
-    case 'registered_late': return 'Đăng ký sau giờ ăn của bữa này';
+    case 'registered_late': return 'Đăng ký sau khi đã chấm ăn hoặc sau giờ ăn của bữa này';
     default: return 'Chưa xác định được — vui lòng báo lại để kiểm tra';
   }
 }
@@ -535,7 +551,7 @@ export function reconcile({ byDate, dates, registrations: allRegistrations, canc
 
     for (const meal of MEALS) {
       // Ai đáng lẽ phải ăn bữa này hôm nay
-      const expected = active.filter(r => countsAsRegistered(r, cancelSet, date, meal, !!taps[r.employeeId]?.[meal]));
+      const expected = active.filter(r => countsAsRegistered(r, cancelSet, date, meal, taps[r.employeeId]?.[meal]));
       const expectedIds = new Set(expected.map(r => r.employeeId));
 
       for (const r of expected) {
@@ -567,7 +583,7 @@ export function reconcile({ byDate, dates, registrations: allRegistrations, canc
           const reg = regByEmployee.get(employeeId);
           const note = duplicated.has(employeeId)
             ? 'Mã NV trùng giữa nhiều đăng ký — chưa xác định được người ăn'
-            : describeNotExpected(notExpectedReason(reg, cancelSet, date, meal), reg, meal);
+            : describeNotExpected(notExpectedReason(reg, cancelSet, date, meal, time), reg, meal);
           extra.push({ ...row, note });
         }
       }
@@ -710,8 +726,8 @@ export function evaluatePersonDay({ date, registration, cancelations = [], times
     if (offDay) { meals[meal] = { code: 'off_day', time }; continue; }
     if (reg && isUsableId(reg.employeeId) && excluded.has(reg.employeeId)) { meals[meal] = { code: 'excluded', time }; continue; }
 
-    const reason = notExpectedReason(reg, cancelSet, date, meal);
-    if (!countsAsRegistered(reg, cancelSet, date, meal, !!time)) {
+    const reason = notExpectedReason(reg, cancelSet, date, meal, time);
+    if (reason !== null) {
       meals[meal] = { code: time ? 'extra' : 'not_registered', time, reason };
       continue;
     }

@@ -18,7 +18,7 @@ Lấy lượt chấm từ hai máy Hikvision trong LAN rồi ghi lên hệ thố
 
 Chạy trên **PC cài phần mềm HAC** — máy đó vốn đã kết nối tới hai thiết bị.
 
-Bản hiện tại: **2026-11-09.1** (script in số bản ở dòng đầu mỗi lần chạy).
+Bản hiện tại: **2026-11-09.2** (script in số bản ở dòng đầu mỗi lần chạy).
 Script khảo sát: **2026-10-14.1**.
 
 ---
@@ -126,6 +126,19 @@ dòng / chữ có dấu thì script không gửi (báo lỗi cấu hình). Dãy 
 ra luôn hợp lệ — dán nguyên dãy, đừng gõ lại tay.
 Script không bao giờ in khoá ra màn hình hay file log. Nghi lộ khoá thì tạo khoá
 mới, thay ở cả hai nơi.
+
+---
+
+## Cập nhật lên 2026-11-09.2
+
+Bỏ ngoại lệ "ăn trước rồi mới nộp đơn trong ngày vẫn tính là đã đăng ký": đơn nộp
+sau lượt chấm của bữa nào thì lượt chấm bữa đó là **chấm chưa đăng ký** (email
+cảnh báo, tab Đối soát, trang Chấm ăn của tôi cùng một quy tắc). Người nộp đơn sau
+bữa mà không chấm thì vẫn không bị tính thiếu chấm bữa đó.
+
+Chép **cả thư mục `agent`** vào `C:\DKAN-Agent` (giữ `config.json`,
+`firebase-key.json`), chạy thử thấy dòng đầu in `(bản 2026-11-09.2)`. Web cần
+triển khai cùng lúc (câu lý do mới trong email nằm ở `/api/meal-alerts`).
 
 ---
 
@@ -537,8 +550,9 @@ Kiểm tra lần lượt:
 Quy định của trường: báo hủy chỉ áp cho ngày hôm sau, không bổ sung đơn hay giải
 trình sau khi đã chấm ăn — nên thư này xét **hôm nay**, ngay sau thư thiếu chấm
 trong cùng lần chạy task 2 (từ bản 2026-11-09.1; bản trước xét ngày có suất ăn
-trước đó). Đơn nộp trong ngày **trước** lần chạy vẫn được tính, kể cả khi nộp sau
-bữa đã ăn. Với `--alerts-date X` (chỉ xem thử) thì xét đúng ngày X.
+trước đó). Đơn nộp **sau lượt chấm** của một bữa (ăn trước rồi mới đăng ký, kể cả
+khi bữa còn đang mở) thì bữa đó là chấm chưa đăng ký, lý do "nộp đơn sau khi đã
+chấm" (từ bản 2026-11-09.2). Với `--alerts-date X` (chỉ xem thử) thì xét đúng ngày X.
 
 1. Ngày đó chưa có trạng thái xong (`sent`, `nothing`, `guarded`, `off_day`); đã
    xong thì bỏ qua ngay, không đọc gì thêm. Trạng thái của thư thiếu chấm (đã
@@ -556,7 +570,7 @@ bữa đã ăn. Với `--alerts-date X` (chỉ xem thử) thì xét đúng ngày
 5. Chỉ xét lượt chấm **trong khung giờ ăn**, mã NV **6 chữ số** (bỏ nhân sự Bếp
    Vina và mã trong danh sách loại trừ). Lý do từng bữa theo cùng quy tắc với tab
    Đối soát: chưa có đơn tháng, đơn không gồm bữa đó, đã báo hủy, chưa tới ngày
-   bắt đầu ăn, nộp đơn sau bữa.
+   bắt đầu ăn, nộp đơn sau khi đã chấm (hoặc sau giờ ăn) của bữa đó.
 6. **Gắn mã NV với tài khoản chỉ qua đơn đăng ký** — không bao giờ qua hồ sơ
    nhân viên (hồ sơ do chính chủ tự sửa được):
    - mã đứng trên đơn tháng đó của **đúng một** tài khoản → gửi cho tài khoản đó;

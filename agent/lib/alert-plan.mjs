@@ -409,7 +409,7 @@ export const EXTRA_REASON_LOG = Object.freeze({
   no_registration: 'chưa có đơn tháng',
   meal_not_registered: 'đơn không gồm bữa này',
   before_start: 'trước ngày bắt đầu ăn trên đơn',
-  registered_late: 'nộp đơn sau bữa ăn',
+  registered_late: 'nộp đơn sau khi đã chấm',
   canceled: 'đã báo hủy',
 });
 

@@ -209,12 +209,34 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Báo hủy suất ăn: mỗi ngày một document {uid}_{ngày}. Nhân viên chỉ TẠO được báo
+    // hủy của chính mình: userId là tài khoản đang đăng nhập và mã document đúng
+    // {uid}_{cancelDate} như trang báo hủy vẫn ghi. Trước đây ai đăng nhập cũng tạo
+    // được báo hủy mang tài khoản người khác (hủy suất của đồng nghiệp). Sửa, xóa báo
+    // hủy đã có chỉ quản trị làm: trang web không có chức năng này cho nhân viên, và
+    // quy định không cho đổi báo hủy sau khi đã ăn. Quản trị tạo/sửa/xóa được cho mọi
+    // người (Hủy ăn người nghỉ việc và Hoàn tác). Đọc giữ như cũ — đọc document chưa
+    // tồn tại được phép để trang báo hủy kiểm tra ngày đã hủy.
     match /cancel_registrations/{cancelId} {
-      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (isAdmin() || (
+        request.resource.data.userId == request.auth.uid &&
+        cancelId == request.auth.uid + '_' + request.resource.data.cancelDate
+      ));
+      allow update, delete: if isAdmin();
     }
 
+    // Đăng ký ăn sự kiện: document {uid}_{mã sự kiện}. Nhân viên chỉ tạo/sửa đăng ký
+    // của chính mình (đổi lựa chọn trước hạn là ghi đè chính document đó), cùng cách
+    // với đơn đăng ký tháng ở trên.
     match /event_registrations/{eventRegId} {
-      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update: if isSignedIn() && (isAdmin() || (
+        (resource == null || resource.data.userId == request.auth.uid) &&
+        request.resource.data.userId == request.auth.uid &&
+        eventRegId == request.auth.uid + '_' + request.resource.data.eventId
+      ));
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
   }
 }

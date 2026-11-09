@@ -68,7 +68,7 @@ test('staff-extra: kiểm tra lượt chấm thật, nội dung cố định, es
       const texts = {
         meal_not_registered: 'Đơn đăng ký suất ăn của tháng không gồm bữa này.',
         before_start: 'Ngày này trước ngày bắt đầu ăn ghi trên đơn đăng ký.',
-        registered_late: 'Đơn đăng ký được nộp sau khi bữa ăn này đã kết thúc.',
+        registered_late: 'Đơn đăng ký được nộp sau khi đã chấm ăn bữa này.',
         canceled: 'Đã báo hủy bữa này nhưng vẫn có lượt chấm.',
       };
       for (const [reason, text] of Object.entries(texts)) {

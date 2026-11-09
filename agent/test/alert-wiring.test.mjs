@@ -22,8 +22,8 @@ const OCT = '2026-10';
  * Một tuần bình thường, tất cả qua hai máy CA_TrH và CA_TIH.
  *   Thứ 2 (D, hôm nay): uM chỉ chấm bữa sáng (thiếu chấm bữa trưa); uX ăn trưa 11:55 mà
  *   chỉ có đơn tháng 10 (mã gắn với tài khoản qua đơn các tháng trước — "chưa có đơn
- *   tháng"); uY ăn sáng 07:15, trưa 11:45 rồi 12:30 mới nộp đơn tháng 11 bắt đầu từ chính
- *   hôm nay (nộp trước giờ gửi cảnh báo, trong cùng ngày: tính là đã đăng ký).
+ *   tháng"); uY nộp đơn tháng 11 lúc 07:00 sáng nay (bắt đầu từ chính hôm nay) rồi ăn sáng
+ *   07:15, trưa 11:45 — đã đăng ký đủ (xem thêm kịch bản "ăn trước rồi mới nộp đơn").
  *   Thứ 6 (P): uX cũng ăn trưa mà chưa đăng ký — ngày đã qua, agent không xét lại.
  */
 function baseWorld() {
@@ -42,7 +42,7 @@ function baseWorld() {
       'registrations/uA_2026-11': registration('uA', '100001', NOV),
       'registrations/uB_2026-11': registration('uB', '100002', NOV),
       'registrations/uM_2026-11': registration('uM', '100005', NOV),
-      'registrations/uY_2026-11': registration('uY', '100004', NOV, { firstMealDate: D, timestamp: utc(D, '12:30') }),
+      'registrations/uY_2026-11': registration('uY', '100004', NOV, { firstMealDate: D, timestamp: utc(D, '07:00') }),
       'registrations/uX_2026-10': registration('uX', '100003', OCT),
       // Thứ 6 đã được task 22:00 hôm đó đồng bộ đủ hai máy (chốt cả hai bữa).
       [`checkins/${P}`]: checkinsDoc(P, tapsP),
@@ -152,8 +152,8 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     const r = await sb.run({ at });
     assert.equal(r.code, 0, r.out);
 
-    // Một thư chấm chưa đăng ký, của hôm nay, cho uX. uY (ăn trước, nộp đơn 12:30 cùng
-    // ngày, trước giờ gửi) không có thư; lượt chấm thứ 6 của uX không được xét lại.
+    // Một thư chấm chưa đăng ký, của hôm nay, cho uX. uY (nộp đơn 07:00 rồi mới ăn)
+    // không có thư; lượt chấm thứ 6 của uX không được xét lại.
     assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D]);
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D]);
     assert.deepEqual(posted(r), [['staff-missing', 200, 1], ['staff-extra', 200, 1]], 'thư thiếu chấm trước; không thư báo quản trị, không yêu cầu bị từ chối');
@@ -392,6 +392,25 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     assert.equal(s.alerts[D1].extra.status, 'nothing');
     assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...missingReads(D1), ...extraReads(D1)].sort());
     assert.deepEqual(journal(r.db), []);
+  });
+
+  test('ăn trước rồi mới nộp đơn trong ngày: nhận thư chấm chưa đăng ký cho các bữa đã chấm trước giờ nộp đơn', async t => {
+    const world = baseWorld();
+    // uY ăn sáng 07:15, nộp đơn 11:00 rồi ăn trưa 11:45: chỉ bữa sáng là chấm trước khi nộp đơn.
+    world.docs['registrations/uY_2026-11'] = registration('uY', '100004', NOV, { firstMealDate: D, timestamp: utc(D, '11:00') });
+    let sb = await sandboxFor(t, world);
+    let r = await sb.run({ at: utc(D, '13:50') });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D, `${D} uy breakfast@07:15:registered_late`]);
+    assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D], 'nộp đơn sau bữa sáng không làm ai bị tính thiếu chấm');
+
+    // Ăn cả hai bữa rồi 12:30 mới nộp đơn: cả hai bữa.
+    world.docs['registrations/uY_2026-11'] = registration('uY', '100004', NOV, { firstMealDate: D, timestamp: utc(D, '12:30') });
+    sb = await sandboxFor(t, world);
+    r = await sb.run({ at: utc(D, '13:50') });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D, `${D} uy breakfast@07:15:registered_late+lunch@11:45:registered_late`]);
+    assert.equal(sync(r).alerts[D].extra.candidates, 2);
   });
 
   test('miễn chấm: bữa trưa được miễn thì chỉ báo bữa sáng; tài liệu hỏng nêu mã chỉ giữ lại người đó, người khác vẫn nhận', async t => {

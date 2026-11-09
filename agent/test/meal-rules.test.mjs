@@ -136,10 +136,18 @@ test('evaluatePersonDay: mọi mã trạng thái', () => {
   assert.equal(r.meals.breakfast.reason, 'registered_late');
   assert.equal(r.meals.lunch.code, 'missing');
 
-  // ăn trước rồi mới nộp đơn trong ngày (đơn tính luôn ngày nộp): có chấm thì là đã ăn bình thường
+  // ăn trước rồi mới nộp đơn trong ngày: không được bổ sung đơn sau khi đã chấm — là chấm chưa đăng ký
   r = evaluatePersonDay({ date: D, registration: { ...reg, timestamp: vn(D, '15:00').toISOString() }, times: ['11:57'], ...final });
-  assert.deepEqual([r.meals.lunch.code, r.meals.lunch.time], ['ok', '11:57']);
+  assert.deepEqual([r.meals.lunch.code, r.meals.lunch.time, r.meals.lunch.reason], ['extra', '11:57', 'registered_late']);
   assert.deepEqual([r.meals.breakfast.code, r.meals.breakfast.reason], ['not_registered', 'registered_late'], 'không chấm thì vẫn không bị tính là thiếu');
+  // nộp đơn lúc bữa trưa còn mở nhưng sau lượt chấm: vẫn là chấm chưa đăng ký
+  r = evaluatePersonDay({ date: D, registration: { ...reg, timestamp: vn(D, '12:05').toISOString() }, times: ['11:57'], ...final });
+  assert.deepEqual([r.meals.lunch.code, r.meals.lunch.reason], ['extra', 'registered_late']);
+  // nộp đơn trước lượt chấm (cùng phút cũng chưa kết luận là nộp sau): bình thường
+  r = evaluatePersonDay({ date: D, registration: { ...reg, timestamp: vn(D, '11:57').toISOString() }, times: ['11:57'], ...final });
+  assert.equal(r.meals.lunch.code, 'ok');
+  r = evaluatePersonDay({ date: D, registration: { ...reg, timestamp: vn(D, '11:30').toISOString() }, times: ['11:57'], ...final });
+  assert.equal(r.meals.lunch.code, 'ok');
 
   // chưa tới ngày bắt đầu
   r = evaluatePersonDay({ date: D, registration: { ...reg, firstMealDate: '2026-10-12' }, ...final });
@@ -269,16 +277,21 @@ test('isSchoolStaffId: đúng 6 chữ số sau khi chuẩn hoá', () => {
   for (const v of ['12345', '1234567', 'AB1234', '', null]) assert.equal(isSchoolStaffId(v), false, JSON.stringify(v));
 });
 
-test('reconcile: ăn trước rồi mới nộp đơn trong ngày (đầu tháng) — có chấm là đã ăn, không vào "chấm nhưng không đăng ký"', () => {
+test('reconcile: ăn trước rồi mới nộp đơn trong ngày — vào "chấm nhưng không đăng ký" (không được bổ sung đơn sau khi đã chấm)', () => {
   const D = '2026-10-01';
   const reg = { userId: 'H', employeeId: '100896', fullName: 'Hoàng Khánh Huyền', month: '2026-10', firstMealDate: D,
     timestamp: '2026-10-01T08:00:00.000Z' /* 15:00 giờ VN, sau giờ ăn trưa */, breakfastCount: 0, lunchCount: 20 };
   const tapped = reconcile({ byDate: buildFromCheckins([{ date: D, people: { '100896': { name: 'Huyền', times: ['11:57'] } } }]).byDate,
     dates: [D], registrations: [reg], cancelations: [] });
-  assert.deepEqual(tapped.extra, []);
+  assert.deepEqual(tapped.extra.map(x => [x.meal, x.time, x.note]), [['lunch', '11:57', 'Đăng ký sau khi đã chấm ăn hoặc sau giờ ăn của bữa này']]);
   assert.deepEqual(tapped.missing, []);
-  assert.deepEqual(tapped.registered.map(x => x.meal), ['lunch']);
+  assert.deepEqual(tapped.registered, []);
   assert.deepEqual(tapped.tapped.map(x => x.time), ['11:57']);
+
+  // Nộp đơn 11:00 (trước khi chấm 11:57): đã đăng ký, đã ăn.
+  const early = reconcile({ byDate: buildFromCheckins([{ date: D, people: { '100896': { name: 'Huyền', times: ['11:57'] } } }]).byDate,
+    dates: [D], registrations: [{ ...reg, timestamp: '2026-10-01T04:00:00.000Z' }], cancelations: [] });
+  assert.deepEqual([early.extra, early.missing, early.registered.map(x => x.meal)], [[], [], ['lunch']]);
 
   // Cùng đơn, hôm đó không chấm: không bị tính "đăng ký nhưng không chấm".
   const none = reconcile({ byDate: { [D]: {} }, dates: [D], registrations: [reg], cancelations: [] });

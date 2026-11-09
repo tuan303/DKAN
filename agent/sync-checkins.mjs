@@ -60,7 +60,7 @@ import { postAlerts, isOldApiKindRejection } from './lib/endpoint.mjs';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ. Cũng được ghi vào settings/checkinSync.
-const AGENT_VERSION = '2026-11-09.1';
+const AGENT_VERSION = '2026-11-09.2';
 // Ghi cạnh agentVersion vào settings/checkinSync.agentFeatures: trang quản trị dựa
 // vào đây để biết agent đang chạy đã áp miễn chấm theo bữa và gửi thư chấm chưa
 // đăng ký chưa, gửi cho ngày nào (web tự triển khai khi push, agent thì chép tay —
