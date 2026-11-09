@@ -108,9 +108,10 @@ interface DeviceHealth {
 }
 
 /**
- * Kết quả gửi thư "chấm nhưng chưa đăng ký" của MỘT ngày ăn. Agent xử lý nhóm
- * này ở lần chạy cảnh báo của NGÀY CÓ SUẤT ĂN KẾ TIẾP (cần dữ liệu cả ngày đã
- * chốt), rồi ghi vào alerts[ngày đó].extra. Chỉ có số đếm, không có danh tính.
+ * Kết quả gửi thư "chấm nhưng chưa đăng ký" của MỘT ngày ăn, ghi vào
+ * alerts[ngày đó].extra. Agent từ bản 2026-11-09.1 (sameDayExtraAlerts) xử lý
+ * ngay trong lần chạy cảnh báo của chính ngày đó; bản trước xử lý ở lần chạy của
+ * ngày có suất ăn kế tiếp. Chỉ có số đếm, không có danh tính.
  */
 export interface ExtraAlertDay {
   status?: AlertStatus;
@@ -525,10 +526,10 @@ export function describeAlert(
 }
 
 /**
- * Diễn giải kết quả gửi thư "chấm nhưng chưa đăng ký" của một ngày ăn đã qua.
- * Agent chỉ xử lý nhóm này ở lần chạy cảnh báo của ngày có suất ăn kế tiếp, nên
- * chưa có kết quả chưa chắc là lỗi: chỉ báo "Đang chờ" khi agent có hỗ trợ và
- * lần chạy đó thật sự còn ở phía trước.
+ * Diễn giải kết quả gửi thư "chấm nhưng chưa đăng ký" của một ngày ăn (hôm nay
+ * với agent gửi trong ngày, ngày ăn trước đó với agent bản cũ). Chưa có kết quả
+ * chưa chắc là lỗi: chỉ báo "Đang chờ" khi agent có hỗ trợ và lần chạy cảnh báo
+ * xử lý ngày đó thật sự còn ở phía trước.
  */
 export function describeExtraAlert(
   extra: ExtraAlertDay | undefined,
@@ -539,8 +540,8 @@ export function describeExtraAlert(
     /** Hôm nay theo giờ Việt Nam, YYYY-MM-DD. */
     today: string;
     /**
-     * Hôm nay có lần chạy cảnh báo theo lịch (DKAN 2 chạy thứ 2–6, kể cả ngày
-     * nghỉ giữa tuần: nhóm thư này nói về ngày ăn trước đó nên vẫn được gửi).
+     * Hôm nay có lần chạy cảnh báo xử lý ngày đang xem (DKAN 2 chạy thứ 2–6; agent
+     * bản cũ gửi thư của ngày ăn trước đó cả vào ngày nghỉ giữa tuần).
      */
     alertRunToday: boolean;
     /** Giờ Việt Nam hiện tại, HH:MM. */
@@ -622,8 +623,8 @@ export function missingCountsText(alert: Pick<AlertDay, 'expected' | 'missing' |
 }
 
 /**
- * Ngày có suất ăn gần nhất trước `today`, hoặc null. Tìm lùi tối đa 7 ngày —
- * đúng như agent (PREVIOUS_MEAL_DAY_LOOKBACK trong agent/lib/alert-plan.mjs):
+ * Ngày có suất ăn gần nhất trước `today`, hoặc null — ngày agent bản cũ (trước
+ * 2026-11-09.1) xét thư chấm chưa đăng ký. Tìm lùi tối đa 7 ngày như agent đó:
  * sau kỳ nghỉ dài hơn, agent không xét lại ngày ăn trước kỳ nghỉ.
  */
 function previousMealDay(today: string, offDays: string[]): string | null {
@@ -670,9 +671,11 @@ export function SyncHealthStrip({ sync, offDays, now: at }: { sync: CheckinSync;
   // 'error' agent không tính gì (doc mang 0/0 hoặc số của lần chạy trước), hiện
   // ra sẽ đọc thành "không ai thiếu" trong khi thật ra chưa biết.
   const showCounts = !!alert && !!alert.status && COUNTED_STATUSES.has(alert.status) && !!alert.expected;
-  // Thư "chấm nhưng chưa đăng ký" của một ngày được gửi ở lần chạy cảnh báo của
-  // ngày ăn kế tiếp, nên dòng này nói về ngày ăn gần nhất trước hôm nay.
-  const extraDate = previousMealDay(today, offDays);
+  // Thư "chấm nhưng chưa đăng ký": agent mới gửi ngay trong ngày (dòng này nói về
+  // hôm nay, chỉ khi hôm nay có suất ăn); agent bản cũ gửi ở lần chạy cảnh báo của
+  // ngày ăn kế tiếp (dòng này nói về ngày ăn gần nhất trước hôm nay).
+  const sameDayExtra = agentSupports(sync, 'sameDayExtraAlerts');
+  const extraDate = sameDayExtra ? (todayMealDay ? today : null) : previousMealDay(today, offDays);
   const extra = extraDate ? sync.alerts?.[extraDate]?.extra : undefined;
   const extraInfo = extraDate
     ? describeExtraAlert(extra, {

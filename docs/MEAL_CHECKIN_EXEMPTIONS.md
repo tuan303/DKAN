@@ -28,7 +28,7 @@ File nhập có ba cột: **Mã nhân viên | Họ tên | Email**. Mỗi lần t
 
 Agent gửi riêng thư **Chấm ăn nhưng chưa có đăng ký phù hợp**. Chỉ xét lượt chấm trong khung giờ ăn, có dữ liệu chốt đủ máy, gắn được với đúng một tài khoản đang hoạt động có email trường. Trường hợp đã báo hủy hoặc chưa tới ngày bắt đầu cũng được giải thích trong thư. Bỏ trường hợp có đăng ký ăn sự kiện phù hợp để tránh gửi nhầm.
 
-Thư thiếu chấm vẫn xét **hôm nay** sau giờ ăn. Thư chấm chưa đăng ký xét **ngày có suất ăn trước đó**, tại lần chạy cảnh báo của ngày có suất ăn tiếp theo (lịch hiện tại 13:45). Lý do: người ăn trước rồi nộp đơn trong cùng ngày vẫn được tính là đã đăng ký; cần chờ hết ngày để kết luận. Đây không phải gửi ngay khi vừa chấm máy. Không tự gửi bù hàng loạt các ngày cũ.
+Cả hai loại thư đều xét **hôm nay**, trong cùng lần chạy cảnh báo sau giờ ăn trưa (lịch hiện tại 13:45): thư thiếu chấm trước, thư chấm chưa đăng ký sau (từ agent 2026-11-09.1; bản 2026-11-06.1 xét thư chấm chưa đăng ký cho ngày có suất ăn trước đó). Lý do: quy định của trường không cho bổ sung đơn, báo hủy (chỉ áp cho ngày hôm sau) hay giải trình sau khi đã chấm ăn. Đây không phải gửi ngay khi vừa chấm máy. Không tự gửi bù các ngày cũ.
 
 Mã chưa gắn chắc chắn với tài khoản, dữ liệu thiếu máy hoặc số người bất thường được giữ để quản trị kiểm tra. Người chưa từng có đơn đăng ký không tự được ánh xạ bằng họ tên trên máy; quản trị vẫn tra cứu được ở mục đối soát.
 

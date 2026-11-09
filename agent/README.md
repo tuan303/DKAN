@@ -9,16 +9,16 @@ Lấy lượt chấm từ hai máy Hikvision trong LAN rồi ghi lên hệ thố
   dinhduong@). Người có tên trong danh sách **Miễn chấm ăn theo bữa** (quản trị
   tự thêm/bớt trên trang Quản trị; mặc định miễn bữa trưa) không bị cảnh báo
   thiếu chấm ở bữa được miễn;
-- cùng lúc đó, người **có lượt chấm trong khung giờ ăn nhưng chưa có đăng ký
-  phù hợp** cho bữa đó ở **ngày có suất ăn trước** nhận **một email cảnh báo
-  chấm chưa đăng ký** (từ bản 2026-11-06.1);
+- cùng lúc đó, người **có lượt chấm trong khung giờ ăn hôm nay nhưng chưa có
+  đăng ký phù hợp** cho bữa đó nhận **một email cảnh báo chấm chưa đăng ký** (từ
+  bản 2026-11-09.1 gửi ngay trong ngày; bản 2026-11-06.1 gửi vào ngày ăn kế tiếp);
 - **15:00 thứ 6 hằng tuần**, CBGV-NV có đăng ký ăn nhận **email mời khảo sát
   chất lượng suất ăn** của tuần (script riêng `survey-invite.mjs`, xem mục
   **Khảo sát bữa ăn hằng tuần**).
 
 Chạy trên **PC cài phần mềm HAC** — máy đó vốn đã kết nối tới hai thiết bị.
 
-Bản hiện tại: **2026-11-06.1** (script in số bản ở dòng đầu mỗi lần chạy).
+Bản hiện tại: **2026-11-09.1** (script in số bản ở dòng đầu mỗi lần chạy).
 Script khảo sát: **2026-10-14.1**.
 
 ---
@@ -126,6 +126,26 @@ dòng / chữ có dấu thì script không gửi (báo lỗi cấu hình). Dãy 
 ra luôn hợp lệ — dán nguyên dãy, đừng gõ lại tay.
 Script không bao giờ in khoá ra màn hình hay file log. Nghi lộ khoá thì tạo khoá
 mới, thay ở cả hai nơi.
+
+---
+
+## Cập nhật lên 2026-11-09.1
+
+Thư **chấm chưa đăng ký** gửi **ngay trong ngày**, cùng lần chạy `DKAN 2` (từ 13:45)
+với thư thiếu chấm — theo quy định của trường: báo hủy chỉ áp cho ngày hôm sau,
+không bổ sung đơn hay giải trình sau khi đã chấm ăn. Bản trước gửi thư này vào
+ngày có suất ăn kế tiếp. Không đổi `config.json`, Task Scheduler hay Firestore Rules.
+
+1. Push bản web mới (để tab **Đối soát** hiện trạng thái thư của hôm nay), đợi
+   Vercel báo **Ready**.
+2. Chép **cả thư mục `agent`** vào `C:\DKAN-Agent` (chép đè), giữ nguyên
+   `config.json` và `firebase-key.json`. Không cần `npm install` lại.
+3. Chạy thử sau 13:45 một ngày có suất ăn: dòng đầu phải in `(bản 2026-11-09.1)`,
+   mục `[2] CHẤM NHƯNG CHƯA ĐĂNG KÝ` mang ngày **hôm nay**.
+
+Chuyển bản giữa ngày: nếu hôm nay bản cũ đã chạy (đã xét ngày ăn trước đó), lần
+chạy kế tiếp của bản mới trong ngày xét luôn hôm nay. Ngày ăn trước đó mà bản cũ
+chưa kịp xét thì không được xét nữa.
 
 ---
 
@@ -285,7 +305,7 @@ chờ bạn bấm phím bất kỳ để đóng.
 | Task | Lịch | Add arguments | Để làm gì |
 |---|---|---|---|
 | `DKAN 1 - Dong bo 08h15` | Thứ 2–6, 08:15 | `--quiet --days 1` | Có lượt chấm bữa sáng trên trang cá nhân |
-| `DKAN 2 - Canh bao 13h45` | Thứ 2–6, 13:45, **lặp mỗi 15 phút trong 1 giờ** | `--quiet --days 1 --send-alerts` | Đồng bộ bữa trưa rồi gửi email cảnh báo: thiếu chấm của hôm nay, chấm chưa đăng ký của ngày có suất ăn trước đó |
+| `DKAN 2 - Canh bao 13h45` | Thứ 2–6, 13:45, **lặp mỗi 15 phút trong 1 giờ** | `--quiet --days 1 --send-alerts` | Đồng bộ bữa trưa rồi gửi email cảnh báo của hôm nay: thiếu chấm, chấm chưa đăng ký |
 | `DKAN 3 - Dong bo 22h` | Hằng ngày, 22:00 | `--quiet` | Lấy lại 7 ngày gần nhất, bù khi có trục trặc |
 
 Gửi lời mời khảo sát (15:00 thứ 6, kèm các lần gửi bù) là task thứ tư, chạy
@@ -297,14 +317,12 @@ trước có máy lỗi. Người đã được ghi vào nhật ký `meal_alerts
 hai thư cùng loại cho cùng ngày. Một loại thư đã xong (vd. thư thiếu chấm hôm
 nay đã `sent`) thì các lần lặp sau bỏ qua loại đó ngay, không đọc thêm gì.
 
-Thư chấm chưa đăng ký của một ngày được gửi ở **lần chạy task 2 kế tiếp** (thứ 2–6,
-từ 13:45; thứ 6 thì sang thứ 2): ai ăn trước rồi nộp đơn chiều cùng ngày vẫn được
-tính là đã đăng ký, nên phải hết ngày mới biết chắc. Ngày nghỉ khai ở tab Cấu hình
-mà rơi vào thứ 2–6 thì task 2 vẫn chạy: thư thiếu chấm bỏ qua (không có suất ăn),
-còn thư chấm chưa đăng ký của ngày có suất ăn trước đó vẫn được gửi ngay hôm đó.
-Agent chỉ tìm lùi tối đa 7 ngày để lấy "ngày có suất ăn trước đó"; sau kỳ nghỉ dài
-hơn, ngày ăn trước kỳ nghỉ không được xét lại. Ngày đã qua phải chốt đủ cả hai bữa
-(đồng bộ đủ mọi máy sau giờ ăn trưa) mới gửi; chưa đủ thì lần chạy sau thử lại.
+Thư chấm chưa đăng ký cũng gửi **ngay trong ngày**, cùng lần chạy với thư thiếu
+chấm (quy định: báo hủy chỉ áp cho ngày hôm sau, không bổ sung đơn hay giải trình
+sau khi đã chấm ăn). Phải chốt đủ cả hai bữa (đồng bộ đủ mọi máy sau giờ ăn trưa)
+mới gửi; chưa đủ thì lần lặp sau thử lại. Hết các lần lặp trong ngày mà vẫn chưa
+gửi được thì ngày đó không được xét lại vào hôm sau. Ngày nghỉ khai ở tab Cấu hình
+thì cả hai loại thư đều bỏ qua.
 
 Ba task khác giờ nên không chạy chồng nhau; nếu lỡ chồng (một lần chạy kéo
 dài, hay chạy tay đúng lúc task đang chạy), lần sau tự chờ lần trước xong nhờ
@@ -369,7 +387,7 @@ Cột **Last Run Result** trong Task Scheduler cho biết kết quả:
 | `node sync-checkins.mjs --dry-run` | Chỉ in ra, không ghi lên hệ thống |
 | `node sync-checkins.mjs --debug` | In thêm mã sự kiện thô của thiết bị |
 | `node sync-checkins.mjs --send-alerts` | Đồng bộ xong thì chạy pha gửi email cảnh báo (cần `alerts.enabled: true`) |
-| `node sync-checkins.mjs --dry-run --send-alerts` | Xem thử ai sẽ nhận email: thư thiếu chấm của hôm nay và thư chấm chưa đăng ký của ngày có suất ăn trước đó. Không gửi, không ghi |
+| `node sync-checkins.mjs --dry-run --send-alerts` | Xem thử ai sẽ nhận email của hôm nay: thư thiếu chấm và thư chấm chưa đăng ký. Không gửi, không ghi |
 | `node sync-checkins.mjs --dry-run --send-alerts --alerts-date 2026-10-08` | Xem thử cả hai loại thư cho đúng một ngày đã qua, bỏ qua kiểm tra giờ |
 | `node survey-invite.mjs --dry-run` | Xem thử lời mời khảo sát tuần này: ai sẽ nhận, mấy thư — không gửi, không ghi (xem mục **Khảo sát bữa ăn hằng tuần**) |
 | `npm test` | Chạy bộ kiểm tra tự động của script (không cần máy nhận diện hay Firebase) |
@@ -445,7 +463,7 @@ trạng thái hay lỗi của loại này không chặn loại kia:
 | Loại | Xét cho ngày | Ai nhận | Nhật ký | Trạng thái |
 |---|---|---|---|---|
 | **[1] Thiếu chấm** | **Hôm nay** | Đã đăng ký bữa đó mà không có lượt chấm (trừ người được miễn chấm bữa đó) | `meal_alerts/{ngày}_{tài khoản}` | `alerts[ngày]` |
-| **[2] Chấm chưa đăng ký** | **Ngày có suất ăn trước hôm nay** (lùi tối đa 7 ngày) | Có lượt chấm trong khung giờ ăn nhưng chưa có đăng ký phù hợp cho bữa đó | `meal_alerts/{ngày}:extra:{tài khoản}` | `alerts[ngày].extra` |
+| **[2] Chấm chưa đăng ký** | **Hôm nay** (cùng lần chạy, sau thư thiếu chấm) | Có lượt chấm trong khung giờ ăn nhưng chưa có đăng ký phù hợp cho bữa đó | `meal_alerts/{ngày}:extra:{tài khoản}` | `alerts[ngày].extra` |
 
 Hai loại dùng chung: `alerts.enabled` phải là `true`; khối `alerts` trong
 `config.json` phải đúng (khoá, địa chỉ, `notBefore` dạng `HH:MM`...) — sai thì
@@ -514,24 +532,27 @@ Kiểm tra lần lượt:
 7. Danh sách miễn chấm có tài liệu hỏng không nêu được mã NV → dừng (xem trên).
 8. Gửi email, ghi nhật ký `meal_alerts/{ngày}_{tài khoản}`.
 
-### [2] Thư chấm chưa đăng ký — ngày có suất ăn trước đó
+### [2] Thư chấm chưa đăng ký — hôm nay
 
-Ăn trước rồi nộp đơn chiều cùng ngày (hay gặp đầu tháng) vẫn được tính là đã
-đăng ký, nên phải **hết ngày** mới biết chắc một lượt chấm là "chưa đăng ký". Vì
-vậy thư của một ngày được xét ở task 2 của **ngày có suất ăn kế tiếp** (thứ 6 thì
-sang thứ 2). Với `--alerts-date X` (chỉ xem thử) thì xét đúng ngày X.
+Quy định của trường: báo hủy chỉ áp cho ngày hôm sau, không bổ sung đơn hay giải
+trình sau khi đã chấm ăn — nên thư này xét **hôm nay**, ngay sau thư thiếu chấm
+trong cùng lần chạy task 2 (từ bản 2026-11-09.1; bản trước xét ngày có suất ăn
+trước đó). Đơn nộp trong ngày **trước** lần chạy vẫn được tính, kể cả khi nộp sau
+bữa đã ăn. Với `--alerts-date X` (chỉ xem thử) thì xét đúng ngày X.
 
 1. Ngày đó chưa có trạng thái xong (`sent`, `nothing`, `guarded`, `off_day`); đã
-   xong thì bỏ qua ngay, không đọc gì thêm. Trạng thái của thư thiếu chấm hôm nay
-   (đã gửi, chưa đủ máy...) không ảnh hưởng.
+   xong thì bỏ qua ngay, không đọc gì thêm. Trạng thái của thư thiếu chấm (đã
+   gửi, lỗi...) không ảnh hưởng, trừ cờ `held` ở bước 3.
 2. Cấu hình đúng, đã qua `notBefore` (như trên).
 3. Ngày đó không bị chốt an toàn của thư thiếu chấm treo lại (`held`, dữ liệu
    máy nhận diện bất thường): trang **Chấm ăn của tôi** và tab Đối soát không kết
-   luận gì cho ngày đó, nên thư này cũng không gửi (trạng thái `guarded`, không
-   báo quản trị lần nữa).
-4. Ngày đó phải có lần đồng bộ **đủ mọi máy sau giờ ăn** (thường là task 2 hoặc
-   task 3 của chính ngày đó). Chưa có thì trạng thái `error`, lần sau thử lại. Chỉ
-   xét những bữa đã chốt.
+   luận gì cho ngày đó, nên thư này cũng chưa gửi (trạng thái `error`, không báo
+   quản trị lần nữa). Lần lặp sau trong ngày mà dữ liệu đã bình thường (thư thiếu
+   chấm gỡ `held`) thì gửi như thường.
+4. Ngày đó phải có lần đồng bộ **đủ mọi máy sau giờ ăn trưa** (lần chạy task 2
+   của chính ngày đó). Chưa có thì trạng thái `error`, lần lặp sau thử lại. Phải
+   chốt đủ cả hai bữa mới xét (chỉ xem thử `--alerts-date` hôm nay mới xét các bữa
+   đã chốt).
 5. Chỉ xét lượt chấm **trong khung giờ ăn**, mã NV **6 chữ số** (bỏ nhân sự Bếp
    Vina và mã trong danh sách loại trừ). Lý do từng bữa theo cùng quy tắc với tab
    Đối soát: chưa có đơn tháng, đơn không gồm bữa đó, đã báo hủy, chưa tới ngày
@@ -583,8 +604,8 @@ phải chấm = `expected` − `exempt`). `sent` là tổng số email thiếu c
 trong ngày; `invalidExemptions` là số tài liệu miễn chấm hỏng agent thấy lúc xét
 ngày đó.
 
-**Thư chấm chưa đăng ký** — `alerts[ngày].extra`, ghi ở lần chạy của ngày có suất
-ăn kế tiếp. Chỉ có số đếm: `status`, `at`, `candidates` (số người cần báo),
+**Thư chấm chưa đăng ký** — `alerts[ngày].extra`, ghi ở lần chạy cảnh báo của
+chính ngày đó. Chỉ có số đếm: `status`, `at`, `candidates` (số người cần báo),
 `sent`, `failed`, `uncertain` (chỉ có khi kết quả gửi chưa rõ), `unmapped` (số mã chưa gắn được với đúng một tài khoản, gồm cả
 mã trùng), `eventSkipped`, `reason`.
 
@@ -592,10 +613,10 @@ mã trùng), `eventSkipped`, `reason`.
 |---|---|---|
 | `sent` | Đã gửi xong cho mọi người cần báo | Không xét lại ngày đó |
 | `nothing` | Không ai cần báo | Không xét lại ngày đó |
-| `guarded` | Không gửi cả ngày: quá ngưỡng chốt an toàn (đã báo quản trị), hoặc ngày đó đang bị chốt an toàn của thư thiếu chấm treo lại (`held`) | Không xét lại ngày đó |
+| `guarded` | Không gửi cả ngày: quá ngưỡng chốt an toàn (đã báo quản trị) | Không xét lại ngày đó |
 | `off_day` | Không phải ngày có suất ăn | Không xét lại ngày đó |
 | `partial` | Có email gửi lỗi (`failed` > 0) hoặc chưa rõ kết quả (`uncertain` > 0), xem `reason` | Chỉ thử lại người chắc chắn chưa gửi; người chưa rõ không tự gửi lại |
-| `error` | Chưa gửi được: chưa có dữ liệu chốt, cấu hình sai, API email bản cũ, gửi email báo quản trị lỗi, hoặc lỗi giữa chừng — xem `reason` | Thử lại |
+| `error` | Chưa gửi được: chưa có dữ liệu chốt, ngày đang bị chốt an toàn của thư thiếu chấm treo (`held`), cấu hình sai, API email bản cũ, gửi email báo quản trị lỗi, hoặc lỗi giữa chừng — xem `reason` | Thử lại ở các lần lặp trong ngày |
 
 ---
 
@@ -965,7 +986,7 @@ sách đã nhận`, và người trong **thư đó** (thường là cả trườ
 | `N chính sách miễn chấm đang có hiệu lực nhưng mã NV không có trên đơn đăng ký nào tháng ...` / `... có email khác email tài khoản trên đơn nên CHƯA được áp dụng` | Chính sách không áp được cho ai: người đó chưa đăng ký tháng này, hoặc email trong danh sách khác email tài khoản đăng nhập. Kiểm tra mã NV và email trong danh sách (mã chỉ in trong log) |
 | `Bỏ qua N mã có lượt chấm nhưng chưa gắn được với đúng một tài khoản qua đơn đăng ký` | Thư chấm chưa đăng ký: mã có lượt chấm nhưng không đứng trên đơn của đúng một tài khoản (tháng đó hoặc 3 tháng trước) — người chưa từng đăng ký, mã trùng, hoặc đổi mã. Không gửi; quản trị đối chiếu ở tab **Đối soát chấm ăn → Chấm nhưng không đăng ký** |
 | `CHỐT AN TOÀN — DỪNG, không gửi thư chấm chưa đăng ký cho CBNV` | Số người sẽ nhận thư chấm chưa đăng ký vượt ngưỡng (30 người, hoặc 25% số người có lượt chấm nếu lớn hơn) — thường do đơn đăng ký chưa đọc đủ hoặc máy ghi sai mã. Trạng thái `guarded`, quản trị được báo một lần, ngày đó không gửi và không xét lại |
-| `Chưa có lần đồng bộ đủ mọi máy phủ ngày ... sau giờ ăn — chưa gửi thư chấm chưa đăng ký` | Ngày có suất ăn trước đó chưa có dữ liệu chốt (mọi lần đồng bộ ngày đó đều thiếu máy). Trạng thái `error`, lần sau thử lại. Muốn gửi bù trong ngày: khi đủ máy, chạy tay `node sync-checkins.mjs --days 7 --send-alerts` (lấy lại 7 ngày nên có dữ liệu chốt cho ngày đó rồi gửi luôn). Qua ngày có suất ăn kế tiếp thì agent chuyển sang xét ngày mới, ngày cũ không được gửi nữa |
+| `Chưa có lần đồng bộ đủ mọi máy phủ ngày ... sau giờ ăn — chưa gửi thư chấm chưa đăng ký` | Hôm nay chưa có lần đồng bộ đủ mọi máy sau giờ ăn trưa (máy lỗi). Trạng thái `error`, các lần lặp sau trong ngày thử lại. Hết lần lặp mà máy mới trả lời lại: chạy tay `node sync-checkins.mjs --days 1 --send-alerts` trong ngày để gửi. Sang ngày hôm sau thì agent xét ngày mới, ngày cũ không được gửi nữa |
 | `Không gửi được cho N người: không có tài khoản đang hoạt động với email @hoangmaistarschool.edu.vn` | Thư chấm chưa đăng ký: tài khoản đã bị xoá, bị khoá, hoặc dùng email ngoài trường. Không gửi được, cần nhắc trực tiếp |
 
 ---

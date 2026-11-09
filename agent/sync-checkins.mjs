@@ -8,9 +8,8 @@
  *   2. tách lượt chấm cho từng người vào `meal_taps/{uid}/months/{tháng}` để
  *      CBNV tự xem trên trang "Chấm ăn của tôi";
  *   3. ghi trạng thái đồng bộ vào `settings/checkinSync`;
- *   4. (khi có --send-alerts) gửi email cảnh báo, hai loại độc lập nhau:
- *      "đăng ký mà không chấm ăn" cho HÔM NAY, và "chấm ăn nhưng chưa đăng ký"
- *      cho NGÀY CÓ SUẤT ĂN TRƯỚC ĐÓ (xem lib/alert-plan.mjs alertDates).
+ *   4. (khi có --send-alerts) gửi email cảnh báo cho HÔM NAY, hai loại độc lập
+ *      nhau: "đăng ký mà không chấm ăn" và "chấm ăn nhưng chưa đăng ký".
  *
  * Cách chạy:
  *   node sync-checkins.mjs                  lấy N ngày gần nhất theo config
@@ -47,7 +46,7 @@ import { parseCheckinExemptionDocs, exemptionQuarantine } from './lib/checkin-ex
 import {
   alertGate, planAlerts, guardVerdict, uidsToLookup, selectRecipients, buildAdminNotice, alertEntry,
   finalAlertStatus, dateLabelOf, deviceMealGaps, mealCounts, exemptionHold, exemptionAudit,
-  alertDates, extraGate, extraEntry, isTerminalExtraStatus, planExtraAlerts, lookbackMonths, relevantEventIds,
+  extraGate, extraEntry, isTerminalExtraStatus, planExtraAlerts, lookbackMonths, relevantEventIds,
   eventSkipUids, extraGuard, buildExtraAdminNotice, sentAlertsByKind, deliverAlerts, deliveryNotes,
   OLD_API_EXTRA_REASON, EXTRA_REASON_LOG,
 } from './lib/alert-plan.mjs';
@@ -61,11 +60,12 @@ import { postAlerts, isOldApiKindRejection } from './lib/endpoint.mjs';
 
 // In ra mỗi lần chạy để biết chắc máy đang dùng bản nào — tránh mất thời gian
 // vì chạy nhầm file cũ. Cũng được ghi vào settings/checkinSync.
-const AGENT_VERSION = '2026-11-06.1';
+const AGENT_VERSION = '2026-11-09.1';
 // Ghi cạnh agentVersion vào settings/checkinSync.agentFeatures: trang quản trị dựa
 // vào đây để biết agent đang chạy đã áp miễn chấm theo bữa và gửi thư chấm chưa
-// đăng ký chưa (web tự triển khai khi push, agent thì chép tay — hai bên có thể lệch).
-const AGENT_FEATURES = ['checkinExemptions', 'extraAlerts'];
+// đăng ký chưa, gửi cho ngày nào (web tự triển khai khi push, agent thì chép tay —
+// hai bên có thể lệch). sameDayExtraAlerts: thư chấm chưa đăng ký xét HÔM NAY.
+const AGENT_FEATURES = ['checkinExemptions', 'extraAlerts', 'sameDayExtraAlerts'];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -997,13 +997,14 @@ async function recordExtraCrash({ settingsRef, syncDoc, date, message }) {
 }
 
 /**
- * Pha cảnh báo. Hai loại thư chạy ĐỘC LẬP — trạng thái hay lỗi của loại này
- * không chặn loại kia:
- *   [1] đăng ký mà không chấm ăn — HÔM NAY (như các bản trước, nay không tính
- *       người được miễn chấm theo danh sách "Miễn chấm ăn theo bữa");
- *   [2] chấm ăn nhưng chưa đăng ký — NGÀY CÓ SUẤT ĂN TRƯỚC hôm nay: ăn trước rồi
- *       nộp đơn trong cùng ngày vẫn được tính là đã đăng ký, nên phải hết ngày
- *       mới biết chắc. Lần chạy 13:45 của ngày có suất ăn kế tiếp xử lý.
+ * Pha cảnh báo, cho HÔM NAY (ngày --alerts-date khi xem thử). Hai loại thư chạy
+ * ĐỘC LẬP — trạng thái hay lỗi của loại này không chặn loại kia:
+ *   [1] đăng ký mà không chấm ăn (không tính người được miễn chấm theo danh sách
+ *       "Miễn chấm ăn theo bữa");
+ *   [2] chấm ăn nhưng chưa đăng ký. Quy định của trường: báo hủy chỉ áp cho ngày
+ *       hôm sau, không bổ sung đơn hay giải trình sau khi đã chấm — nên gửi ngay
+ *       trong ngày như loại [1]. Loại [1] chạy trước: nếu chốt an toàn của [1] treo
+ *       ngày này (dữ liệu máy bất thường) thì [2] chờ tới lần lặp sau.
  * Mã trả về: 2 nếu một trong hai loại còn việc phải làm lại ở lần chạy sau.
  */
 async function runAlerts(ctx) {
@@ -1033,14 +1034,14 @@ async function runAlerts(ctx) {
   const nowVn = vnParts(now);
   const offSnap = await db.collection('settings').doc('mealOffDays').get();
   const offDays = Array.isArray(offSnap.data()?.dates) ? offSnap.data().dates : [];
-  const dates = alertDates({ today: TODAY, alertsDate: args.alertsDate, offDays });
-  const shared = { ...ctx, cfg, configProblems, now, nowVn, offDays };
+  const date = args.alertsDate || TODAY;
+  const shared = { ...ctx, cfg, configProblems, now, nowVn, offDays, date };
 
   let code = 0;
   log('');
-  log(`  [1] ĐĂNG KÝ NHƯNG CHƯA CHẤM — ${dateLabelOf(dates.missing)}`);
+  log(`  [1] ĐĂNG KÝ NHƯNG CHƯA CHẤM — ${dateLabelOf(date)}`);
   try {
-    code = await runMissingAlerts({ ...shared, date: dates.missing });
+    code = await runMissingAlerts(shared);
   } catch (err) {
     code = 2;
     const message = redact(err?.message ?? err, cfg.secret);
@@ -1049,16 +1050,14 @@ async function runAlerts(ctx) {
   }
 
   log('');
-  log(`  [2] CHẤM NHƯNG CHƯA ĐĂNG KÝ — ${dates.extra
-    ? `${dateLabelOf(dates.extra)}${args.alertsDate ? '' : ' (ngày có suất ăn trước hôm nay)'}`
-    : 'không có ngày nào để xét'}`);
+  log(`  [2] CHẤM NHƯNG CHƯA ĐĂNG KÝ — ${dateLabelOf(date)}`);
   try {
-    code = Math.max(code, await runExtraAlerts({ ...shared, date: dates.extra }));
+    code = Math.max(code, await runExtraAlerts(shared));
   } catch (err) {
     code = 2;
     const message = redact(err?.message ?? err, cfg.secret);
     log(`  LỖI ở thư chấm chưa đăng ký: ${message}`);
-    await recordExtraCrash({ settingsRef, syncDoc, date: dates.extra, message });
+    await recordExtraCrash({ settingsRef, syncDoc, date, message });
   }
   return code;
 }
@@ -1087,8 +1086,8 @@ async function runMissingAlerts({
     const alerts = { [date]: entry };
     for (const k of pruneDateKeys(syncDoc.alerts, TODAY)) if (k !== date) alerts[k] = DEL;
     // set merge chỉ ghi các trường của mục thư thiếu chấm: phần `extra` (thư chấm
-    // chưa đăng ký của chính ngày đó, ghi ở lần chạy của ngày có suất ăn kế tiếp)
-    // giữ nguyên. Mục quá 100 ngày bị xoá cả cụm, gồm cả `extra`.
+    // chưa đăng ký của cùng ngày, do pha [2] ghi) giữ nguyên. Mục quá 100 ngày bị
+    // xoá cả cụm, gồm cả `extra`.
     await settingsRef.set({ alerts }, { merge: true });
     rememberAlert(syncDoc, date, entry);
   };
@@ -1276,7 +1275,7 @@ async function runMissingAlerts({
     }
     // Lần này chốt an toàn đã qua (dữ liệu máy bình thường), nên bỏ cờ held cũ:
     // để nguyên thì ngày này bị coi là "dữ liệu máy bất thường" mãi, và nhóm thư
-    // "chấm chưa đăng ký" của ngày này (xét vào ngày ăn kế tiếp) bị chặn theo.
+    // "chấm chưa đăng ký" của ngày này (pha [2] ngay sau) bị chặn theo.
     // Giữ 'guarded' nếu hôm nay đã báo quản trị — đó là dấu để không báo lại.
     await writeStatus(alertEntry(holdStatus, new Date().toISOString(), {
       stats, sent: alreadySent.size, reason: holdReason, held: false, invalidExemptions,
@@ -1336,19 +1335,15 @@ async function runMissingAlerts({
 }
 
 /**
- * [2] Chấm ăn nhưng chưa đăng ký — ngày `date` (ngày có suất ăn trước hôm nay;
- * ngày --alerts-date khi xem thử). Trạng thái ghi riêng ở alerts[ngày].extra
- * (chỉ số đếm). 'sent', 'nothing', 'guarded', 'off_day' là xong hẳn: các lần chạy
- * sau dừng ngay ở cửa chặn, không đọc thêm gì.
+ * [2] Chấm ăn nhưng chưa đăng ký — ngày `date` (hôm nay; ngày --alerts-date khi
+ * xem thử). Trạng thái ghi riêng ở alerts[ngày].extra (chỉ số đếm). 'sent',
+ * 'nothing', 'guarded', 'off_day' là xong hẳn: các lần chạy sau dừng ngay ở cửa
+ * chặn, không đọc thêm gì.
  */
 async function runExtraAlerts({
   db, settingsRef, syncDoc, finalDocs, runEndAt, coveredDates, realRegistrationsOf, lookupUsers, authCache, excludedIdsList,
   cfg, configProblems, now, nowVn, offDays, date,
 }) {
-  if (!date) {
-    log('  7 ngày trước hôm nay đều không có suất ăn — không có gì để xét.');
-    return 0;
-  }
   const existing = syncDoc.alerts?.[date]?.extra || null;
   // Mốc chốt mới nhất của ngày xét: lần chạy này nếu nó phủ đủ mọi máy ngày đó
   // (vd. chạy 7 ngày), không thì mốc đã ghi từ các lần chạy trước.

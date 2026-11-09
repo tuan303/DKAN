@@ -14,37 +14,36 @@ import {
 } from './fixtures/agent-sandbox.mjs';
 
 const D = '2026-11-09'; // thứ 2 — hôm nay
-const P = '2026-11-06'; // thứ 6 — ngày có suất ăn trước hôm nay
+const P = '2026-11-06'; // thứ 6 — ngày có suất ăn trước hôm nay (không được xét lại)
 const NOV = '2026-11';
 const OCT = '2026-10';
 
 /**
  * Một tuần bình thường, tất cả qua hai máy CA_TrH và CA_TIH.
- *   Thứ 6 (P): uX ăn trưa 11:50 mà chỉ có đơn tháng 10 (mã gắn với tài khoản qua đơn
- *   các tháng trước — "chưa có đơn tháng"); uY ăn trưa 11:45 rồi 15:00 mới nộp đơn tháng
- *   11 bắt đầu từ chính hôm đó (ăn trước, nộp sau trong ngày: tính là đã đăng ký).
- *   Thứ 2 (D, hôm nay): uM chỉ chấm bữa sáng; uX (11:55) và uW (11:50, chỉ có đơn tháng
- *   10) chấm bữa trưa mà chưa đăng ký — hôm nay chưa phải ngày xét loại thư đó.
+ *   Thứ 2 (D, hôm nay): uM chỉ chấm bữa sáng (thiếu chấm bữa trưa); uX ăn trưa 11:55 mà
+ *   chỉ có đơn tháng 10 (mã gắn với tài khoản qua đơn các tháng trước — "chưa có đơn
+ *   tháng"); uY ăn sáng 07:15, trưa 11:45 rồi 12:30 mới nộp đơn tháng 11 bắt đầu từ chính
+ *   hôm nay (nộp trước giờ gửi cảnh báo, trong cùng ngày: tính là đã đăng ký).
+ *   Thứ 6 (P): uX cũng ăn trưa mà chưa đăng ký — ngày đã qua, agent không xét lại.
  */
 function baseWorld() {
   const tapsP = {
     CA_TrH: { 100001: ['07:05', '11:35'], 100003: ['11:50'], 100005: ['07:20', '11:30'] },
-    CA_TIH: { 100002: ['07:10', '11:40'], 100004: ['11:45'] },
+    CA_TIH: { 100002: ['07:10', '11:40'] },
   };
   const tapsD = {
     CA_TrH: { 100001: ['07:05', '11:35'], 100003: ['11:55'], 100005: ['07:20'] },
-    CA_TIH: { 100002: ['07:10', '11:40'], 100004: ['07:15', '11:45'], 100007: ['11:50'] },
+    CA_TIH: { 100002: ['07:10', '11:40'], 100004: ['07:15', '11:45'] },
   };
   return {
-    users: Object.fromEntries(['uA', 'uB', 'uM', 'uX', 'uY', 'uW'].map(uid => [uid, { email: email(uid) }])),
+    users: Object.fromEntries(['uA', 'uB', 'uM', 'uX', 'uY'].map(uid => [uid, { email: email(uid) }])),
     taps: { [P]: tapsP, [D]: tapsD },
     docs: {
       'registrations/uA_2026-11': registration('uA', '100001', NOV),
       'registrations/uB_2026-11': registration('uB', '100002', NOV),
       'registrations/uM_2026-11': registration('uM', '100005', NOV),
-      'registrations/uY_2026-11': registration('uY', '100004', NOV, { firstMealDate: P, timestamp: utc(P, '15:00') }),
+      'registrations/uY_2026-11': registration('uY', '100004', NOV, { firstMealDate: D, timestamp: utc(D, '12:30') }),
       'registrations/uX_2026-10': registration('uX', '100003', OCT),
-      'registrations/uW_2026-10': registration('uW', '100007', OCT),
       // Thứ 6 đã được task 22:00 hôm đó đồng bộ đủ hai máy (chốt cả hai bữa).
       [`checkins/${P}`]: checkinsDoc(P, tapsP),
       'settings/checkinSync': { agentVersion: '2026-11-05.1', coverage: { [P]: utc(P, '22:00') }, alerts: {} },
@@ -55,7 +54,7 @@ function baseWorld() {
 }
 
 // Thư gửi đúng của thế giới trên.
-const EXTRA_P = `${P} ux lunch@11:50:no_registration`;
+const EXTRA_D = `${D} ux lunch@11:55:no_registration`;
 const MISSING_D = `${D} um lunch`;
 
 // Lượt đọc (tính tiền) của pha cảnh báo — hạn mức đọc của gói Spark. Lượt đọc đầu
@@ -72,19 +71,18 @@ const missingReads = date => [
   ...datesFromTo(addDays(date, -10), addDays(date, -1)).map(d => `getAll checkins/${d}`),
 ];
 /**
- * Thư chấm chưa đăng ký cho thứ 6 của baseWorld(): document checkins của ngày đó (ngoài
- * khoảng --days 1), báo hủy, đơn 3 tháng trước (mã của uX không đứng trên đơn tháng 11;
- * tháng 10 có 2 đơn), sự kiện (có người cần báo), nhật ký đã gửi.
+ * Thư chấm chưa đăng ký cho `date` trong khoảng --days 1 (lượt chấm vừa đồng bộ, đơn
+ * tháng đã đọc): báo hủy, đơn 3 tháng trước khi có mã không đứng trên đơn tháng này
+ * (`lookback`; tháng 10 có 1 đơn), sự kiện (khi có người cần báo), nhật ký đã gửi.
  */
-const EXTRA_READS_P = [
-  `get checkins/${P}`,
-  `query cancel_registrations where cancelDate == "${P}"`,
-  'query registrations where month == "2026-10" [2]',
-  'query registrations where month == "2026-09"',
-  'query registrations where month == "2026-08"',
-  'query events',
-  `query meal_alerts where date == "${P}"`,
+const extraReads = (date, { lookback = false, candidates = false } = {}) => [
+  `query cancel_registrations where cancelDate == "${date}"`,
+  ...(lookback ? ['query registrations where month == "2026-10"', 'query registrations where month == "2026-09"', 'query registrations where month == "2026-08"'] : []),
+  ...(candidates ? ['query events'] : []),
+  `query meal_alerts where date == "${date}"`,
 ];
+// Mã của uX không đứng trên đơn tháng 11 nên phải đọc đơn 3 tháng trước.
+const EXTRA_READS_D = extraReads(D, { lookback: true, candidates: true });
 
 const noAt = ({ at, ...rest }) => rest;
 const sync = r => r.db.docs['settings/checkinSync'];
@@ -117,10 +115,10 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     sb.extraResponse = body => ({ results: body.alerts.map(a => ({ to: a.to, ok: false, maybeSent: true, error: 'OFFLINE network interruption' })) });
     const first = await sb.run({ at: utc(D, '13:50') });
     assert.equal(first.code, 2, first.out);
-    const entry = sync(first).alerts[P].extra;
+    const entry = sync(first).alerts[D].extra;
     assert.deepEqual([entry.status, entry.sent, entry.failed, entry.uncertain], ['partial', 0, 0, 1]);
     assert.match(entry.reason, /Không tự gửi lại.*kiểm tra hộp thư/);
-    const receipt = first.db.docs[`meal_alerts/${P}:extra:uX`];
+    const receipt = first.db.docs[`meal_alerts/${D}:extra:uX`];
     assert.equal(receipt.delivery, 'uncertain');
     assert.equal(Object.hasOwn(receipt, 'sentAt'), false);
     assert.equal(first.db.docs[`meal_alerts/${D}_uM`].kind, 'missing');
@@ -128,7 +126,7 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     const retry = await sb.run({ at: utc(D, '14:05') });
     assert.equal(retry.code, 2, retry.out);
     assert.deepEqual(retry.posts, [], 'cả thư đã gửi và thư chưa rõ đều không tự gửi lại');
-    const later = sync(retry).alerts[P].extra;
+    const later = sync(retry).alerts[D].extra;
     assert.deepEqual([later.status, later.sent, later.failed, later.uncertain], ['partial', 0, 0, 1]);
     assert.match(later.reason, /Không tự gửi lại/);
     assertNoPersonalData(retry);
@@ -139,50 +137,50 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     sb.extraResponse = body => ({ results: body.alerts.map(a => ({ to: a.to, ok: false, error: 'Graph 400: OFFLINE rejected' })) });
     const first = await sb.run({ at: utc(D, '13:50') });
     assert.equal(first.code, 2, first.out);
-    assert.equal(first.db.docs[`meal_alerts/${P}:extra:uX`], undefined);
-    assert.deepEqual([sync(first).alerts[P].extra.status, sync(first).alerts[P].extra.failed], ['partial', 1]);
+    assert.equal(first.db.docs[`meal_alerts/${D}:extra:uX`], undefined);
+    assert.deepEqual([sync(first).alerts[D].extra.status, sync(first).alerts[D].extra.failed], ['partial', 1]);
     sb.extraResponse = null;
     const retry = await sb.run({ at: utc(D, '14:05') });
     assert.equal(retry.code, 0, retry.out);
-    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [EXTRA_P]);
-    assert.deepEqual([sync(retry).alerts[P].extra.status, sync(retry).alerts[P].extra.sent], ['sent', 1]);
+    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [EXTRA_D]);
+    assert.deepEqual([sync(retry).alerts[D].extra.status, sync(retry).alerts[D].extra.sent], ['sent', 1]);
   });
 
-  test('thư chấm chưa đăng ký xét ngày có suất ăn TRƯỚC (thứ 6), không xét hôm nay; lần chạy sau thấy cả hai loại đã xong thì không đọc thêm gì', async t => {
+  test('thư chấm chưa đăng ký xét HÔM NAY, cùng lần chạy với thư thiếu chấm; thứ 6 không xét lại; lần lặp sau thấy cả hai loại đã xong thì không đọc thêm gì', async t => {
     const sb = await sandboxFor(t, baseWorld());
     const at = utc(D, '13:50');
     const r = await sb.run({ at });
     assert.equal(r.code, 0, r.out);
 
-    // Một thư chấm chưa đăng ký, của thứ 6, cho uX. uY (ăn trước, nộp đơn chiều cùng
-    // ngày) không có thư; lượt chấm hôm nay của uX, uW không được xét.
-    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_P]);
-    assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D], 'thư thiếu chấm vẫn là của hôm nay');
-    assert.deepEqual(posted(r), [['staff-missing', 200, 1], ['staff-extra', 200, 1]], 'không thư báo quản trị, không yêu cầu bị từ chối');
+    // Một thư chấm chưa đăng ký, của hôm nay, cho uX. uY (ăn trước, nộp đơn 12:30 cùng
+    // ngày, trước giờ gửi) không có thư; lượt chấm thứ 6 của uX không được xét lại.
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D]);
+    assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D]);
+    assert.deepEqual(posted(r), [['staff-missing', 200, 1], ['staff-extra', 200, 1]], 'thư thiếu chấm trước; không thư báo quản trị, không yêu cầu bị từ chối');
     const extraBody = r.posts.find(p => p.kind === 'staff-extra').body;
-    assert.deepEqual([extraBody.date, extraBody.dateLabel, extraBody.alerts[0].employeeId], [P, 'Thứ 6, 06/11/2026', '100003']);
+    assert.deepEqual([extraBody.date, extraBody.dateLabel, extraBody.alerts[0].employeeId], [D, 'Thứ 2, 09/11/2026', '100003']);
 
     const s = sync(r);
-    assert.deepEqual(noAt(s.alerts[P].extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
-    assertWrittenBy(s.alerts[P].extra.at, at);
-    assert.deepEqual(Object.keys(s.alerts[P]), ['extra'], 'mục thư thiếu chấm của thứ 6 không bị đụng tới');
-    assert.equal(s.alerts[D].extra, undefined, 'hôm nay chưa xét thư chấm chưa đăng ký');
-    assert.deepEqual(noAt(s.alerts[D]), {
+    const { extra, ...missingEntry } = s.alerts[D];
+    assert.deepEqual(noAt(extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
+    assertWrittenBy(extra.at, at);
+    assert.deepEqual(noAt(missingEntry), {
       status: 'sent', held: false, sent: 1, failed: 0, expected: { breakfast: 4, lunch: 4 }, missing: { breakfast: 0, lunch: 1 },
       exempt: { breakfast: 0, lunch: 0 }, invalidExemptions: 0, reason: null,
     });
-    assert.deepEqual(journal(r.db), [`meal_alerts/${P}:extra:uX`, `meal_alerts/${D}_uM`]);
-    const { sentAt, ...receipt } = r.db.docs[`meal_alerts/${P}:extra:uX`];
-    assert.deepEqual(receipt, { uid: 'uX', date: P, kind: 'extra', to: email('uX'), employeeId: '100003', meals: ['lunch'] });
+    assert.equal(s.alerts[P], undefined, 'thứ 6 không được xét lại');
+    assert.deepEqual(journal(r.db), [`meal_alerts/${D}:extra:uX`, `meal_alerts/${D}_uM`]);
+    const { sentAt, ...receipt } = r.db.docs[`meal_alerts/${D}:extra:uX`];
+    assert.deepEqual(receipt, { uid: 'uX', date: D, kind: 'extra', to: email('uX'), employeeId: '100003', meals: ['lunch'] });
     assertWrittenBy(sentAt, at);
     assert.equal(r.db.docs[`meal_alerts/${D}_uM`].kind, 'missing');
-    assert.deepEqual(s.agentFeatures, ['checkinExemptions', 'extraAlerts']);
+    assert.deepEqual(s.agentFeatures, ['checkinExemptions', 'extraAlerts', 'sameDayExtraAlerts']);
     assertNoPersonalData(r);
 
-    // Số lượt đọc của pha cảnh báo (hạn mức Spark): mỗi loại chỉ đọc dữ liệu ngày của nó.
-    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...missingReads(D), ...EXTRA_READS_P].sort());
+    // Số lượt đọc của pha cảnh báo (hạn mức Spark): chỉ dữ liệu của hôm nay.
+    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...missingReads(D), ...EXTRA_READS_D].sort());
 
-    // Lần lặp 15 phút sau: hôm nay đã 'sent', thứ 6 đã 'sent' — dừng ở hai cửa chặn,
+    // Lần lặp 15 phút sau: hai loại thư của hôm nay đều đã 'sent' — dừng ở hai cửa chặn,
     // không đọc thêm lượt nào, không gửi, không ghi đè.
     const again = await sb.run({ at: utc(D, '14:05') });
     assert.equal(again.code, 0, again.out);
@@ -192,7 +190,7 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     assert.deepEqual(journal(again.db), journal(r.db));
   });
 
-  test("thư thiếu chấm đã 'sent' là xong: không ghi đè, không gửi thêm, không đọc gì sau cửa chặn — thư chấm chưa đăng ký của thứ 6 vẫn chạy", async t => {
+  test("thư thiếu chấm đã 'sent' là xong: không ghi đè, không gửi thêm, không đọc gì sau cửa chặn — thư chấm chưa đăng ký hôm nay vẫn chạy", async t => {
     const world = baseWorld();
     // Lần chạy 13:46 đã gửi cho uM. Sau đó có thêm uR đăng ký mà không chấm: lần lặp sau
     // vẫn không tính lại hôm nay.
@@ -209,34 +207,35 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     const r = await sb.run({ at: utc(D, '14:00') });
     assert.equal(r.code, 0, r.out);
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), [], 'không gửi thêm thư thiếu chấm nào (kể cả uR)');
-    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_P]);
-    assert.deepEqual(sync(r).alerts[D], sentAt1346, "mục 'sent' giữ nguyên từng trường");
-    assert.equal(sync(r).alerts[P].extra.status, 'sent');
-    assert.deepEqual(journal(r.db), [`meal_alerts/${P}:extra:uX`, `meal_alerts/${D}_uM`]);
-    // Không lượt đọc nào của thư thiếu chấm: chỉ ngày nghỉ (chung) và dữ liệu của thứ 6.
-    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...EXTRA_READS_P].sort());
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D]);
+    const { extra, ...missingEntry } = sync(r).alerts[D];
+    assert.deepEqual(missingEntry, sentAt1346, "mục 'sent' giữ nguyên từng trường");
+    assert.equal(extra.status, 'sent');
+    assert.deepEqual(journal(r.db), [`meal_alerts/${D}:extra:uX`, `meal_alerts/${D}_uM`]);
+    // Không lượt đọc nào của thư thiếu chấm: chỉ ngày nghỉ (chung) và dữ liệu thư chấm chưa đăng ký.
+    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...EXTRA_READS_D].sort());
   });
 
-  test('thư chấm chưa đăng ký lỗi giữa chừng (đọc báo hủy thất bại): thư thiếu chấm vẫn gửi; ngày đó để error, lần sau gửi bù', async t => {
+  test('thư chấm chưa đăng ký lỗi giữa chừng (đọc sự kiện thất bại): thư thiếu chấm vẫn gửi; để error, lần lặp sau gửi bù', async t => {
     const sb = await sandboxFor(t, baseWorld());
-    const r = await sb.run({ at: utc(D, '13:50'), failReads: [`query cancel_registrations where cancelDate == "${P}"`] });
+    const r = await sb.run({ at: utc(D, '13:50'), failReads: ['query events'] });
     assert.equal(r.code, 2, r.out);
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D]);
     assert.deepEqual(staffMails(r.posts, 'staff-extra'), []);
     assert.equal(sync(r).alerts[D].status, 'sent');
-    assert.deepEqual(noAt(sync(r).alerts[P].extra), {
+    assert.deepEqual(noAt(sync(r).alerts[D].extra), {
       status: 'error', candidates: 0, sent: 0, failed: 0, unmapped: 0, eventSkipped: 0,
-      reason: `Pha cảnh báo chấm chưa đăng ký gặp lỗi: FAKE read failure: query cancel_registrations where cancelDate == "${P}". Sẽ thử lại ở lần chạy sau.`,
+      reason: 'Pha cảnh báo chấm chưa đăng ký gặp lỗi: FAKE read failure: query events. Sẽ thử lại ở lần chạy sau.',
     });
     assert.deepEqual(journal(r.db), [`meal_alerts/${D}_uM`]);
 
     // 'error' không phải trạng thái xong: lần lặp sau gửi bù, thư thiếu chấm không gửi lại.
     const retry = await sb.run({ at: utc(D, '14:05') });
     assert.equal(retry.code, 0, retry.out);
-    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [EXTRA_P]);
+    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [EXTRA_D]);
     assert.deepEqual(staffMails(retry.posts, 'staff-missing'), []);
-    assert.equal(sync(retry).alerts[P].extra.status, 'sent');
-    assert.deepEqual(readList(alertPhaseReads(retry.reads)), [OFF_DAYS_READ, ...EXTRA_READS_P].sort());
+    assert.equal(sync(retry).alerts[D].extra.status, 'sent');
+    assert.deepEqual(readList(alertPhaseReads(retry.reads)), [OFF_DAYS_READ, ...EXTRA_READS_D].sort());
   });
 
   test('thư thiếu chấm lỗi giữa chừng (đọc danh sách miễn chấm thất bại): thư chấm chưa đăng ký vẫn gửi; hôm nay để error, lần sau gửi', async t => {
@@ -245,19 +244,19 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     const r = await sb.run({ at, failReads: ['query meal_checkin_exemptions'] });
     assert.equal(r.code, 2, r.out);
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), []);
-    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_P]);
-    const entry = sync(r).alerts[D];
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D]);
+    const { extra, ...entry } = sync(r).alerts[D];
     assert.deepEqual(noAt(entry), {
       status: 'error', held: false, sent: 0, failed: 0, expected: { breakfast: 0, lunch: 0 }, missing: { breakfast: 0, lunch: 0 },
       reason: 'Pha cảnh báo gặp lỗi: FAKE read failure: query meal_checkin_exemptions. Sẽ thử lại ở lần chạy sau.',
     });
     assertWrittenBy(entry.at, at);
-    assert.equal(sync(r).alerts[P].extra.status, 'sent');
+    assert.equal(extra.status, 'sent');
 
     const retry = await sb.run({ at: utc(D, '14:05') });
     assert.equal(retry.code, 0, retry.out);
     assert.deepEqual(staffMails(retry.posts, 'staff-missing'), [MISSING_D]);
-    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [], 'thứ 6 đã xong');
+    assert.deepEqual(staffMails(retry.posts, 'staff-extra'), [], 'thư chấm chưa đăng ký hôm nay đã xong');
     assert.equal(sync(retry).alerts[D].status, 'sent');
   });
 
@@ -269,17 +268,17 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     assert.deepEqual(posted(r), [['staff-missing', 200, 1], ['staff-extra', 400, 1]], 'dừng sau lô đầu tiên bị từ chối');
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), [MISSING_D]);
     assert.equal(sync(r).alerts[D].status, 'sent');
-    const oldApi = sync(r).alerts[P].extra;
+    const oldApi = sync(r).alerts[D].extra;
     assert.deepEqual(noAt(oldApi), { status: 'error', candidates: 1, sent: 0, failed: 1, unmapped: 0, eventSkipped: 0, reason: OLD_API_EXTRA_REASON });
     assert.deepEqual(journal(r.db), [`meal_alerts/${D}_uM`], 'thư bị từ chối không được ghi nhật ký');
 
-    // Web vẫn là bản cũ: chỉ một yêu cầu rỗng để hỏi, không đọc dữ liệu thứ 6, không ghi đè trạng thái.
+    // Web vẫn là bản cũ: chỉ một yêu cầu rỗng để hỏi, không đọc dữ liệu, không ghi đè trạng thái.
     const still = await sb.run({ at: utc(D, '14:05') });
     assert.equal(still.code, 2, still.out);
     assert.deepEqual(posted(still), [['staff-extra', 400, 0]]);
     assert.equal(still.posts[0].response.error, "kind phải là 'staff-missing', 'admin-notice' hoặc 'survey-invite'.");
     assert.deepEqual(readList(alertPhaseReads(still.reads)), [OFF_DAYS_READ]);
-    assert.deepEqual(sync(still).alerts[P].extra, oldApi);
+    assert.deepEqual(sync(still).alerts[D].extra, oldApi);
 
     // Web đã triển khai bản mới: yêu cầu rỗng bị từ chối vì danh sách rỗng (không nhắc
     // tới kind) nên agent đọc dữ liệu và gửi thật.
@@ -288,23 +287,23 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     assert.equal(deployed.code, 0, deployed.out);
     assert.deepEqual(posted(deployed), [['staff-extra', 400, 0], ['staff-extra', 200, 1]]);
     assert.equal(deployed.posts[0].response.error, 'alerts phải có từ 1 đến 20 phần tử.');
-    assert.deepEqual(staffMails(deployed.posts, 'staff-extra'), [EXTRA_P]);
-    assert.deepEqual(noAt(sync(deployed).alerts[P].extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
-    assert.deepEqual(journal(deployed.db), [`meal_alerts/${P}:extra:uX`, `meal_alerts/${D}_uM`]);
-    assert.deepEqual(readList(alertPhaseReads(deployed.reads)), [OFF_DAYS_READ, ...EXTRA_READS_P].sort());
+    assert.deepEqual(staffMails(deployed.posts, 'staff-extra'), [EXTRA_D]);
+    assert.deepEqual(noAt(sync(deployed).alerts[D].extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
+    assert.deepEqual(journal(deployed.db), [`meal_alerts/${D}:extra:uX`, `meal_alerts/${D}_uM`]);
+    assert.deepEqual(readList(alertPhaseReads(deployed.reads)), [OFF_DAYS_READ, ...EXTRA_READS_D].sort());
   });
 
-  // ------------------------------------------------ cờ held còn sót của chốt an toàn
+  // ------------------------------------------------ chốt an toàn treo ngày (held)
 
   const D0 = '2026-11-05'; // thứ 5 — chốt an toàn dừng lúc 13:46
   const D1 = '2026-11-06'; // thứ 6 — ngày có suất ăn kế tiếp
-  const P0 = '2026-11-04'; // thứ 4 — ngày xét thư chấm chưa đăng ký của các lần chạy thứ 5
   const HOLD_RE = /1 tài liệu hỏng không xác định được mã nhân viên/;
 
   /**
    * Thứ 5 lúc 13:46: máy CA_TIH chưa có lượt bữa trưa nào → chốt an toàn dừng, đã báo
-   * quản trị (guarded, held). Danh sách miễn chấm có một tài liệu hỏng không nêu được mã
-   * NV. uX ăn trưa thứ 5 mà chỉ có đơn tháng 10; uM chỉ chấm bữa sáng thứ 5.
+   * quản trị (guarded, held); thư chấm chưa đăng ký của cùng lần chạy chờ (error, chưa
+   * xong). Danh sách miễn chấm có một tài liệu hỏng không nêu được mã NV. uX ăn trưa
+   * thứ 5 mà chỉ có đơn tháng 10; uM chỉ chấm bữa sáng thứ 5.
    */
   function heldWorld({ synced2200 = false } = {}) {
     const tapsD0 = {
@@ -316,6 +315,10 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
       status: 'guarded', at: utc(D0, '13:46'), held: true, sent: 0, failed: 0, expected: { breakfast: 3, lunch: 3 },
       missing: { breakfast: 0, lunch: 2 }, exempt: { breakfast: 0, lunch: 0 }, invalidExemptions: 1,
       reason: 'Dữ liệu một máy nhận diện bất thường — máy CA_TIH không có lượt chấm nào trong khung Bữa trưa (10:00–13:30).',
+      extra: {
+        status: 'error', at: utc(D0, '13:46'), candidates: 0, sent: 0, failed: 0, unmapped: 0, eventSkipped: 0,
+        reason: 'Ngày Thứ 5, 05/11/2026 đang bị chốt an toàn treo lại — chưa gửi thư chấm chưa đăng ký; sẽ thử lại ở lần chạy sau.',
+      },
     };
     return {
       users: Object.fromEntries(['uA', 'uB', 'uM', 'uX'].map(uid => [uid, { email: email(uid) }])),
@@ -332,11 +335,8 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
         'meal_checkin_exemptions/khong-ro-ma': { email: 'x' },
         'settings/checkinSync': {
           agentVersion: '2026-11-05.1',
-          coverage: { [P0]: utc(P0, '22:00'), [D0]: utc(D0, synced2200 ? '22:00' : '13:46') },
-          alerts: {
-            [P0]: { extra: { status: 'nothing', at: utc(D0, '13:46'), candidates: 0, sent: 0, failed: 0, unmapped: 0, eventSkipped: 0, reason: null } },
-            [D0]: guarded,
-          },
+          coverage: { [D0]: utc(D0, synced2200 ? '22:00' : '13:46') },
+          alerts: { [D0]: guarded },
         },
         'settings/mealOffDays': { dates: [] },
         'settings/reconcileExcludes': { employeeIds: [] },
@@ -344,15 +344,17 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     };
   }
 
-  test('ngày bị chốt an toàn treo (guarded, held) + tài liệu miễn chấm hỏng không nêu mã: lần chạy sau dữ liệu ổn gỡ held, ngày có suất ăn kế tiếp gửi thư chấm chưa đăng ký của ngày đó', async t => {
+  test('ngày bị chốt an toàn treo (guarded, held) + tài liệu miễn chấm hỏng không nêu mã: lần lặp sau trong ngày dữ liệu ổn gỡ held và gửi luôn thư chấm chưa đăng ký của ngày đó', async t => {
     const world = heldWorld();
     const sb = await sandboxFor(t, world);
     const at = utc(D0, '14:00');
     const r = await sb.run({ at });
     assert.equal(r.code, 2, r.out);
-    assert.deepEqual(r.posts, [], 'tài liệu hỏng giữ cả loại thư thiếu chấm; đã báo quản trị lúc 13:46 nên không báo lại');
-    const entry = sync(r).alerts[D0];
-    const { at: heldAt, reason, ...counts } = entry;
+    // Tài liệu hỏng giữ cả loại thư thiếu chấm (đã báo quản trị lúc 13:46 nên không báo
+    // lại); thư chấm chưa đăng ký không phụ thuộc danh sách miễn chấm nên gửi được.
+    assert.deepEqual(posted(r), [['staff-extra', 200, 1]]);
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [`${D0} ux lunch@11:50:no_registration`]);
+    const { extra, at: heldAt, reason, ...counts } = sync(r).alerts[D0];
     // Giữ 'guarded' (dấu đã báo quản trị trong ngày) nhưng bỏ cờ held: lần chạy này chốt
     // an toàn đã qua, dữ liệu máy bình thường.
     assert.deepEqual(counts, {
@@ -361,34 +363,34 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     });
     assert.match(reason, HOLD_RE);
     assertWrittenBy(heldAt, at);
-    // Thư chấm chưa đăng ký của thứ 4 đã xong ('nothing'): không đọc gì cho thứ 4.
-    assert.deepEqual(sync(r).alerts[P0], world.docs['settings/checkinSync'].alerts[P0]);
-    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...missingReads(D0)].sort());
+    assert.deepEqual(noAt(extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
+    assert.deepEqual(readList(alertPhaseReads(r.reads)),
+      [OFF_DAYS_READ, ...missingReads(D0), ...extraReads(D0, { lookback: true, candidates: true })].sort());
+    assert.deepEqual(journal(r.db), [`meal_alerts/${D0}:extra:uX`]);
 
-    // Thứ 6: thứ 5 không còn bị treo → gửi thư chấm chưa đăng ký của thứ 5. Thư thiếu chấm
-    // của thứ 6 vẫn bị giữ vì tài liệu hỏng (error — chưa báo quản trị gì cho thứ 6).
+    // Thứ 6: thư thiếu chấm vẫn bị giữ vì tài liệu hỏng (error — chưa báo quản trị gì cho
+    // thứ 6); thứ 6 không ai chấm mà chưa đăng ký; thứ 5 không bị đụng tới.
     const next = await sb.run({ at: utc(D1, '13:50') });
     assert.equal(next.code, 2, next.out);
-    assert.deepEqual(posted(next), [['staff-extra', 200, 1]]);
-    assert.deepEqual(staffMails(next.posts, 'staff-extra'), [`${D0} ux lunch@11:50:no_registration`]);
+    assert.deepEqual(next.posts, []);
     const s = sync(next);
-    assert.deepEqual(noAt(s.alerts[D0].extra), { status: 'sent', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null });
-    assert.deepEqual([s.alerts[D0].status, s.alerts[D0].held, s.alerts[D0].at], ['guarded', false, heldAt], 'mục thư thiếu chấm của thứ 5 giữ nguyên');
-    assert.deepEqual([s.alerts[D1].status, s.alerts[D1].held], ['error', false]);
+    assert.deepEqual(s.alerts[D0], sync(r).alerts[D0]);
+    assert.deepEqual([s.alerts[D1].status, s.alerts[D1].held, s.alerts[D1].extra.status], ['error', false, 'nothing']);
     assert.match(s.alerts[D1].reason, HOLD_RE);
     assert.deepEqual(journal(next.db), [`meal_alerts/${D0}:extra:uX`]);
     assertNoPersonalData(next);
   });
 
-  test('đối chứng: không có lần chạy nào sau 13:46 của ngày bị treo thì held còn nguyên và ngày đó không có thư chấm chưa đăng ký (guarded, không báo quản trị)', async t => {
-    const sb = await sandboxFor(t, heldWorld({ synced2200: true }));
+  test('đối chứng: ngày bị treo tới hết ngày thì thư chấm chưa đăng ký của ngày đó không được gửi bù hôm sau — agent chỉ xét hôm nay', async t => {
+    const world = heldWorld({ synced2200: true });
+    const sb = await sandboxFor(t, world);
     const r = await sb.run({ at: utc(D1, '13:50') });
     assert.equal(r.code, 2, r.out);
     assert.deepEqual(r.posts, []);
     const s = sync(r);
-    assert.equal(s.alerts[D0].held, true);
-    assert.equal(s.alerts[D0].extra.status, 'guarded');
-    assert.match(s.alerts[D0].extra.reason, /đang bị chốt an toàn treo lại/);
+    assert.deepEqual(s.alerts[D0], world.docs['settings/checkinSync'].alerts[D0], 'thứ 5 giữ nguyên: held, thư chấm chưa đăng ký vẫn chờ');
+    assert.equal(s.alerts[D1].extra.status, 'nothing');
+    assert.deepEqual(readList(alertPhaseReads(r.reads)), [OFF_DAYS_READ, ...missingReads(D1), ...extraReads(D1)].sort());
     assert.deepEqual(journal(r.db), []);
   });
 
@@ -411,12 +413,14 @@ describe('pha cảnh báo chạy thật (sync-checkins.mjs + Firestore giả + m
     // uE, uQ, uR đều không chấm gì hôm nay.
     assert.deepEqual(staffMails(r.posts, 'staff-missing'), [`${D} ue breakfast`, MISSING_D, `${D} ur breakfast+lunch`]);
     assert.doesNotMatch(JSON.stringify(r.posts), /uq@|100011/i, 'người có tài liệu miễn chấm hỏng không nhận thư nào');
-    assert.deepEqual(noAt(sync(r).alerts[D]), {
+    const { extra, ...missingEntry } = sync(r).alerts[D];
+    assert.deepEqual(noAt(missingEntry), {
       status: 'sent', held: false, sent: 3, failed: 0, expected: { breakfast: 6, lunch: 6 }, missing: { breakfast: 2, lunch: 2 },
       exempt: { breakfast: 0, lunch: 1 }, invalidExemptions: 1,
       reason: '1 mã NV có tài liệu miễn chấm hỏng, tạm chưa gửi cho các mã này.',
     });
-    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_P], 'danh sách miễn chấm không chặn thư chấm chưa đăng ký');
+    assert.deepEqual(staffMails(r.posts, 'staff-extra'), [EXTRA_D], 'danh sách miễn chấm không chặn thư chấm chưa đăng ký');
+    assert.equal(extra.status, 'sent');
     assertNoPersonalData(r);
   });
 });

@@ -199,7 +199,7 @@ test('thư lỗi một phần: nêu lý do, chỉ hứa "gửi nốt" khi có th
   assert.doesNotMatch(ui.describeAlert({ status: 'sent', sent: 30 }, true, '14:10').text, /gửi nốt/);
 });
 
-test('dòng thư "chấm chưa đăng ký" nói về ngày ăn trước (agent gửi ở lần chạy của ngày ăn kế tiếp)', () => {
+test('agent bản 2026-11-06.1: dòng thư "chấm chưa đăng ký" nói về ngày ăn trước (gửi ở lần chạy của ngày ăn kế tiếp)', () => {
   const features = { agentVersion: '2026-11-06.1', agentFeatures: ['checkinExemptions', 'extraAlerts'] };
   const strip = (alerts, at, sync = features, offDays = []) => renderToStaticMarkup(createElement(ui.SyncHealthStrip, {
     sync: { ...sync, lastRunAt: '2026-11-06T13:47:00+07:00', alerts }, offDays, now: new Date(at),
@@ -230,6 +230,28 @@ test('dòng thư "chấm chưa đăng ký" nói về ngày ăn trước (agent g
   const old = strip({}, '2026-11-06T10:00:00+07:00', { agentVersion: '2026-10-20.1' });
   assert.match(old, /Agent trên máy HAC chưa hỗ trợ gửi loại thư này \(bản đang chạy: 2026-10-20\.1\)\./);
   assert.doesNotMatch(old, /Đang chờ/);
+});
+
+test('agent gửi trong ngày (sameDayExtraAlerts): dòng thư "chấm chưa đăng ký" nói về hôm nay', () => {
+  const features = { agentVersion: '2026-11-09.1', agentFeatures: ['checkinExemptions', 'extraAlerts', 'sameDayExtraAlerts'] };
+  const strip = (alerts, at, sync = features, offDays = []) => renderToStaticMarkup(createElement(ui.SyncHealthStrip, {
+    sync: { ...sync, lastRunAt: '2026-11-09T13:47:00+07:00', alerts }, offDays, now: new Date(at),
+  }));
+  const extra = { status: 'sent', at: '2026-11-09T13:48:00+07:00', candidates: 1, sent: 1, failed: 0, unmapped: 0, eventSkipped: 0, reason: null };
+
+  const done = strip({ '2026-11-09': { status: 'sent', at: '2026-11-09T13:47:00+07:00', extra } }, '2026-11-09T14:10:00+07:00');
+  assert.match(done, /Cảnh báo chấm chưa đăng ký ngày Thứ 2, 09\/11:/);
+  assert.match(done, /Đã gửi 1\/1 email\./);
+  // Kết quả của Thứ 6 (agent bản cũ ghi) không còn là dòng đang xem.
+  assert.doesNotMatch(strip({ '2026-11-06': { extra } }, '2026-11-09T14:10:00+07:00'), /Thứ 6, 06\/11/);
+
+  assert.match(strip({}, '2026-11-09T10:00:00+07:00'), /ngày Thứ 2, 09\/11:.*Đang chờ — gửi trong lần chạy cảnh báo hôm nay \(từ 13:45 tới khoảng 14:45\)\./s);
+  // Cuối tuần, ngày nghỉ đã khai: không có thư nào để chờ.
+  assert.doesNotMatch(strip({}, '2026-11-07T09:00:00+07:00'), /Cảnh báo chấm chưa đăng ký/);
+  assert.doesNotMatch(strip({}, '2026-11-09T09:00:00+07:00', features, ['2026-11-09']), /Cảnh báo chấm chưa đăng ký/);
+  // Bản ghi chưa có agentFeatures thì theo phiên bản.
+  assert.match(strip({}, '2026-11-09T10:00:00+07:00', { agentVersion: '2026-11-09.1' }), /ngày Thứ 2, 09\/11:/);
+  assert.match(strip({}, '2026-11-09T10:00:00+07:00', { agentVersion: '2026-11-06.1' }), /ngày Thứ 6, 06\/11:/);
 });
 
 test('email extra chưa rõ: không tính là đã gửi và không hứa tự gửi lại', () => {

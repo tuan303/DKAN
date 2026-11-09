@@ -7,7 +7,16 @@
 /** Bản agent đầu tiên áp dụng miễn chấm theo bữa và gửi thư "chấm chưa đăng ký". */
 export const EXEMPTION_AGENT_VERSION = '2026-11-06.1';
 
-export type AgentFeature = 'checkinExemptions' | 'extraAlerts';
+/** Bản agent đầu tiên gửi thư "chấm chưa đăng ký" ngay trong ngày (trước đó: ngày ăn kế tiếp). */
+export const SAME_DAY_EXTRA_AGENT_VERSION = '2026-11-09.1';
+
+export type AgentFeature = 'checkinExemptions' | 'extraAlerts' | 'sameDayExtraAlerts';
+
+const FIRST_VERSION: Record<AgentFeature, string> = {
+  checkinExemptions: EXEMPTION_AGENT_VERSION,
+  extraAlerts: EXEMPTION_AGENT_VERSION,
+  sameDayExtraAlerts: SAME_DAY_EXTRA_AGENT_VERSION,
+};
 
 /** Phiên bản agent dạng YYYY-MM-DD.N. */
 function parseVersion(value: unknown): [string, number] | null {
@@ -31,5 +40,5 @@ export function agentSupports(
 ): boolean {
   if (!sync) return false;
   if (Array.isArray(sync.agentFeatures)) return sync.agentFeatures.includes(feature);
-  return agentVersionAtLeast(sync.agentVersion, EXEMPTION_AGENT_VERSION);
+  return agentVersionAtLeast(sync.agentVersion, FIRST_VERSION[feature]);
 }

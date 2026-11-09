@@ -5,10 +5,9 @@
  *   - 'missing' — "đăng ký mà không chấm ăn": xét cho HÔM NAY, sau giờ ăn trưa.
  *     Email này nói với một người rằng họ vi phạm quy định, có thể bị tạm dừng
  *     đăng ký tháng sau;
- *   - 'extra' — "chấm ăn nhưng chưa đăng ký": xét cho NGÀY CÓ SUẤT ĂN TRƯỚC hôm
- *     nay (alertDates). Ăn trước rồi nộp đơn trong cùng ngày vẫn được tính là đã
- *     đăng ký (countsAsRegistered — hay gặp đầu tháng), nên phải hết ngày mới biết
- *     chắc một lượt chấm là "chưa đăng ký".
+ *   - 'extra' — "chấm ăn nhưng chưa đăng ký": cũng xét cho HÔM NAY, cùng lần chạy
+ *     sau giờ ăn trưa. Quy định của trường: báo hủy chỉ áp cho ngày hôm sau, không
+ *     bổ sung đơn hay giải trình sau khi đã chấm ăn, nên không phải chờ hết ngày.
  *
  * Gửi oan một lần là mất lòng tin vào cả hệ thống, nên mọi bước ở đây nghiêng về
  * phía KHÔNG gửi khi có nghi ngờ: dữ liệu chưa chốt thì chờ, mã trùng thì bỏ, mã
@@ -98,36 +97,6 @@ export function alertEntry(status, at, { sent = 0, failed = 0, stats = null, rea
   };
 }
 
-// ------------------------------------------------------------ ngày xét
-
-/** Số ngày lùi tối đa để tìm ngày có suất ăn trước đó (nghỉ dài hơn thì thôi). */
-export const PREVIOUS_MEAL_DAY_LOOKBACK = 7;
-
-/**
- * Ngày có suất ăn gần nhất TRƯỚC `date`, lùi tối đa `maxDays` ngày; null nếu không có.
- * @param {string} date @param {Iterable<string>} [offDays] @param {number} [maxDays]
- */
-export function previousMealDay(date, offDays = [], maxDays = PREVIOUS_MEAL_DAY_LOOKBACK) {
-  const off = new Set(offDays);
-  for (let i = 1; i <= maxDays; i++) {
-    const d = addDays(date, -i);
-    if (isMealDay(d, off)) return d;
-  }
-  return null;
-}
-
-/**
- * Ngày xét của hai loại thư trong một lần chạy:
- *   - missing: hôm nay;
- *   - extra:   ngày có suất ăn trước hôm nay (null nếu 7 ngày trước đều nghỉ).
- * --alerts-date X (chỉ để xem thử): cả hai loại xét đúng ngày X.
- * @param {{ today: string, alertsDate?: string | null, offDays?: Iterable<string> }} input
- * @returns {{ missing: string, extra: string | null }}
- */
-export function alertDates({ today, alertsDate = null, offDays = [] }) {
-  if (alertsDate) return { missing: alertsDate, extra: alertsDate };
-  return { missing: today, extra: previousMealDay(today, offDays) };
-}
 
 // ---------------------------------------------------- thư thiếu chấm (missing)
 
@@ -446,7 +415,7 @@ export const EXTRA_REASON_LOG = Object.freeze({
 
 /**
  * `alerts[ngày].extra` trong settings/checkinSync — trạng thái thư chấm chưa đăng
- * ký của NGÀY ĐÓ (ghi ở lần chạy của ngày có suất ăn kế tiếp). Chỉ số đếm: không
+ * ký của NGÀY ĐÓ (ghi ở lần chạy cảnh báo của chính ngày đó). Chỉ số đếm: không
  * bao giờ có mã NV, họ tên hay email (mọi người đã đăng nhập đều đọc được).
  * Ghi đủ mọi trường mỗi lần (reason: null) để set merge không giữ lại số cũ.
  * @param {'sent' | 'nothing' | 'partial' | 'guarded' | 'error' | 'off_day'} status
@@ -464,7 +433,7 @@ export function extraEntry(status, at, { candidates = 0, sent = 0, failed = 0, u
  * đã chốt của chính ngày xét.
  *
  * @param {{
- *   date: string,                     // ngày xét (ngày có suất ăn trước hôm nay)
+ *   date: string,                     // ngày xét: hôm nay (--alerts-date: ngày xem thử)
  *   now: Date,
  *   nowVn: { date: string, time: string },
  *   offDays?: Iterable<string>,
@@ -479,8 +448,9 @@ export function extraEntry(status, at, { candidates = 0, sent = 0, failed = 0, u
  *   meals: các bữa đã chốt của ngày xét — chỉ những bữa này được xét.
  *   held: dữ liệu ngày đó bị coi là bất thường — trang "Chấm ăn của tôi" và tab
  *   Đối soát không kết luận gì cho ngày đó, nên thư này cũng không được kết luận
- *   ("email và trang cá nhân không bao giờ nói hai điều khác nhau"). Ghi
- *   'guarded' (xong hẳn), không báo quản trị lần nữa.
+ *   ("email và trang cá nhân không bao giờ nói hai điều khác nhau"). Ghi 'error'
+ *   (chưa xong), không báo quản trị lần nữa: lần lặp sau trong ngày mà dữ liệu đã
+ *   bình thường (thư thiếu chấm gỡ cờ held) thì gửi như thường.
  */
 export function extraGate({ date, now, nowVn, offDays = [], notBefore, coverageAt, configProblems = [], existing = null, held = false, ignoreTime = false }) {
   const at = now.toISOString();
@@ -521,30 +491,19 @@ export function extraGate({ date, now, nowVn, offDays = [], notBefore, coverageA
   }
   if (held) {
     const reason = `Ngày ${label} đang bị chốt an toàn treo lại (dữ liệu máy nhận diện bất thường, xem lý do ở trạng thái thư thiếu chấm của ngày đó): ` +
-      'trang Chấm ăn của tôi và tab Đối soát chưa kết luận ngày này, nên không gửi thư chấm chưa đăng ký.';
-    return {
-      proceed: false,
-      code: 'held',
-      write: extraEntry('guarded', at, {
-        candidates: existing?.candidates ?? 0,
-        sent: existing?.sent ?? 0,
-        unmapped: existing?.unmapped ?? 0,
-        eventSkipped: existing?.eventSkipped ?? 0,
-        reason,
-      }),
-      meals,
-      message: reason,
-    };
+      'trang Chấm ăn của tôi và tab Đối soát chưa kết luận ngày này, nên chưa gửi thư chấm chưa đăng ký; sẽ thử lại ở lần chạy sau.';
+    return { proceed: false, code: 'held', write: errorEntry(reason), meals, message: reason };
   }
   if (!meals.length) {
     const reason = `Chưa có lần đồng bộ đủ mọi máy phủ ngày ${label} sau giờ ăn — chưa gửi thư chấm chưa đăng ký; sẽ thử lại ở lần chạy sau.`;
     return { proceed: false, code: 'no_coverage', write: errorEntry(reason), meals, message: reason };
   }
-  // Ngày đã qua mà mới chốt được một bữa (vd. mốc đồng bộ đủ máy cuối cùng là
-  // lần 08:15): xử lý luôn thì trạng thái thành "xong" và lượt chấm bữa còn lại
-  // không bao giờ được xét. Chờ chốt đủ mọi bữa — lần đồng bộ sau (22:00 lấy lại
-  // 7 ngày) sẽ bù. Chạy xem trước cho chính hôm nay thì xét các bữa đã chốt.
-  if (meals.length < MEALS.length && nowVn?.date && date < nowVn.date) {
+  // Mới chốt được một bữa (vd. lần 13:45 thiếu máy, mốc đủ máy cuối cùng là lần
+  // 08:15): xử lý luôn thì trạng thái thành "xong" và lượt chấm bữa còn lại không
+  // bao giờ được xét. Chờ chốt đủ mọi bữa — lần lặp sau đủ máy sẽ bù. Chỉ xem
+  // trước (--alerts-date) cho chính hôm nay mới xét các bữa đã chốt.
+  const previewToday = ignoreTime && !(nowVn?.date && date < nowVn.date);
+  if (meals.length < MEALS.length && !previewToday) {
     const pending = MEALS.filter(m => !meals.includes(m)).map(m => MEAL_LABEL[m].toLowerCase()).join(', ');
     const reason = `Ngày ${label} chưa chốt dữ liệu ${pending} (chưa có lần đồng bộ đủ mọi máy sau giờ ăn) — chưa gửi thư chấm chưa đăng ký; sẽ thử lại ở lần chạy sau.`;
     return { proceed: false, code: 'no_coverage', write: errorEntry(reason), meals, message: reason };

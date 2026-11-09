@@ -1,4 +1,4 @@
-// Hai loại thư của pha cảnh báo (bản 2026-11-06.1): ngày xét của từng loại, cửa
+// Hai loại thư của pha cảnh báo (bản 2026-11-09.1): cùng xét hôm nay, cửa
 // chặn riêng của thư chấm chưa đăng ký, trạng thái 'sent' của thư thiếu chấm
 // không bị mở lại, danh sách miễn chấm hỏng, chốt an toàn, suất ăn sự kiện, gửi
 // và ghi nhật ký, API email bản cũ, mẫu số không tính người được miễn chấm.
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  alertGate, alertDates, previousMealDay, extraGate, extraEntry, isTerminalExtraStatus, TERMINAL_EXTRA_STATUSES,
+  alertGate, extraGate, extraEntry, isTerminalExtraStatus, TERMINAL_EXTRA_STATUSES,
   planAlerts, exemptionHold, exemptionAudit, extraGuard, relevantEventIds, eventSkipUids, lookbackMonths,
   deliverAlerts, deliveryNotes, sentAlertsByKind, alertEntry, buildAdminNotice, buildExtraAdminNotice, mealCounts, OLD_API_EXTRA_REASON,
 } from '../lib/alert-plan.mjs';
@@ -30,20 +30,14 @@ const nowVn = { date: MON, time: '13:50' };
 
 // ----------------------------------------------------------- ngày xét
 
-test('ngày có suất ăn trước đó: qua cuối tuần, ngày nghỉ, sang tháng trước; nghỉ dài thì không có', () => {
-  assert.equal(previousMealDay(MON), FRI, 'thứ 2 -> thứ 6 tuần trước');
-  assert.equal(previousMealDay('2026-11-10', [MON]), FRI, 'thứ 2 là ngày nghỉ -> lùi tiếp');
-  assert.equal(previousMealDay('2026-12-01'), '2026-11-30', 'sang tháng trước');
-  assert.equal(previousMealDay('2026-11-02'), '2026-10-30', 'đầu tháng lùi về thứ 6 tháng trước');
-  const tet = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'];
-  assert.equal(previousMealDay(MON, tet), null, 'cả 7 ngày trước đều nghỉ');
-  assert.equal(previousMealDay('2026-11-10', tet), MON);
-});
-
-test('thư chấm chưa đăng ký xét ngày có suất ăn TRƯỚC hôm nay; --alerts-date xét đúng ngày đó', () => {
-  assert.deepEqual(alertDates({ today: MON }), { missing: MON, extra: FRI });
-  assert.deepEqual(alertDates({ today: '2026-11-10', offDays: [MON] }), { missing: '2026-11-10', extra: FRI });
-  assert.deepEqual(alertDates({ today: MON, alertsDate: '2026-11-05' }), { missing: '2026-11-05', extra: '2026-11-05' });
+test('hai loại thư cùng xét HÔM NAY (--alerts-date: đúng ngày đó), thư thiếu chấm chạy trước', () => {
+  const src = readFileSync(join(AGENT, 'sync-checkins.mjs'), 'utf8');
+  assert.match(src, /const date = args\.alertsDate \|\| TODAY;\s*const shared = \{ \.\.\.ctx, cfg, configProblems, now, nowVn, offDays, date \};/);
+  const missing = src.indexOf('await runMissingAlerts(shared)');
+  const extra = src.indexOf('await runExtraAlerts(shared)');
+  assert.ok(missing > 0 && extra > missing, 'thư thiếu chấm chạy trước: cờ held của nó chặn được thư chấm chưa đăng ký ngay trong lần chạy');
+  assert.doesNotMatch(src, /previousMealDay|alertDates/);
+  assert.match(src, /'sameDayExtraAlerts'/);
 });
 
 test('đơn 3 tháng trước: qua năm cũ', () => {
@@ -79,14 +73,14 @@ test("agent không còn biến 'sent' thành 'partial' để xét lại thư thi
   assert.doesNotMatch(src, /collection\('staff'\)/);
   // Thư chấm chưa đăng ký chỉ ghi alerts[ngày].extra; agent ghi agentFeatures cạnh agentVersion.
   assert.match(src, /settingsRef\.set\(\{ alerts: \{ \[date\]: \{ extra: entry \} \} \}, \{ merge: true \}\)/);
-  assert.match(src, /const AGENT_FEATURES = \['checkinExemptions', 'extraAlerts'\];/);
+  assert.match(src, /const AGENT_FEATURES = \['checkinExemptions', 'extraAlerts', 'sameDayExtraAlerts'\];/);
   assert.match(src, /agentFeatures: AGENT_FEATURES/);
 });
 
 // ------------------------------------------- cửa chặn thư chấm chưa đăng ký
 
 test('cửa chặn thư chấm chưa đăng ký: độc lập với thư thiếu chấm hôm nay', () => {
-  const base = { date: FRI, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(FRI, '13:45').toISOString() };
+  const base = { date: MON, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(MON, '13:45').toISOString() };
   // Thư thiếu chấm hôm nay đã 'sent' hay chưa đủ máy cũng không liên quan.
   assert.equal(alertGate({ date: MON, now: NOW, nowVn, notBefore: '13:40', coverageAt: null, failedDevices: ['CA_TIH'], existing: { status: 'sent' } }).proceed, false);
   let g = extraGate(base);
@@ -104,7 +98,7 @@ test('cửa chặn thư chấm chưa đăng ký: độc lập với thư thiếu
 });
 
 test('cửa chặn thư chấm chưa đăng ký: cấu hình, giờ, dữ liệu chốt của chính ngày đó', () => {
-  const base = { date: FRI, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(FRI, '13:45').toISOString() };
+  const base = { date: MON, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(MON, '13:45').toISOString() };
   const existing = { status: 'partial', candidates: 7, sent: 5, failed: 2, unmapped: 1, eventSkipped: 0 };
   let g = extraGate({ ...base, existing, configProblems: ['alerts.secret đang trống.'] });
   assert.equal(g.code, 'bad_config');
@@ -120,27 +114,31 @@ test('cửa chặn thư chấm chưa đăng ký: cấu hình, giờ, dữ liệu
   g = extraGate({ ...base, coverageAt: null });
   assert.equal(g.code, 'no_coverage');
   assert.equal(g.write.status, 'error');
-  assert.match(g.write.reason, /06\/11\/2026/);
-  // Ngày đã qua mà mới chốt bữa sáng (mốc đủ máy cuối là lần 08:15): chưa xử lý,
-  // để lần sau (22:00 lấy lại 7 ngày) chốt đủ rồi xét cả bữa trưa — không đóng
-  // trạng thái sớm làm mất thư của bữa trưa.
-  g = extraGate({ ...base, coverageAt: vn(FRI, '08:15').toISOString() });
+  assert.match(g.write.reason, /09\/11\/2026/);
+  // Lần 13:45 hôm nay thiếu máy, mốc đủ máy cuối là lần 08:15 (mới chốt bữa sáng):
+  // chưa xử lý, để lần lặp sau đủ máy xét cả bữa trưa — không đóng trạng thái sớm
+  // làm mất thư của bữa trưa.
+  g = extraGate({ ...base, coverageAt: vn(MON, '08:15').toISOString() });
   assert.deepEqual([g.proceed, g.code, g.meals, g.write.status], [false, 'no_coverage', ['breakfast'], 'error']);
   assert.match(g.write.reason, /chưa chốt dữ liệu bữa trưa/);
-  // Xem trước cho chính hôm nay (--alerts-date hôm nay) thì xét các bữa đã chốt.
-  g = extraGate({ ...base, coverageAt: vn(FRI, '08:15').toISOString(), nowVn: { date: FRI, time: '09:00' }, ignoreTime: true });
+  // Ngày đã qua cũng vậy, kể cả khi chỉ xem thử.
+  g = extraGate({ ...base, date: FRI, coverageAt: vn(FRI, '08:15').toISOString(), ignoreTime: true });
+  assert.deepEqual([g.proceed, g.code], [false, 'no_coverage']);
+  // Chỉ xem thử (--alerts-date) cho chính hôm nay mới xét các bữa đã chốt.
+  g = extraGate({ ...base, coverageAt: vn(MON, '08:15').toISOString(), nowVn: { date: MON, time: '09:00' }, ignoreTime: true });
   assert.deepEqual([g.proceed, g.meals], [true, ['breakfast']]);
   // --alerts-date vào ngày nghỉ (chỉ xem thử).
   g = extraGate({ ...base, date: '2026-11-07', ignoreTime: true });
   assert.deepEqual([g.code, g.write.status], ['off_day', 'off_day']);
 });
 
-test('ngày bị chốt an toàn của thư thiếu chấm treo lại (held): không gửi thư chấm chưa đăng ký, xong hẳn', () => {
-  const base = { date: FRI, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(FRI, '13:45').toISOString() };
+test('ngày bị chốt an toàn của thư thiếu chấm treo lại (held): chưa gửi thư chấm chưa đăng ký, lần lặp sau thử lại', () => {
+  const base = { date: MON, now: NOW, nowVn, notBefore: '13:40', offDays: [], coverageAt: vn(MON, '13:45').toISOString() };
   const g = extraGate({ ...base, held: true, existing: { status: 'error', sent: 0 } });
-  assert.deepEqual([g.proceed, g.code, g.write.status], [false, 'held', 'guarded']);
-  assert.match(g.write.reason, /chưa kết luận ngày này/);
-  assert.equal(isTerminalExtraStatus(g.write.status), true, 'lần sau không xét lại, không báo quản trị lại');
+  assert.deepEqual([g.proceed, g.code, g.write.status], [false, 'held', 'error']);
+  assert.match(g.write.reason, /chưa kết luận ngày này.*thử lại ở lần chạy sau/);
+  assert.equal(isTerminalExtraStatus(g.write.status), false, 'dữ liệu bình thường lại trong ngày thì lần lặp sau gửi');
+  assert.equal(extraGate({ ...base, existing: g.write }).proceed, true, 'cờ held đã gỡ');
   // Chưa tới giờ thì chưa làm gì; đã xong thì không ghi đè.
   assert.equal(extraGate({ ...base, held: true, nowVn: { date: MON, time: '09:00' } }).write, null);
   assert.equal(extraGate({ ...base, held: true, existing: { status: 'sent' } }).code, 'done');

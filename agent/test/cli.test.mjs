@@ -86,7 +86,7 @@ test('readAlertsConfig: kiểm tra endpoint, ngưỡng, email quản trị; khô
 
 test('script đồng bộ: đúng bản, firebase-admin chỉ nạp muộn, lib không đụng tới Firebase', () => {
   const src = readFileSync(join(AGENT, 'sync-checkins.mjs'), 'utf8');
-  assert.match(src, /const AGENT_VERSION = '2026-11-06\.1';/);
+  assert.match(src, /const AGENT_VERSION = '2026-11-09\.1';/);
   assert.doesNotMatch(src, /^\s*import\s[^;]*['"]firebase-admin['"]/m, 'không import tĩnh firebase-admin');
   assert.match(src, /await import\('firebase-admin'\)/);
   // Pha cảnh báo chỉ chạy sau khi xong mọi việc với thiết bị.
